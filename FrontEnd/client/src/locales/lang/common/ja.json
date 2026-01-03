@@ -1,0 +1,12 @@
+{
+  "login": {
+    "title": "おかえりなさい", 
+    "subtitle": "試験にアクセスするために情報を入力してください",
+    "email": "メール",
+    "email_placeholder": "メールを入力してください",
+    "password": "パスワード",
+    "password_placeholder": "パスワードを入力してください",
+    "submit": "ログイン", 
+    "forgot_password": "パスワードを忘れましたか？"
+  }
+}

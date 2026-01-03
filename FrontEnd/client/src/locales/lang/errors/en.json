@@ -1,0 +1,5 @@
+{
+  "required": "This field is required",
+  "unauthorized": "You are not authorized",
+  "server_error": "Server error, try again later"
+}

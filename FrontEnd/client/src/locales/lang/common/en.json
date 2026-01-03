@@ -1,0 +1,12 @@
+{
+  "login": {
+    "title": "Welcome Back",
+    "subtitle": "Please enter your details to access your exam",
+    "email": "Email",
+    "email_placeholder": "Enter your email",
+    "password": "Password",
+    "password_placeholder": "Enter your password",
+    "submit": "Log in",
+    "forgot_password": "Forgot Password?"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "login": {
+    "title": "Chào mừng quay lại",
+    "subtitle": "Vui lòng nhập thông tin để truy cập kỳ thi",
+    "email": "Email",
+    "email_placeholder": "Nhập email",
+    "password": "Mật khẩu",
+    "password_placeholder": "Nhập mật khẩu",
+    "submit": "Đăng nhập",
+    "forgot_password": "Quên mật khẩu?"
+  }
+}
