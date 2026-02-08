@@ -1,6 +1,6 @@
 import { AppShell } from '@mantine/core';
 import Sidebar from '@/components/SideBar/SideBar';
-import { NavbarNested } from '@/components/NavBar/NavBarNested';
+import { NavbarNested } from '@/components/NavBar/NavbarNested';
 import Views from '@/components/Layout/Views';
 
 const DefaultLayout = () => (
