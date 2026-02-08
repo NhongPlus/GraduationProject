@@ -8,7 +8,6 @@ export const useLanguage = () => {
   const changeLanguage = async (lang: "vi" | "en" | "ja") => {
     await i18n.changeLanguage(lang);
   };
-
   return {
     language,
     changeLanguage,

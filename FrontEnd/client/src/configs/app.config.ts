@@ -1,21 +1,23 @@
-// import { LayoutTypes } from '@/@types/layout';
+import { LayoutTypes } from '@/@types/layout';
 
-// export type AppConfig = {
-//   apiPrefix: string;
-//   authenticatedEntryPath: string;
-//   unAuthenticatedEntryPath: string;
-//   enableMock: boolean;
-//   locale: string;
-//   layoutType: LayoutTypes;
-// };
+export type AppConfig = {
+	apiPrefix: string;
+	apiURL: string;
+	authenticatedEntryPath: string;
+	unAuthenticatedEntryPath: string;
+	enableMock: boolean;
+	locale: string;
+	layoutType: LayoutTypes;
+};
 
-// const appConfig: AppConfig = {
-//   layoutType: LayoutTypes.SimpleSideBar,
-//   apiPrefix: '',
-//   authenticatedEntryPath: '/dashboard',
-//   unAuthenticatedEntryPath: '/sign-in',
-//   enableMock: true,
-//   locale: 'vi',
-// };
+const appConfig: AppConfig = {
+	layoutType: LayoutTypes.SimpleSideBar,
+	apiURL: '',
+	apiPrefix: '',
+	authenticatedEntryPath: '/dashboard',
+	unAuthenticatedEntryPath: '/login',
+	enableMock: false,
+	locale: 'vi',
+};
 
-// export default appConfig;
+export default appConfig;
