@@ -5,9 +5,13 @@ import useLocale from '@/hooks/useLocale';
 
 export function Layout() {
   const { authenticated } = useAuth();
-
   useLocale();
 
+  // useMemo
+  /*
+    Theo như cơ bản thì nếu mà AppLayout thay đổi thì sẽ tính toán lại giá trị => 
+    sd useMemo => AppLayout thay đổi khi mà authenticated thay đổi
+  */
   const AppLayout = useMemo(() => {
     if (authenticated) {
       return lazy(() => import('./LayoutTypes/DefaultLayout'));
@@ -16,14 +20,16 @@ export function Layout() {
   }, [authenticated]);
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-auto flex-col h-[100vh]">
-          <LoadingScreen />
-        </div>
-      }
-    >
-      <AppLayout />
-    </Suspense>
+    <QueryClientProvider client={queryClient}>
+      <Suspense
+        fallback={
+          <div className="flex flex-auto flex-col h-[100vh]">
+            <LoadingScreen />
+          </div>
+        }
+      >
+        <AppLayout />
+      </Suspense>
+    </QueryClientProvider>
   );
 }

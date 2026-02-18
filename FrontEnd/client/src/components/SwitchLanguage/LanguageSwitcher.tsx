@@ -1,6 +1,6 @@
 import { useLanguage } from '@/hooks/useLanguage';
 import { Menu, Group, Text } from '@mantine/core';
-import ButtonBase from '../Button/ButtonBase/ButtonBase';
+import ButtonLight from '../Button/ButtonLight/ButtonLight';
 
 const LANGS = {
   en: { label: 'English', flag: '🇺🇸' },
@@ -14,9 +14,10 @@ function LanguageSwitcher() {
   return (
     <Menu shadow="md" width={200}>
       <Menu.Target>
-        <ButtonBase
+        <ButtonLight
           label={`${LANGS[language].flag} ${LANGS[language].label}`}
-        />
+        /> 
+        
       </Menu.Target>
 
       <Menu.Dropdown>

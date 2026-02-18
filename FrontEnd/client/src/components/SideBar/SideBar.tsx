@@ -7,7 +7,6 @@ import {
   Anchor
 } from '@mantine/core';
 import styles from './SideBar.module.scss';
-import ButtonBase, { SecondaryButton } from '../Button/ButtonBase/ButtonBase';
 import icon from '@/assets/logo/logo.svg'
 import LanguageSwitcher from '../SwitchLanguage/LanguageSwitcher';
 
