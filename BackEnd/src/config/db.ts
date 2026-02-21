@@ -1,15 +1,10 @@
-import mongoose from 'mongoose';
+import pkg from 'pg'
+const { Pool } = pkg
 
-const connectDB = async () => {
-  try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ ';
-    await mongoose.connect(mongoURI);
-    
-    console.log(`📍 Database: ${mongoose.connection.name}`);
-  } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1);
-  }
-};
-
-export default connectDB;
+export const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'learnDatabase',
+  password: 'nhongplus',
+  port: 5432,
+})
