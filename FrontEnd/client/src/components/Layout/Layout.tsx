@@ -20,7 +20,6 @@ export function Layout() {
   }, [authenticated]);
 
   return (
-    <QueryClientProvider client={queryClient}>
       <Suspense
         fallback={
           <div className="flex flex-auto flex-col h-[100vh]">
@@ -30,6 +29,5 @@ export function Layout() {
       >
         <AppLayout />
       </Suspense>
-    </QueryClientProvider>
   );
 }

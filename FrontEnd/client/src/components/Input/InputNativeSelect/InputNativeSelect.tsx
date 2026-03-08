@@ -8,32 +8,54 @@ import {
 } from "@mantine/core";
 import { IconX } from "@tabler/icons-react";
 import { useState, type ReactNode } from "react";
+import style from "./InputNativeSelect.module.scss";
 
-interface NativeSelectProps extends InputBaseProps {
+interface NativeSelectProps
+  extends Omit<InputBaseProps, "onChange"> {
   data: string[];
+
+  value?: string | null;
+  onChange?: (value: string | null) => void;
+
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+
   placeholder?: string;
   error?: string;
+
   fullWidth?: boolean;
   clear?: boolean;
 }
 
 const NativeSelect = ({
   data,
+
+  value,
+  onChange,
+
   leftIcon,
   rightIcon,
+
   placeholder = "Pick value",
   clear,
   fullWidth,
   error,
+
   ...props
 }: NativeSelectProps) => {
   const combobox = useCombobox({
     onDropdownClose: () => combobox.resetSelectedOption(),
   });
 
-  const [value, setValue] = useState<string | null>(null);
+  const [internalValue, setInternalValue] = useState<string | null>(null);
+
+  const selectedValue =
+    value !== undefined ? value : internalValue;
+
+  const setValue = (val: string | null) => {
+    if (onChange) onChange(val);
+    if (value === undefined) setInternalValue(val);
+  };
 
   const options = data.map((item) => (
     <Combobox.Option value={item} key={item}>
@@ -42,7 +64,7 @@ const NativeSelect = ({
   ));
 
   const remove =
-    clear && value ? (
+    clear && selectedValue ? (
       <ActionIcon
         size="sm"
         variant="subtle"
@@ -52,9 +74,15 @@ const NativeSelect = ({
           setValue(null);
         }}
       >
-        <IconX size={14} color={error ? 'var(--mantine-color-red-6)' : 'var(--mantine-color-gray-6)'}
- />
-      </ActionIcon >
+        <IconX
+          size={14}
+          color={
+            error
+              ? "var(--mantine-color-error-6)"
+              : "var(--mantine-color-gray-6)"
+          }
+        />
+      </ActionIcon>
     ) : (
       rightIcon || <Combobox.Chevron />
     );
@@ -63,32 +91,42 @@ const NativeSelect = ({
     <Combobox
       store={combobox}
       withinPortal={false}
-      width={fullWidth == true ? '100%' : undefined}
+      width={fullWidth ? "100%" : undefined}
       onOptionSubmit={(val) => {
         setValue(val);
         combobox.closeDropdown();
       }}
     >
-      <Combobox.Target  >
+      <Combobox.Target>
         <InputBase
           component="button"
           type="button"
-          radius={'md'}
-          error={error}
+          radius="md"
           pointer
-          w={fullWidth == true ? '100%' : undefined}
+          error={error}
+          w={fullWidth ? "100%" : undefined}
           leftSection={leftIcon}
-          rightSectionPointerEvents="auto"
           rightSection={remove}
+          rightSectionPointerEvents="auto"
           onClick={() => combobox.toggleDropdown()}
+          classNames={{
+            input: style.inputField,
+            section: style.sectionField,
+          }}
           {...props}
         >
-          {value || <Input.Placeholder>{placeholder}</Input.Placeholder>}
+          {selectedValue || (
+            <Input.Placeholder>
+              {placeholder}
+            </Input.Placeholder>
+          )}
         </InputBase>
       </Combobox.Target>
 
       <Combobox.Dropdown>
-        <Combobox.Options >{options}</Combobox.Options>
+        <Combobox.Options>
+          {options}
+        </Combobox.Options>
       </Combobox.Dropdown>
     </Combobox>
   );

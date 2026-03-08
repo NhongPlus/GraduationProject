@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import InputNumber from "./InputNumber";
-import { IconCoin } from "@tabler/icons-react";
+import InputPassword from "./InputPassword";
+import { IconLock } from "@tabler/icons-react";
 
-const meta: Meta<typeof InputNumber> = {
-  title: "Input/Number",
-  component: InputNumber,
+const meta: Meta<typeof InputPassword> = {
+  title: "Input/Password",
+  component: InputPassword,
   args: {
-    label: "Amount",
-    placeholder: "Enter amount",
+    label: "Password",
+    placeholder: "Enter password",
     fullWidth: true,
   },
   decorators: [(Story) => <div style={{ width: 320 }}><Story /></div>],
@@ -15,25 +15,25 @@ const meta: Meta<typeof InputNumber> = {
 
 export default meta;
 
-type Story = StoryObj<typeof InputNumber>;
+type Story = StoryObj<typeof InputPassword>;
 
 export const Primary: Story = {};
 
 export const WithIcon: Story = {
   args: {
-    leftIcon: <IconCoin size={16} />,
+    leftIcon: <IconLock size={16} />,
   },
 };
 
 export const Error: Story = {
   args: {
-    error: "Invalid amount",
+    error: "Password is incorrect",
   },
 };
 
 export const Disabled: Story = {
   args: {
     disabled: true,
-    value: 100,
+    value: "12345678",
   },
 };
