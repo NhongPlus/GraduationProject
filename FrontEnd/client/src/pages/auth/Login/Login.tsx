@@ -8,13 +8,15 @@ import {
   Title,
   Box,
   Anchor,
+  Button,
+  TextInput,
+  PasswordInput,
 } from "@mantine/core";
 import { Carousel } from "@mantine/carousel";
 import image from "@/assets/img/login.jpg"; // đảm bảo đường dẫn đúng
 import classes from './Login.module.scss';
 
-import { IconLock } from '@tabler/icons-react';
-import InputBase from "@/components/Input/InputBase/InputBase";
+
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import demoAccounts from "@/mock/accounts";
@@ -32,7 +34,11 @@ function Login() {
     );
     if (found) {
       localStorage.setItem("access_token", "demo-token");
-      window.location.reload();
+      localStorage.setItem("user_role", found.role || "user");
+      localStorage.setItem("user_name", found.name || found.username);
+      localStorage.setItem("user_email", `${found.username}@example.com`);
+      window.dispatchEvent(new Event('auth-change'));
+      window.location.href = "/dashboard";
     } else {
       setError("Sai tài khoản hoặc mật khẩu!");
     }
@@ -59,25 +65,34 @@ function Login() {
                 <Text>{t("login.subtitle")}</Text>
               </Flex>
               <Flex gap={12} direction={"column"} mb={24}>
-                <InputBase
+                <TextInput
                   label={t("login.email")}
                   placeholder={t("login.email_placeholder")}
                   value={username}
-                  onChange={(e: any) => setUsername(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+                  required
                 />
-                <InputBase
-                  inputType="password"
+                <PasswordInput
                   label={t("login.password")}
                   placeholder={t("login.password_placeholder")}
                   value={password}
-                  onChange={(e: any) => setPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                  required
                 />
               </Flex>
               {error && (
                 <Text color="red" size="sm" mb={8}>{error}</Text>
               )}
-          
-              <Anchor underline="never">
+
+              <Button
+                mt={12}
+                fullWidth
+                onClick={handleLogin}
+              >
+                {t('login.button') || 'Đăng nhập'}
+              </Button>
+
+              <Anchor underline="never" style={{ marginTop: 12, display: 'inline-block' }}>
                 {t("login.forgot_password")}
               </Anchor>
             </Box>

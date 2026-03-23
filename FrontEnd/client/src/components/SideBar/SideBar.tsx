@@ -9,8 +9,12 @@ import {
 import styles from './SideBar.module.scss';
 import icon from '@/assets/logo/logo.svg'
 import LanguageSwitcher from '../SwitchLanguage/LanguageSwitcher';
+import ButtonFilled from '../Button/ButtonFilled/ButtonFilled';
+import useAuth from '@/hooks/useAuth';
 
 export default function SideBar() {
+  const { authenticated } = useAuth();
+
   return (
     <Box className={styles.wrapper}>
       <Flex justify={'space-between'} align={'center'}>
@@ -27,8 +31,7 @@ export default function SideBar() {
         </Anchor>
         <Group>
           <LanguageSwitcher/>
-          <SecondaryButton label={'Contact Support'} color='#0D141B' />
-          <ButtonBase label={'Sign up'} />
+          {!authenticated && <ButtonFilled label={'Sign up'} disabled={false} />}
         </Group>
       </Flex>
     </Box>

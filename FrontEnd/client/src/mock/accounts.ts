@@ -6,7 +6,18 @@ export const demoAccounts = [
     role: 'admin',
     name: 'Administrator',
   },
-  // Thêm các account khác nếu cần
+  {
+    username: 'student1',
+    password: 'student1',
+    role: 'student',
+    name: 'Nguyễn Văn A',
+  },
+  {
+    username: 'student2',
+    password: 'student2',
+    role: 'student',
+    name: 'Trần Thị B',
+  },
 ];
 
 export default demoAccounts;

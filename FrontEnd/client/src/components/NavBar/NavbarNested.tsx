@@ -1,11 +1,9 @@
 import {
-    IconAdjustments,
     IconCalendarStats,
     IconFileAnalytics,
     IconGauge,
     IconLock,
     IconNotes,
-    IconPresentationAnalytics,
     IconChevronRight,
 } from '@tabler/icons-react';
 import {
@@ -19,6 +17,8 @@ import {
     Stack,
 } from '@mantine/core';
 import { useState, type ComponentType } from 'react';
+import { useNavigate } from 'react-router-dom';
+import useAuth from '@/hooks/useAuth';
 import classes from './NavbarNested.module.css';
 
 /* ================== LinksGroup ================== */
@@ -77,18 +77,23 @@ function LinksGroup({ label, icon: Icon, links, initiallyOpened = false }: Links
 }
 
 /* ================== UserButton ================== */
+
 function UserButton() {
+    const navigate = useNavigate();
+    const name = localStorage.getItem('user_name') || 'NhongPlus';
+    const email = localStorage.getItem('user_email') || 'frontend@dev.com';
+
     return (
-        <UnstyledButton className={classes.user}>
+        <UnstyledButton className={classes.user} onClick={() => navigate('/profile')}>
             <Group>
                 <Avatar radius="xl" />
 
                 <Box style={{ flex: 1 }}>
                     <Text size="sm" fw={500}>
-                        NhongPlus
+                        {name}
                     </Text>
                     <Text c="dimmed" size="xs">
-                        frontend@dev.com
+                        {email}
                     </Text>
                 </Box>
             </Group>
@@ -97,31 +102,44 @@ function UserButton() {
 }
 
 /* ================== DATA ================== */
-const mockdata = [
+const adminNav = [
     { label: 'Dashboard', icon: IconGauge },
     {
-        label: 'Market news',
-        icon: IconNotes,
+        label: 'Bài thi',
+        icon: IconFileAnalytics,
         initiallyOpened: true,
         links: [
-            { label: 'Overview', link: '/' },
-            { label: 'Forecasts', link: '/' },
-            { label: 'Outlook', link: '/' },
-            { label: 'Real time', link: '/' },
+            { label: 'Danh sách bài thi', link: '/exams' },
+            { label: 'Dự đoán điểm', link: '/prediction' },
         ],
     },
     {
-        label: 'Releases',
+        label: 'Quản lý sinh viên',
         icon: IconCalendarStats,
         links: [
-            { label: 'Upcoming releases', link: '/' },
-            { label: 'Previous releases', link: '/' },
-            { label: 'Releases schedule', link: '/' },
+            { label: 'Danh sách sinh viên', link: '/admin/students' },
         ],
     },
-    { label: 'Analytics', icon: IconPresentationAnalytics },
-    { label: 'Contracts', icon: IconFileAnalytics },
-    { label: 'Settings', icon: IconAdjustments },
+];
+
+const studentNav = [
+    { label: 'Dashboard', icon: IconGauge },
+    {
+        label: 'Bài thi',
+        icon: IconFileAnalytics,
+        initiallyOpened: true,
+        links: [
+            { label: 'Danh sách bài thi', link: '/exams' },
+            { label: 'Dự đoán điểm', link: '/prediction' },
+        ],
+    },
+    {
+        label: 'Sinh viên',
+        icon: IconNotes,
+        links: [
+            { label: 'Kết quả của tôi', link: '/my-results' },
+        ],
+    },
     {
         label: 'Security',
         icon: IconLock,
@@ -135,11 +153,17 @@ const mockdata = [
 
 /* ================== Navbar ================== */
 export function NavbarNested() {
+    const { userAuthority } = useAuth();
+    const isAdmin = userAuthority.includes('admin');
+    const isClient = userAuthority.includes('user');
+
+    const links = isAdmin ? adminNav : isClient ? studentNav : [{ label: 'Dashboard', icon: IconGauge }];
+
     return (
         <nav className={classes.navbar}>
             <ScrollArea className={classes.links}>
                 <div className={classes.linksInner}>
-                    {mockdata.map((item) => (
+                    {links.map((item) => (
                         <LinksGroup key={item.label} {...item} />
                     ))}
                 </div>
