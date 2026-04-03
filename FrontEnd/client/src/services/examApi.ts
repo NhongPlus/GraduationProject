@@ -1,118 +1,140 @@
-type Exam = {
+import apiClient from './apiClient';
+
+export interface Exam {
   id: string;
   title: string;
-  subject: string;
-  duration: number;
-  status: 'Chưa làm' | 'Đã làm';
-};
+  description: string | null;
+  class_id: string;
+  created_by: string;
+  duration_min: number;
+  created_at: string;
+  subject_name?: string;
+  class_semester?: string;
+  class_year?: number;
+  creator_name?: string | null;
+}
 
-type Question = {
-  id: number;
-  question: string;
-  options: string[];
-  answer: number;
-};
+export interface Question {
+  id: string;
+  exam_id: string;
+  content: string;
+  options: Record<string, string>;
+  points: number;
+  created_at: string;
+  correct_answer?: string | string[];
+}
 
-type Result = {
-  examId: string;
-  total: number;
-  correct: number;
-  percentage: number;
-  takenAt: string;
-};
+export interface ExamSession {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: 'active' | 'submitted' | 'expired';
+}
 
-const exams: Exam[] = [
-  { id: 'exam-1', title: 'Toán đại số', subject: 'Toán', duration: 30, status: 'Chưa làm' },
-  { id: 'exam-2', title: 'Lập trình web', subject: 'Tin học', duration: 40, status: 'Chưa làm' },
-  { id: 'exam-3', title: 'Tiếng Anh cơ bản', subject: 'Ngoại ngữ', duration: 35, status: 'Đã làm' },
-];
-
-const questionBank: Record<string, Question[]> = {
-  'exam-1': [
-    { id: 1, question: '2 + 2 = ?', options: ['3', '4', '5', '6'], answer: 1 },
-    { id: 2, question: '5 - 2 = ?', options: ['1', '2', '3', '4'], answer: 2 },
-  ],
-  'exam-2': [
-    { id: 1, question: 'HTML là viết tắt của?', options: ['Web', 'Website', 'HyperText Markup Language', 'Hosting'], answer: 2 },
-    { id: 2, question: 'React là thư viện của?', options: ['Google', 'Apple', 'Facebook', 'Microsoft'], answer: 2 },
-  ],
-  'exam-3': [
-    { id: 1, question: 'How do you say "Xin chào" in English?', options: ['Goodbye', 'Hello', 'Thanks', 'Sorry'], answer: 1 },
-    { id: 2, question: 'What is the opposite of "hot"?', options: ['Cold', 'Warm', 'Big', 'Fast'], answer: 0 },
-  ],
-};
-
-const RESULT_STORAGE_KEY = 'mock_exam_results';
-
-const getPersistentResults = (): Record<string, Result> => {
-  try {
-    const raw = localStorage.getItem(RESULT_STORAGE_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-};
-
-const setPersistentResults = (results: Record<string, Result>) => {
-  localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
-};
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export interface SubmitResult {
+  session: ExamSession;
+  score: number;
+  total_points: number;
+  correct_count: number;
+  total_questions: number;
+  details: Array<{
+    question_id: string;
+    submitted: string | string[] | null;
+    correct: string | string[];
+    is_correct: boolean;
+    points_earned: number;
+  }>;
+}
 
 const examApi = {
-  getExams: async (): Promise<Exam[]> => {
-    await delay(200);
-    const history = getPersistentResults();
-    return exams.map((exam) => ({
-      ...exam,
-      status: history[exam.id] ? 'Đã làm' : 'Chưa làm',
-    }));
+  // --- Exams ---
+  getExams: async (classId?: string): Promise<Exam[]> => {
+    const params = classId ? { class_id: classId } : {};
+    const res = await apiClient.get<{ success: boolean; data: Exam[] }>('/exams', { params });
+    return res.data.data;
   },
 
-  getExamQuestions: async (examId: string): Promise<Question[]> => {
-    await delay(200);
-    return questionBank[examId] || [];
+  getExam: async (id: string): Promise<Exam> => {
+    const res = await apiClient.get<{ success: boolean; data: Exam }>(`/exams/${id}`);
+    return res.data.data;
   },
 
-  submitExam: async (examId: string, answers: Record<number, number>): Promise<Result> => {
-    await delay(300);
-    const questions = questionBank[examId] || [];
-    const correct = questions.reduce((acc, q) => (answers[q.id] === q.answer ? acc + 1 : acc), 0);
-    const result: Result = {
-      examId,
-      total: questions.length,
-      correct,
-      percentage: Math.round((correct / Math.max(questions.length, 1)) * 100),
-      takenAt: new Date().toISOString(),
-    };
-
-    const results = getPersistentResults();
-    results[examId] = result;
-    setPersistentResults(results);
-
-    return result;
+  createExam: async (payload: {
+    title: string;
+    class_id: string;
+    duration_min: number;
+    description?: string;
+  }): Promise<Exam> => {
+    const res = await apiClient.post<{ success: boolean; data: Exam }>('/exams', payload);
+    return res.data.data;
   },
 
-  getExamResult: async (examId: string): Promise<Result | null> => {
-    await delay(200);
-    const results = getPersistentResults();
-    return results[examId] || null;
+  deleteExam: async (id: string): Promise<void> => {
+    await apiClient.delete(`/exams/${id}`);
   },
 
-  getAllResults: async (): Promise<Result[]> => {
-    await delay(200);
-    const results = getPersistentResults();
-    return Object.values(results);
+  // --- Questions ---
+  getQuestions: async (examId: string): Promise<Question[]> => {
+    const res = await apiClient.get<{ success: boolean; data: Question[] }>(
+      `/exams/${examId}/questions`
+    );
+    return res.data.data;
   },
 
-  getPrediction: async (): Promise<number> => {
-    await delay(200);
-    const pastGrades = [85, 78, 80, 74];
-    const avg = pastGrades.reduce((sum, val) => sum + val, 0) / pastGrades.length;
-    return Math.min(100, Math.round(avg * 0.95 + 5));
+  addQuestion: async (
+    examId: string,
+    payload: {
+      content: string;
+      options: Record<string, string>;
+      correct_answer: string | string[];
+      points: number;
+    }
+  ): Promise<Question> => {
+    const res = await apiClient.post<{ success: boolean; data: Question }>(
+      `/exams/${examId}/questions`,
+      payload
+    );
+    return res.data.data;
+  },
+
+  deleteQuestion: async (examId: string, questionId: string): Promise<void> => {
+    await apiClient.delete(`/exams/${examId}/questions/${questionId}`);
+  },
+
+  // --- Sessions ---
+  startSession: async (examId: string): Promise<ExamSession> => {
+    const res = await apiClient.post<{ success: boolean; data: ExamSession }>(
+      `/exams/${examId}/sessions`
+    );
+    return res.data.data;
+  },
+
+  submitSession: async (
+    sessionId: string,
+    answers: Record<string, string | string[]>
+  ): Promise<SubmitResult> => {
+    const res = await apiClient.post<{ success: boolean; data: SubmitResult }>(
+      `/exams/sessions/${sessionId}/submit`,
+      { answers }
+    );
+    return res.data.data;
+  },
+
+  getMySessions: async (): Promise<ExamSession[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
+      '/exams/sessions/me'
+    );
+    return res.data.data;
+  },
+
+  getExamSessions: async (examId: string): Promise<ExamSession[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
+      `/exams/${examId}/sessions`
+    );
+    return res.data.data;
   },
 };
 
-export type { Exam, Question, Result };
 export default examApi;

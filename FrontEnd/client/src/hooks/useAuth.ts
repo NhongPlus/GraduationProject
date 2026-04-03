@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 const ACCESS_TOKEN_KEY = 'access_token';
 const USER_ROLE_KEY = 'user_role';
 
+// DB dùng 'teacher', admin/teacher → quyền admin trong FE
 const resolveRole = (): 'admin' | 'user' => {
   const role = localStorage.getItem(USER_ROLE_KEY);
   if (role === 'admin' || role === 'teacher') return 'admin';
@@ -10,7 +11,9 @@ const resolveRole = (): 'admin' | 'user' => {
 };
 
 const useAuth = () => {
-  const [authenticated, setAuthenticated] = useState(() => Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
+  const [authenticated, setAuthenticated] = useState(
+    () => Boolean(localStorage.getItem(ACCESS_TOKEN_KEY))
+  );
   const [userRole, setUserRole] = useState<'admin' | 'user'>(resolveRole);
 
   useEffect(() => {
@@ -20,14 +23,11 @@ const useAuth = () => {
     };
 
     window.addEventListener('storage', refresh);
-
-    // Tiền xử lý cho những hành động cùng tab (dispatch thủ công)
-    const custom = () => refresh();
-    window.addEventListener('auth-change', custom as EventListener);
+    window.addEventListener('auth-change', refresh as EventListener);
 
     return () => {
       window.removeEventListener('storage', refresh);
-      window.removeEventListener('auth-change', custom as EventListener);
+      window.removeEventListener('auth-change', refresh as EventListener);
     };
   }, []);
 

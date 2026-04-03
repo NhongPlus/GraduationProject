@@ -1,25 +1,51 @@
 import { Request, Response, NextFunction } from "express";
-import { createUser, getUsers } from "~/services/user.service";
+import {
+  getUsers,
+  getUserDetail,
+  createUserService,
+  updateUserService,
+  deleteUserService,
+} from "~/services/user.service";
 
 export const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await getUsers();
     res.json({ success: true, data: users });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
+};
+
+export const getUserController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await getUserDetail(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+    res.json({ success: true, data: user });
+  } catch (err) { next(err); }
 };
 
 export const createUserController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, role } = req.body;
-    if (!email || !password || !role) {
-      return res.status(400).json({ success: false, message: "email/password/role required" });
+    const { email, username, password, role, full_name } = req.body;
+    if (!email || !username || !password || !role) {
+      return res.status(400).json({ success: false, message: "email/username/password/role là bắt buộc" });
     }
-
-    const user = await createUser(email, password, role);
+    const user = await createUserService(email, username, password, role, full_name);
     res.status(201).json({ success: true, data: user });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
+};
+
+export const updateUserController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { full_name, is_active, role } = req.body;
+    const user = await updateUserService(req.params.id, { full_name, is_active, role });
+    if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+    res.json({ success: true, data: user });
+  } catch (err) { next(err); }
+};
+
+export const deleteUserController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const ok = await deleteUserService(req.params.id);
+    if (!ok) return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+    res.json({ success: true, message: "Đã xóa người dùng" });
+  } catch (err) { next(err); }
 };

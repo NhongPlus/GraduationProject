@@ -1,12 +1,18 @@
 import express from "express";
 import exitHook from "async-exit-hook";
-
+import cors from "cors";
 import { connectDB, closeDB } from "./config/db";
 import { env } from "./config/enviroment";
-import  RouterV1  from "./routes/v1/index";
+import RouterV1 from "./routes/v1/index";
 import { errorHandler } from "~/middlewares/error.middleware";
 const START_SERVER = () => {
   const app = express();
+  app.use(
+    cors({
+      origin: "http://localhost:5173",
+      credentials: true,
+    }),
+  );
   app.use(express.json());
 
   app.use("/v1", RouterV1);
@@ -16,13 +22,11 @@ const START_SERVER = () => {
     res.json({ success: true, message: "API is running" });
   });
 
-  // Global error handler (uniform response)
-  
   app.use(errorHandler);
 
   const server = app.listen(env.APP_PORT, () => {
     console.log(
-      `Hi ${env.AUTHOR}, Back-end Server running at http://${env.APP_HOST}:${env.APP_PORT}`
+      `Hi ${env.AUTHOR}, Back-end Server running at http://${env.APP_HOST}:${env.APP_PORT}`,
     );
   });
 

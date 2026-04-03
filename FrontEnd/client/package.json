@@ -22,6 +22,7 @@
     "@reduxjs/toolkit": "^2.7.0",
     "@tabler/icons-react": "^3.36.1",
     "@tanstack/react-query-devtools": "4",
+    "axios": "^1.13.6",
     "dayjs": "^1.11.19",
     "embla-carousel": "^8.5.2",
     "embla-carousel-react": "^8.5.2",

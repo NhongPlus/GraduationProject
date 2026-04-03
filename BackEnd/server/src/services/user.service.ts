@@ -1,19 +1,53 @@
 import bcrypt from "bcrypt";
-import { getUserByEmail, createUser as createUserModel, getAllUsers, User } from "~/models/user.model";
+import {
+  getAllUsers,
+  getUserById,
+  getUserByEmail,
+  getUserByUsername,
+  createUser,
+  updateUser,
+  deleteUser,
+  User,
+  PublicUser,
+} from "~/models/user.model";
 
-export const getUsers = async (): Promise<Partial<User>[]> => {
-  const users = await getAllUsers();
-  return users.map((u) => ({ id: u.id, email: u.email, role: u.role, created_at: u.created_at }));
+export const getUsers = async (): Promise<PublicUser[]> => {
+  return getAllUsers();
 };
 
-export const createUser = async (email: string, password: string, role: User["role"]): Promise<Partial<User>> => {
-  const existing = await getUserByEmail(email);
-  if (existing) {
-    throw new Error("Email đã tồn tại");
-  }
+export const getUserDetail = async (id: string): Promise<PublicUser | null> => {
+  const user = await getUserById(id);
+  if (!user) return null;
+  const { hashed_password, ...publicUser } = user;
+  return publicUser;
+};
 
-  const hashedPassword = await bcrypt.hash(password, 12);
-  const result = await createUserModel(email, hashedPassword, role);
+export const createUserService = async (
+  email: string,
+  username: string,
+  password: string,
+  role: User["role"],
+  fullName?: string
+): Promise<PublicUser> => {
+  if (await getUserByEmail(email)) throw new Error("Email đã tồn tại");
+  if (await getUserByUsername(username)) throw new Error("Username đã tồn tại");
 
-  return { id: result.id, email: result.email, role: result.role, created_at: result.created_at };
+  const hashed = await bcrypt.hash(password, 12);
+  const user = await createUser(email, username, hashed, role, fullName);
+  const { hashed_password, ...publicUser } = user;
+  return publicUser;
+};
+
+export const updateUserService = async (
+  id: string,
+  fields: Partial<Pick<User, "full_name" | "is_active" | "role">>
+): Promise<PublicUser | null> => {
+  const user = await updateUser(id, fields);
+  if (!user) return null;
+  const { hashed_password, ...publicUser } = user;
+  return publicUser;
+};
+
+export const deleteUserService = async (id: string): Promise<boolean> => {
+  return deleteUser(id);
 };
