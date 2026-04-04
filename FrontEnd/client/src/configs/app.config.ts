@@ -12,7 +12,7 @@ export type AppConfig = {
 
 const appConfig: AppConfig = {
   layoutType: LayoutTypes.SimpleSideBar,
-  apiURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  apiURL: import.meta.env.VITE_API_URL || 'https://api.nhongplus.id.vn',
   apiPrefix: '/v1',
   authenticatedEntryPath: '/dashboard',
   unAuthenticatedEntryPath: '/login',
