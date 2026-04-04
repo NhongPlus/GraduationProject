@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Title, Table, Loader, Text, Button } from '@mantine/core';
+import { Box, Title, Table, Loader, Text } from '@mantine/core';
 import examApi from '@/services/examApi';
 import type { Result } from '@/services/examApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const MyResults = () => {
   const [results, setResults] = useState<Result[]>([]);
@@ -67,9 +68,7 @@ const MyResults = () => {
               <td>{item.percentage}%</td>
               <td>{new Date(item.takenAt).toLocaleString()}</td>
               <td>
-                <Button size="xs" onClick={() => navigate(`/result/${item.examId}`)}>
-                  Xem
-                </Button>
+                <ButtonFilled size="xs" label="Xem" disabled={false} onClick={() => navigate(`/result/${item.examId}`)} />
               </td>
             </tr>
           ))}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Box, Title, Text, Progress, Table, Button, Loader } from '@mantine/core';
+import { Box, Title, Text, Progress, Table, Loader } from '@mantine/core';
 import examApi from '@/services/examApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const pastGrades = [
   { subject: 'Toán', score: 85 },
@@ -74,9 +75,14 @@ const Prediction = () => {
         <Progress value={prediction} mt="xs" />
       </Box>
 
-      <Button mt="lg" onClick={() => window.location.href = '/dashboard'}>
-        Quay lại Dashboard
-      </Button>
+      <ButtonFilled
+        style={{ marginTop: 24 }}
+        label="Quay lại Dashboard"
+        disabled={false}
+        onClick={() => {
+          window.location.href = '/dashboard';
+        }}
+      />
     </Box>
   );
 };

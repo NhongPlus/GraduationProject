@@ -1,9 +1,10 @@
-import { Box, Title, Button, Group, Text } from '@mantine/core';
+import { Box, Title, Group, Text } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import StatsSection from '@/components/StatsSection/StatsSection';
 import UpcomingExamsTable from '@/components/UpcomingExamsTable/UpcomingExamsTable';
 import PerformanceChart from '@/components/PerformanceChart/PerformanceChart';
 import RecentResults from '@/components/RecentResults/RecentResults';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -14,9 +15,9 @@ const StudentDashboard = () => {
       <Title order={2}>Chào mừng, {userName}!</Title>
 
       <Group mt="md" mb="md">
-        <Button color="blue" onClick={() => navigate('/exams')}>Xem danh sách bài thi</Button>
-        <Button color="teal" onClick={() => navigate('/my-results')}>Xem kết quả của tôi</Button>
-        <Button color="gray" onClick={() => navigate('/prediction')}>Dự đoán điểm</Button>
+        <ButtonFilled color="blue" label="Xem danh sách bài thi" disabled={false} onClick={() => navigate('/exams')} />
+        <ButtonFilled color="teal" label="Xem kết quả của tôi" disabled={false} onClick={() => navigate('/my-results')} />
+        <ButtonFilled color="gray" label="Dự đoán điểm" disabled={false} onClick={() => navigate('/prediction')} />
       </Group>
 
       <StatsSection />

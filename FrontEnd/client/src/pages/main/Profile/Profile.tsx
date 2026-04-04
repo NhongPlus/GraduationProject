@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Title, Text, Paper, Stack, Button,
-  Tabs, TextInput, PasswordInput, Notification,
+  Box, Title, Text, Paper, Stack,
+  Tabs, Notification,
 } from '@mantine/core';
 import { clearSession } from '@/services/authApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import InputPassword from '@/components/Input/InputPassword/InputPassword';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -50,9 +52,13 @@ const Profile = () => {
               <Text><strong>Vai trò:</strong> {role}</Text>
               <Text><strong>Email:</strong> {email}</Text>
             </Stack>
-            <Button mt="md" color="red" onClick={handleLogout}>
-              Đăng xuất
-            </Button>
+            <ButtonFilled
+              style={{ marginTop: 16 }}
+              color="red"
+              label="Đăng xuất"
+              disabled={false}
+              onClick={handleLogout}
+            />
           </Paper>
         </Tabs.Panel>
 
@@ -65,22 +71,25 @@ const Profile = () => {
                 </Notification>
               )}
               <Title order={4}>Đổi mật khẩu</Title>
-              <PasswordInput
+              <InputPassword
                 label="Mật khẩu hiện tại"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+                fullWidth
               />
-              <PasswordInput
+              <InputPassword
                 label="Mật khẩu mới"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.currentTarget.value)}
+                fullWidth
               />
-              <PasswordInput
+              <InputPassword
                 label="Xác nhận mật khẩu mới"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+                fullWidth
               />
-              <Button onClick={handleChangePassword}>Đổi mật khẩu</Button>
+              <ButtonFilled label="Đổi mật khẩu" disabled={false} onClick={handleChangePassword} />
             </Stack>
           </Paper>
         </Tabs.Panel>

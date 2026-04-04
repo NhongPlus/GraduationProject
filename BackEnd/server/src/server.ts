@@ -1,15 +1,19 @@
 import express from "express";
+import { createServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
 import exitHook from "async-exit-hook";
 import cors from "cors";
 import { connectDB, closeDB } from "./config/db";
 import { env } from "./config/enviroment";
 import RouterV1 from "./routes/v1/index";
 import { errorHandler } from "~/middlewares/error.middleware";
+import { registerExamSocket } from "~/socket/examSocket";
+
 const START_SERVER = () => {
   const app = express();
   app.use(
     cors({
-      origin: "http://localhost:5173",
+      origin: env.CORS_ORIGINS,
       credentials: true,
     }),
   );
@@ -24,17 +28,30 @@ const START_SERVER = () => {
 
   app.use(errorHandler);
 
-  const server = app.listen(env.APP_PORT, () => {
+  const httpServer = createServer(app);
+  const io = new SocketIOServer(httpServer, {
+    cors: {
+      origin: env.CORS_ORIGINS,
+      credentials: true,
+      methods: ["GET", "POST"],
+    },
+    path: "/socket.io",
+  });
+  registerExamSocket(io);
+
+  httpServer.listen(Number(env.APP_PORT), () => {
     console.log(
-      `Hi ${env.AUTHOR}, Back-end Server running at http://${env.APP_HOST}:${env.APP_PORT}`,
+      `Hi ${env.AUTHOR}, Back-end + Socket.IO at http://${env.APP_HOST}:${env.APP_PORT} (WS path /socket.io)`,
     );
   });
 
-  // graceful shutdown
   exitHook(async () => {
     console.log("Server shutting down...");
-    server.close(); // đóng express
-    await closeDB(); // đóng postgres
+    await new Promise<void>((resolve) => {
+      io.close(() => resolve());
+    });
+    httpServer.close();
+    await closeDB();
     console.log("PostgreSQL disconnected.");
   });
 };

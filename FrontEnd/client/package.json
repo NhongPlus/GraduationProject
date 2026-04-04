@@ -37,7 +37,7 @@
     "recharts": "^3.6.0",
     "redux-persist": "^6.0.0",
     "scss": "^0.2.4",
-    "storybook-dark-mode": "^4.0.2",
+    "socket.io-client": "4.8.3",
     "tabler": "^1.0.0-alpha.8"
   },
   "devDependencies": {

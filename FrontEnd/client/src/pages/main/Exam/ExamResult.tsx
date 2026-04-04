@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Title, Text, Button, Loader, Table, Badge } from '@mantine/core';
+import { Box, Title, Text, Loader, Table, Badge } from '@mantine/core';
 import examApi from '@/services/examApi';
 import type { Result, Question } from '@/services/examApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const ExamResult = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -59,9 +60,12 @@ const ExamResult = () => {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Title order={2}>Chưa có kết quả cho bài thi này</Title>
-        <Button mt="md" onClick={() => navigate('/exams')}>
-          Quay lại danh sách bài thi
-        </Button>
+        <ButtonFilled
+          style={{ marginTop: 16 }}
+          label="Quay lại danh sách bài thi"
+          disabled={false}
+          onClick={() => navigate('/exams')}
+        />
       </Box>
     );
   }
@@ -106,9 +110,12 @@ const ExamResult = () => {
         </tbody>
       </Table>
 
-      <Button mt="md" onClick={() => navigate('/prediction')}>
-        Xem dự đoán điểm AI
-      </Button>
+      <ButtonFilled
+        style={{ marginTop: 16 }}
+        label="Xem dự đoán điểm AI"
+        disabled={false}
+        onClick={() => navigate('/prediction')}
+      />
     </Box>
   );
 };

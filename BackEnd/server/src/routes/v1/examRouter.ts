@@ -13,29 +13,39 @@ import {
   submitSessionController,
   getMySessionsController,
   getExamSessionsController,
+  getMySubmissionController,
+  getSessionGradingController,
+  gradeSessionController,
 } from "~/controllers/exam.controller";
 
 const examRouter = Router();
 
 examRouter.use(authMiddleware);
 
-// Exams
-examRouter.get("/", roleMiddleware(["admin", "lecturer", "student"]), getExamListController);
-examRouter.post("/", roleMiddleware(["admin", "lecturer"]), createExamController);
-examRouter.get("/:id", roleMiddleware(["admin", "lecturer", "student"]), getExamController);
-examRouter.delete("/:id", roleMiddleware(["admin", "lecturer"]), deleteExamController);
-
-// Questions
-examRouter.get("/:examId/questions", roleMiddleware(["admin", "lecturer", "student"]), getQuestionsController);
-examRouter.post("/:examId/questions", roleMiddleware(["admin", "lecturer"]), addQuestionController);
-examRouter.delete("/:examId/questions/:questionId", roleMiddleware(["admin", "lecturer"]), deleteQuestionController);
-
-// Sessions
-examRouter.post("/:examId/sessions", roleMiddleware(["student"]), startSessionController);
-examRouter.get("/:examId/sessions", roleMiddleware(["admin", "lecturer"]), getExamSessionsController);
-examRouter.post("/sessions/:sessionId/submit", roleMiddleware(["student"]), submitSessionController);
-
-// Student xem lịch sử thi của mình
 examRouter.get("/sessions/me", roleMiddleware(["student"]), getMySessionsController);
+examRouter.post("/sessions/:sessionId/submit", roleMiddleware(["student"]), submitSessionController);
+examRouter.get(
+  "/sessions/:sessionId/grading",
+  roleMiddleware(["admin", "teacher"]),
+  getSessionGradingController
+);
+examRouter.patch(
+  "/sessions/:sessionId/grade",
+  roleMiddleware(["admin", "teacher"]),
+  gradeSessionController
+);
+
+examRouter.get("/", roleMiddleware(["admin", "teacher", "student"]), getExamListController);
+examRouter.post("/", roleMiddleware(["admin", "teacher"]), createExamController);
+examRouter.get("/:id", roleMiddleware(["admin", "teacher", "student"]), getExamController);
+examRouter.delete("/:id", roleMiddleware(["admin", "teacher"]), deleteExamController);
+
+examRouter.get("/:examId/questions", roleMiddleware(["admin", "teacher", "student"]), getQuestionsController);
+examRouter.post("/:examId/questions", roleMiddleware(["admin", "teacher"]), addQuestionController);
+examRouter.delete("/:examId/questions/:questionId", roleMiddleware(["admin", "teacher"]), deleteQuestionController);
+
+examRouter.post("/:examId/sessions", roleMiddleware(["student"]), startSessionController);
+examRouter.get("/:examId/sessions", roleMiddleware(["admin", "teacher"]), getExamSessionsController);
+examRouter.get("/:examId/my-submission", roleMiddleware(["student"]), getMySubmissionController);
 
 export default examRouter;

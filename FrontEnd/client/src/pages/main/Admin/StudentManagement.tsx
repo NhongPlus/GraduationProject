@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Title, Table, Button, TextInput, Select, Modal, Group, Text, Loader } from '@mantine/core';
+import { Box, Title, Table, Select, Modal, Group, Text, Loader } from '@mantine/core';
 import userApi from '@/services/userApi';
 import type { UserAccount, UserRole } from '@/services/userApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import InputText from '@/components/Input/InputText/InputText';
 
 const roles = [
   { value: 'student', label: 'Sinh viên' },
@@ -68,7 +70,7 @@ const StudentManagement = () => {
       <Title order={2} mb="md">Quản lý tài khoản sinh viên</Title>
 
       <Group mb="md">
-        <Button onClick={() => setIsModalOpen(true)}>Tạo tài khoản</Button>
+        <ButtonFilled label="Tạo tài khoản" disabled={false} onClick={() => setIsModalOpen(true)} />
       </Group>
 
       {error && <Text color="red">{error}</Text>}
@@ -93,9 +95,7 @@ const StudentManagement = () => {
               <td>{u.email}</td>
               <td>{u.role}</td>
               <td>
-                <Button size="xs" color="red" onClick={() => removeUser(u.id)}>
-                  Xóa
-                </Button>
+                <ButtonFilled size="xs" color="red" label="Xóa" disabled={false} onClick={() => removeUser(u.id)} />
               </td>
             </tr>
           ))}
@@ -103,9 +103,9 @@ const StudentManagement = () => {
       </Table>
 
       <Modal opened={isModalOpen} onClose={() => setIsModalOpen(false)} title="Tạo tài khoản mới">
-        <TextInput label="Họ tên" value={name} onChange={(e) => setName(e.currentTarget.value)} mb="sm" />
-        <TextInput label="Tên đăng nhập" value={username} onChange={(e) => setUsername(e.currentTarget.value)} mb="sm" />
-        <TextInput label="Email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} mb="sm" />
+        <InputText label="Họ tên" value={name} onChange={(e) => setName(e.currentTarget.value)} mb="sm" />
+        <InputText label="Tên đăng nhập" value={username} onChange={(e) => setUsername(e.currentTarget.value)} mb="sm" />
+        <InputText label="Email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} mb="sm" />
         <Select
           label="Vai trò"
           data={roles}
@@ -113,7 +113,7 @@ const StudentManagement = () => {
           onChange={(value) => setRole(value as UserRole)}
           mb="sm"
         />
-        <Button onClick={addUser}>Lưu</Button>
+        <ButtonFilled label="Lưu" disabled={false} onClick={addUser} />
       </Modal>
     </Box>
   );

@@ -3,7 +3,10 @@
   "scripts": {
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
     "build": "tsc && tsc-alias",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "socket:smoke": "node scripts/socket-smoke.js",
+    "socket:student": "node scripts/socket-student.js",
+    "socket:proctor": "node scripts/socket-proctor.js"
   },
   "dependencies": {
     "async-exit-hook": "^2.0.1",
@@ -16,6 +19,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "pg": "^8.18.0",
+    "socket.io": "^4.8.3",
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
@@ -28,6 +32,7 @@
     "@types/node": "^25.0.3",
     "@types/pg": "^8.16.0",
     "nodemon": "^3.1.11",
+    "socket.io-client": "^4.8.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsc-alias": "^1.8.16",

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Title, RadioGroup, Radio, Button, Text, Loader, Progress, Alert } from '@mantine/core';
+import { Box, Title, RadioGroup, Text, Loader, Progress, Alert } from '@mantine/core';
 import examApi from '@/services/examApi';
 import type { Question } from '@/services/examApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import InputRadio from '@/components/Input/InputRadio/InputRadio';
 
 const localKey = (id: string) => `exam_draft_${id}`;
 
@@ -100,9 +102,12 @@ const ExamTake = () => {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Title order={2}>Không tìm thấy bài thi</Title>
-        <Button mt="md" onClick={() => navigate('/exams')}>
-          Trở về danh sách bài thi
-        </Button>
+        <ButtonFilled
+          style={{ marginTop: 16 }}
+          label="Trở về danh sách bài thi"
+          disabled={false}
+          onClick={() => navigate('/exams')}
+        />
       </Box>
     );
   }
@@ -162,19 +167,18 @@ const ExamTake = () => {
             }}
           >
             {q.options.map((option, idx) => (
-              <Radio key={idx} value={String(idx)} label={option} />
+              <InputRadio key={idx} value={String(idx)} label={option} />
             ))}
           </RadioGroup>
         </Box>
       ))}
 
-      <Button
+      <ButtonFilled
         color="green"
+        label="Nộp bài"
         onClick={handleSubmit}
         disabled={questions.some((q) => answers[q.id] === undefined)}
-      >
-        Nộp bài
-      </Button>
+      />
 
       <Alert title="Lưu nháp" color="blue" mt="md">
         Bài làm đã tự động lưu. Đăng xuất/chuyển tab vẫn giữ trạng thái.

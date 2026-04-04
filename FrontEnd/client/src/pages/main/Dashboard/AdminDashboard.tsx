@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Box, Button, Table, Title, TextInput, Flex } from '@mantine/core';
+import { Box, Table, Title, Flex } from '@mantine/core';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import InputText from '@/components/Input/InputText/InputText';
 
 type StudentRecord = { id: number; name: string; username: string; email: string };
 
@@ -28,7 +30,7 @@ const AdminDashboard = () => {
       <Box mb="xl">
         <Title order={4} mb={8}>Tạo tài khoản sinh viên</Title>
         <Flex gap="sm" align="flex-end" wrap="wrap">
-          <TextInput
+          <InputText
             label="Họ tên"
             value={newStudent.name}
             onChange={(event) => {
@@ -37,7 +39,7 @@ const AdminDashboard = () => {
             }}
             required
           />
-          <TextInput
+          <InputText
             label="Tên đăng nhập"
             value={newStudent.username}
             onChange={(event) => {
@@ -46,7 +48,7 @@ const AdminDashboard = () => {
             }}
             required
           />
-          <TextInput
+          <InputText
             label="Email"
             value={newStudent.email}
             onChange={(event) => {
@@ -54,7 +56,7 @@ const AdminDashboard = () => {
               setNewStudent((s) => ({ ...s, email }));
             }}
           />
-          <Button onClick={addStudent} color="green">Thêm sinh viên</Button>
+          <ButtonFilled label="Thêm sinh viên" disabled={false} onClick={addStudent} color="green" />
         </Flex>
       </Box>
 

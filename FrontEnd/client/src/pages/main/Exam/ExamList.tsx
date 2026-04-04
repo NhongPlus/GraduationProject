@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Title, Table, Button, Loader, Text, TextInput, Select, Stack } from '@mantine/core';
+import { Box, Title, Table, Loader, Text, Select, Stack } from '@mantine/core';
 import examApi from '@/services/examApi';
 import type { Exam } from '@/services/examApi';
+import InputText from '@/components/Input/InputText/InputText';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const ExamList = () => {
   const navigate = useNavigate();
@@ -60,7 +62,7 @@ const ExamList = () => {
       </Title>
 
       <Stack mb="md" gap="sm">
-        <TextInput
+        <InputText
           placeholder="Tìm theo tên bài thi..."
           value={searchText}
           onChange={(event) => setSearchText(event.currentTarget.value)}
@@ -98,22 +100,21 @@ const ExamList = () => {
                 <td>{item.duration}</td>
                 <td>{item.status}</td>
                 <td>
-                  <Button
+                  <ButtonFilled
                     size="xs"
                     color="blue"
+                    label="Làm bài"
+                    disabled={false}
                     onClick={() => navigate(`/exam/${item.id}`)}
-                  >
-                    Làm bài
-                  </Button>
-                  <Button
+                  />
+                  <ButtonFilled
                     size="xs"
                     style={{ marginLeft: 8 }}
                     color="gray"
+                    label="Kết quả"
                     disabled={item.status === 'Chưa làm'}
                     onClick={() => navigate(`/result/${item.id}`)}
-                  >
-                    Kết quả
-                  </Button>
+                  />
                 </td>
               </tr>
             ))
