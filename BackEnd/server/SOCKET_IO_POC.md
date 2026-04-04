@@ -17,6 +17,62 @@ POC giúp bạn **test kết nối, auth, room, broadcast** trước khi nối v
 
 ---
 
+## Checklist: làm sao để bạn bè test một phát là thấy chạy (banner xanh)
+
+Làm **đủ các bước dưới** (theo thứ tự). Bước 1 là chỗ hay thiếu nhất — trước đây `https://api.../socket.io/...` trả **HTML lỗi** thay vì handshake Socket.IO.
+
+### 1. Reverse proxy (Nginx) — bắt buộc nếu API qua domain
+
+Node đang lắng nghe (ví dụ `127.0.0.1:5000`). Thêm **riêng** `location` cho Socket.IO **trước** hoặc **cùng cấp** với block proxy API, để mọi request `/socket.io/` tới đúng process Node:
+
+```nginx
+# Thay 5000 bằng PORT thật trong .env của API
+location /socket.io/ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400;
+    proxy_buffering off;
+}
+```
+
+Sau đó: `sudo nginx -t && sudo systemctl reload nginx` (hoặc lệnh tương đương).
+
+### 2. Tự kiểm tra trước khi nhờ bạn (30 giây)
+
+Trên máy bất kỳ:
+
+```bash
+curl -sS "https://api.nhongplus.id.vn/socket.io/?EIO=4&transport=polling" | head -c 120
+```
+
+- **Ổn:** chuỗi bắt đầu kiểu `0{"sid":` (JSON handshake Socket.IO v4).  
+- **Chưa ổn:** ra HTML (`<!DOCTYPE`…) → quay lại bước 1 hoặc kiểm tra firewall / CDN chặn path.
+
+### 3. Biến môi trường API
+
+- `CORS_ORIGINS` gồm `https://nhongplus.id.vn` (và `https://www.nhongplus.id.vn` nếu FE dùng `www`).  
+- `JWT_SECRET` ổn định; deploy lại API sau khi sửa Nginx.
+
+### 4. Build & deploy frontend
+
+- Build với `VITE_API_URL=https://api.nhongplus.id.vn` (đúng HTTPS, **không** thừa `/v1`).  
+- Deploy bản build mới lên `nhongplus.id.vn`.  
+- Nếu banner vẫn đỏ nhưng bước 2 đã OK: thử build thêm `VITE_SOCKET_FORCE_POLLING=true` (một số mạng/chặn WebSocket).
+
+### 5. Việc bạn bè cần làm
+
+1. Mở `https://nhongplus.id.vn/login`  
+2. Đăng nhập tài khoản bạn cấp  
+3. Nếu thấy **Realtime: thành công** (banner xanh vài giây) → coi như **REST + Socket.IO production đều thông**.
+
+---
+
 ## Cách chạy thử nhanh (backend)
 
 1. Trong thư mục `server`: `npm run dev` (hoặc `npm run build && npm start`).

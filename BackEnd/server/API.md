@@ -7,6 +7,8 @@
 
 **Frontend production:** `https://nhongplus.id.vn` — cần khớp **CORS** / **Socket.IO** (`CORS_ORIGINS` trong `.env`, xem `src/config/enviroment.ts`).
 
+**SPA (React `BrowserRouter`):** Host tĩnh phải trả `index.html` cho mọi path kiểu `/login` (không tìm file tên `login`). Nếu không, lần đầu vào `/` rồi điều hướng trong app có thể vẫn OK, nhưng **F5 hoặc mở thẳng URL** sẽ **404**. Trong repo FE: `public/_redirects` (Netlify / Cloudflare Pages), `vercel.json` (Vercel), `public/.htaccess` (Apache); Nginx dùng `try_files $uri /index.html`.
+
 **Auth:** Các route dưới `/v1/users` và `/v1/exams` cần header `Authorization: Bearer <token>` (trừ khi ghi rõ là public).
 
 ---
