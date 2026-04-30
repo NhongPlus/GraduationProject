@@ -1,6 +1,6 @@
 # Tính Năng Đã Hoàn Thiện & Hướng Dẫn Test
 
-> Cập nhật: 2026-04-30
+> Cập nhật: 2026-04-30 · Thêm AI Prediction bằng MiniMax
 
 ---
 
@@ -59,6 +59,12 @@
 - [x] `GET /v1/board` ✅ **MỚI MOUNT**
 - [x] Word `.docx` import (mammoth)
 - [x] Email reminder scheduler cho exam deadline
+
+#### 9. AI Prediction (MiniMax)
+- [x] `POST /v1/prediction` — AI dự đoán điểm các môn tiếp theo dựa trên kết quả vừa thi
+- [x] System prompt chứa knowledge base CNTT16-02 (37 SV, 52 môn, Pearson correlations, ĐTB lớp)
+- [x] Tự động phát hiện môn phụ thuộc từ chuỗi prerequisites
+- [x] Fallback khi parse JSON lỗi
 
 ---
 
