@@ -1,0 +1,1705 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "id": "sYH4e",
+      "type": "ref",
+      "ref": "4:ITZkn",
+      "x": 80,
+      "y": 1323
+    },
+    {
+      "type": "frame",
+      "id": "y02yY",
+      "x": 0,
+      "y": 0,
+      "name": "dashboard",
+      "width": 1440,
+      "height": 900,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "CrEfl",
+          "x": 0,
+          "y": 0,
+          "name": "sidebar",
+          "width": 260,
+          "height": 900,
+          "fill": "#1E293B",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "s0Kcm0",
+              "name": "logoArea",
+              "width": 260,
+              "height": 64,
+              "gap": 12,
+              "padding": [
+                0,
+                20
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "QVTSV",
+                  "name": "logoIcon",
+                  "fill": "#0D9488",
+                  "width": 32,
+                  "height": 32
+                },
+                {
+                  "type": "text",
+                  "id": "LyL2R",
+                  "name": "logoText",
+                  "fill": "#FFFFFF",
+                  "content": "ExamPro",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ilUa9",
+              "name": "navSection",
+              "width": 260,
+              "height": 400,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": [
+                20,
+                12
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "YV7HW",
+                  "name": "navItem1",
+                  "width": 236,
+                  "height": 44,
+                  "fill": "#0D9488",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "CLb5W",
+                      "name": "navText1",
+                      "fill": "#FFFFFF",
+                      "content": "📊  Trang chủ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "kH1XV",
+                  "name": "navItem2",
+                  "width": 236,
+                  "height": 44,
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "UUW0c",
+                      "name": "navText2",
+                      "fill": "#94A3B8",
+                      "content": "📝  Bài thi",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GT7lF",
+                  "name": "navItem3",
+                  "width": 236,
+                  "height": 44,
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "WFSzX",
+                      "name": "navText3",
+                      "fill": "#94A3B8",
+                      "content": "📋  Kết quả",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "fRGjk",
+                  "name": "navItem4",
+                  "width": 236,
+                  "height": 44,
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "z2JJ4",
+                      "name": "navText4",
+                      "fill": "#94A3B8",
+                      "content": "👤  Hồ sơ",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "u0Te6m",
+              "name": "userSection",
+              "width": 236,
+              "height": 60,
+              "cornerRadius": 12,
+              "gap": 12,
+              "padding": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "liwxI",
+                  "name": "userAvatar",
+                  "fill": "#0D9488",
+                  "width": 36,
+                  "height": 36
+                },
+                {
+                  "type": "frame",
+                  "id": "wfvp5",
+                  "name": "userInfo",
+                  "width": 140,
+                  "height": 36,
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rQGht",
+                      "name": "userName",
+                      "fill": "#FFFFFF",
+                      "content": "Nguyễn Văn A",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FjX3N",
+                      "name": "userEmail",
+                      "fill": "#94A3B8",
+                      "content": "user@email.com",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VJjxH",
+          "x": 260,
+          "y": 0,
+          "name": "header",
+          "width": 1180,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#E9E9E9"
+          },
+          "children": [
+            {
+              "type": "frame",
+              "id": "kYsbN",
+              "name": "headerContent",
+              "width": 1180,
+              "height": 64,
+              "padding": [
+                0,
+                24
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "R449Bw",
+                  "name": "pageTitle",
+                  "fill": "#1E293B",
+                  "content": "Trang chủ",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "MahX0",
+                  "name": "headerRight",
+                  "width": 400,
+                  "height": 40,
+                  "gap": 12,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "z0gPf",
+                      "name": "langBtn",
+                      "width": 72,
+                      "height": 36,
+                      "fill": "#F1F5F9",
+                      "cornerRadius": 8,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "saDqr",
+                          "name": "langText",
+                          "fill": "#64748B",
+                          "content": "🌐 VI",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "u7B8pS",
+                      "name": "notifBtn",
+                      "width": 36,
+                      "height": 36,
+                      "fill": "#F1F5F9",
+                      "cornerRadius": 18,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "pBJs6",
+                          "name": "notifIcon",
+                          "content": "🔔",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xN48Z",
+                      "name": "userBtn",
+                      "width": 140,
+                      "height": 36,
+                      "fill": "#F1F5F9",
+                      "cornerRadius": 18,
+                      "gap": 10,
+                      "padding": [
+                        4,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "adJaJ",
+                          "name": "userAvatar",
+                          "fill": "#0D9488",
+                          "width": 28,
+                          "height": 28
+                        },
+                        {
+                          "type": "text",
+                          "id": "Xdgfc",
+                          "name": "userName",
+                          "fill": "#1E293B",
+                          "content": "Nguyễn Văn A",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "qIfZa",
+          "x": 260,
+          "y": 64,
+          "name": "mainContent",
+          "width": 1180,
+          "height": 836,
+          "fill": "#F8FAFC",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "zzQlp",
+              "name": "welcome",
+              "width": 1132,
+              "height": 60,
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "v4lz9O",
+                  "name": "welcomeTitle",
+                  "fill": "#1E293B",
+                  "content": "Xin chào, Nguyễn Văn A! 👋",
+                  "fontFamily": "Inter",
+                  "fontSize": 24,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "egSEj",
+                  "name": "welcomeSub",
+                  "fill": "#64748B",
+                  "content": "Chào mừng bạn quay trở lại",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "x31BW",
+              "name": "statsRow",
+              "width": 1132,
+              "height": 110,
+              "gap": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "bIcQG",
+                  "name": "stat1",
+                  "width": 270,
+                  "height": 110,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "M55vf",
+                      "name": "stat1Header",
+                      "width": 230,
+                      "height": 40,
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "gdDyr",
+                          "name": "stat1Icon",
+                          "width": 40,
+                          "height": 40,
+                          "fill": "#F0FDFA",
+                          "cornerRadius": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "EDHtI",
+                              "name": "stat1IconText",
+                              "fill": "#0D9488",
+                              "content": "✓",
+                              "fontFamily": "Inter",
+                              "fontSize": 18,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tzcWZ",
+                      "name": "stat1Body",
+                      "width": 230,
+                      "height": 50,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "znehV",
+                          "name": "stat1Value",
+                          "fill": "#0D9488",
+                          "content": "12",
+                          "fontFamily": "Inter",
+                          "fontSize": 28,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "O9V64",
+                          "name": "stat1Label",
+                          "fill": "#64748B",
+                          "content": "Bài thi hoàn thành",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "VeKP8",
+                  "name": "stat2",
+                  "width": 270,
+                  "height": 110,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "c5a61o",
+                      "name": "stat2Header",
+                      "width": 230,
+                      "height": 40,
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Bk2pA",
+                          "name": "stat2Icon",
+                          "width": 40,
+                          "height": 40,
+                          "fill": "#DCFCE7",
+                          "cornerRadius": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "fC4G2",
+                              "name": "stat2IconText",
+                              "fill": "#16A34A",
+                              "content": "★",
+                              "fontFamily": "Inter",
+                              "fontSize": 18,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Z5DYB",
+                      "name": "stat2Body",
+                      "width": 230,
+                      "height": 50,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TzebQ",
+                          "name": "stat2Value",
+                          "fill": "#16A34A",
+                          "content": "8.5",
+                          "fontFamily": "Inter",
+                          "fontSize": 28,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "M8vrhP",
+                          "name": "stat2Label",
+                          "fill": "#64748B",
+                          "content": "Điểm trung bình",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oW4Oo",
+                  "name": "stat3",
+                  "width": 270,
+                  "height": 110,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "uuVFb",
+                      "name": "stat3Header",
+                      "width": 230,
+                      "height": 40,
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ppN2z",
+                          "name": "stat3Icon",
+                          "width": 40,
+                          "height": 40,
+                          "fill": "#CFFAFE",
+                          "cornerRadius": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "u3mtU",
+                              "name": "stat3IconText",
+                              "fill": "#0891B2",
+                              "content": "⏱",
+                              "fontFamily": "Inter",
+                              "fontSize": 18,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "beYFR",
+                      "name": "stat3Body",
+                      "width": 230,
+                      "height": 50,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ZI5YQ",
+                          "name": "stat3Value",
+                          "fill": "#0891B2",
+                          "content": "45 ph",
+                          "fontFamily": "Inter",
+                          "fontSize": 28,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "JQ9se",
+                          "name": "stat3Label",
+                          "fill": "#64748B",
+                          "content": "Thời gian TB",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G0s1qU",
+                  "name": "stat4",
+                  "width": 270,
+                  "height": 110,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "x9CnJ",
+                      "name": "stat4Header",
+                      "width": 230,
+                      "height": 40,
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "jHgp7",
+                          "name": "stat4Icon",
+                          "width": 40,
+                          "height": 40,
+                          "fill": "#FEF3C7",
+                          "cornerRadius": 10,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ncM6c",
+                              "name": "stat4IconText",
+                              "fill": "#D97706",
+                              "content": "🏆",
+                              "fontFamily": "Inter",
+                              "fontSize": 18,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "TD7EK",
+                      "name": "stat4Body",
+                      "width": 230,
+                      "height": 50,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "qxwvd",
+                          "name": "stat4Value",
+                          "fill": "#D97706",
+                          "content": "Top 15%",
+                          "fontFamily": "Inter",
+                          "fontSize": 28,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "p4uyl",
+                          "name": "stat4Label",
+                          "fill": "#64748B",
+                          "content": "Xếp hạng lớp",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UUZ5C",
+              "name": "contentRow",
+              "width": 1132,
+              "height": 340,
+              "gap": 20,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "EQcXf",
+                  "name": "upcomingCard",
+                  "width": 520,
+                  "height": 340,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "jbaZB",
+                      "name": "upcomingHeader",
+                      "width": 480,
+                      "height": 36,
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "e7mO1",
+                          "name": "upcomingIcon",
+                          "content": "📅",
+                          "fontFamily": "Inter",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "BrL6v",
+                          "name": "upcomingTitle",
+                          "fill": "#1E293B",
+                          "content": "Bài thi sắp tới",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bPOsJ",
+                      "name": "exam1",
+                      "width": 480,
+                      "height": 120,
+                      "fill": "#0D9488",
+                      "cornerRadius": 12,
+                      "layout": "vertical",
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "BTt1e",
+                          "name": "exam1Row",
+                          "width": 448,
+                          "height": 36,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Jnexk",
+                              "name": "exam1Subject",
+                              "fill": "#FFFFFF",
+                              "content": "Toán cao cấp - Giữa kỳ",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "imBZg",
+                              "name": "exam1Badge",
+                              "width": 60,
+                              "height": 24,
+                              "fill": "#FFFFFF30",
+                              "cornerRadius": 12,
+                              "padding": [
+                                4,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "M2eQJt",
+                                  "name": "exam1BadgeText",
+                                  "fill": "#FFFFFF",
+                                  "content": "Sắp thi",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "PdKyY",
+                          "name": "exam1Meta",
+                          "width": 448,
+                          "height": 24,
+                          "gap": 16,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zZCXl",
+                              "name": "exam1Date",
+                              "fill": "#E0E7FF",
+                              "content": "📅 Thứ 3, 15/04",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "vt2Q0",
+                              "name": "exam1Time",
+                              "fill": "#E0E7FF",
+                              "content": "⏱ 90 phút",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "QuEPx",
+                              "name": "exam1Questions",
+                              "fill": "#E0E7FF",
+                              "content": "📝 50 câu",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "nTA8C",
+                          "name": "exam1Btn",
+                          "width": 100,
+                          "height": 32,
+                          "fill": "#FFFFFF",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "iuCLJ",
+                              "name": "exam1BtnText",
+                              "fill": "#0D9488",
+                              "content": "Làm bài",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "yMyxP",
+                      "name": "exam2",
+                      "width": 480,
+                      "height": 100,
+                      "fill": "#F8FAFC",
+                      "cornerRadius": 12,
+                      "stroke": {
+                        "thickness": 1,
+                        "fill": "#E9E9E9"
+                      },
+                      "layout": "vertical",
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "tCntP",
+                          "name": "exam2Row",
+                          "width": 448,
+                          "height": 36,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "rdsex",
+                              "name": "exam2Subject",
+                              "fill": "#1E293B",
+                              "content": "Tiếng Anh - Bài kiểm tra",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "gjn6y",
+                              "name": "exam2Badge",
+                              "width": 72,
+                              "height": 24,
+                              "fill": "#F1F5F9",
+                              "cornerRadius": 12,
+                              "padding": [
+                                4,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "l7sOSI",
+                                  "name": "exam2BadgeText",
+                                  "fill": "#64748B",
+                                  "content": "Chưa mở",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "M9Dn15",
+                          "name": "exam2Meta",
+                          "width": 448,
+                          "height": 24,
+                          "gap": 16,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "mcqfh",
+                              "name": "exam2Date",
+                              "fill": "#64748B",
+                              "content": "📅 Thứ 5, 17/04",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "QA6hz",
+                              "name": "exam2Time",
+                              "fill": "#64748B",
+                              "content": "⏱ 60 phút",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "A2O6p",
+                  "name": "resultsCard",
+                  "width": 592,
+                  "height": 340,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oypuT",
+                      "name": "resultsHeader",
+                      "width": 552,
+                      "height": 36,
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "CDP1O",
+                          "name": "resultsIcon",
+                          "content": "📋",
+                          "fontFamily": "Inter",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "I4POLQ",
+                          "name": "resultsTitle",
+                          "fill": "#1E293B",
+                          "content": "Kết quả gần đây",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "WJ0aF",
+                      "name": "tableHeader",
+                      "width": 552,
+                      "height": 32,
+                      "fill": "#F8FAFC",
+                      "cornerRadius": 8,
+                      "gap": 12,
+                      "padding": [
+                        6,
+                        12
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XW3HU",
+                          "name": "th1",
+                          "fill": "#64748B",
+                          "content": "Môn học",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NGIJA",
+                          "name": "th2",
+                          "fill": "#64748B",
+                          "content": "Ngày",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "hezgd",
+                          "name": "th3",
+                          "fill": "#64748B",
+                          "content": "Điểm",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "orSOf",
+                          "name": "th4",
+                          "fill": "#64748B",
+                          "content": "Thời gian",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "iuq1f",
+                          "name": "th5",
+                          "fill": "#64748B",
+                          "content": "Xếp loại",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n21Q9",
+                      "name": "row1",
+                      "width": 552,
+                      "height": 44,
+                      "gap": 12,
+                      "padding": [
+                        10,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "G4wYF",
+                          "name": "r1s1",
+                          "fill": "#1E293B",
+                          "content": "Vật lý đại cương",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "l4rOw",
+                          "name": "r1s2",
+                          "fill": "#64748B",
+                          "content": "10/04",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "N8iJ2",
+                          "name": "r1s3",
+                          "fill": "#16A34A",
+                          "content": "9.0",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "teOmv",
+                          "name": "r1s4",
+                          "fill": "#64748B",
+                          "content": "45/60",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "LeIjV",
+                          "name": "r1badge",
+                          "width": 48,
+                          "height": 22,
+                          "fill": "#DCFCE7",
+                          "cornerRadius": 11,
+                          "padding": [
+                            3,
+                            6
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uXBeK",
+                              "name": "r1badgeT",
+                              "fill": "#16A34A",
+                              "content": "Giỏi",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Q7FDA",
+                      "name": "row2",
+                      "width": 552,
+                      "height": 44,
+                      "gap": 12,
+                      "padding": [
+                        10,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "N3WCmV",
+                          "name": "r2s1",
+                          "fill": "#1E293B",
+                          "content": "Nhập môn lập trình",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "d5R6o5",
+                          "name": "r2s2",
+                          "fill": "#64748B",
+                          "content": "08/04",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "W2TuyS",
+                          "name": "r2s3",
+                          "fill": "#0D9488",
+                          "content": "8.5",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "t8OgJ9",
+                          "name": "r2s4",
+                          "fill": "#64748B",
+                          "content": "50/60",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "a2gMt",
+                          "name": "r2badge",
+                          "width": 44,
+                          "height": 22,
+                          "fill": "#F0FDFA",
+                          "cornerRadius": 11,
+                          "padding": [
+                            3,
+                            6
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "wSSv3",
+                              "name": "r2badgeT",
+                              "fill": "#0D9488",
+                              "content": "Khá",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R13qYO",
+                      "name": "row3",
+                      "width": 552,
+                      "height": 44,
+                      "gap": 12,
+                      "padding": [
+                        10,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "y8aRN5",
+                          "name": "r3s1",
+                          "fill": "#1E293B",
+                          "content": "Giải tích 1",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Q141a",
+                          "name": "r3s2",
+                          "fill": "#64748B",
+                          "content": "05/04",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "nH6lf",
+                          "name": "r3s3",
+                          "fill": "#D97706",
+                          "content": "7.5",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qU7Pl",
+                          "name": "r3s4",
+                          "fill": "#64748B",
+                          "content": "55/90",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "EuBOQ",
+                          "name": "r3badge",
+                          "width": 68,
+                          "height": 22,
+                          "fill": "#FEF3C7",
+                          "cornerRadius": 11,
+                          "padding": [
+                            3,
+                            6
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "NCAnd",
+                              "name": "r3badgeT",
+                              "fill": "#D97706",
+                              "content": "Trung bình",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "pyGvb",
+              "name": "chartCard",
+              "width": 1132,
+              "height": 260,
+              "fill": "#FFFFFF",
+              "cornerRadius": 16,
+              "stroke": {
+                "thickness": 1,
+                "fill": "#E9E9E9"
+              },
+              "layout": "vertical",
+              "padding": 20,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MzF02",
+                  "name": "chartHeader",
+                  "width": 1092,
+                  "height": 36,
+                  "gap": 8,
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Xuf7o",
+                      "name": "chartTitle",
+                      "width": 300,
+                      "height": 36,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "UZZMG",
+                          "name": "chartLabel",
+                          "fill": "#1E293B",
+                          "content": "Biểu đồ hiệu suất",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "spB8U",
+                          "name": "chartSubtitle",
+                          "fill": "#64748B",
+                          "content": "Điểm số qua các bài thi",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DM7h8",
+                  "name": "chartArea",
+                  "width": 1092,
+                  "height": 180,
+                  "gap": 32,
+                  "justifyContent": "space_around",
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FMy0S",
+                      "name": "barG1",
+                      "width": 80,
+                      "height": 140,
+                      "fill": "#0D9488",
+                      "cornerRadius": [
+                        6,
+                        6,
+                        0,
+                        0
+                      ],
+                      "layout": "vertical",
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "l6FbIg",
+                          "name": "bar1Val",
+                          "fill": "#FFFFFF",
+                          "content": "9.0",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "QvgaA",
+                          "name": "bar1Lbl",
+                          "fill": "#64748B",
+                          "content": "Toán",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zODEP",
+                      "name": "barG2",
+                      "width": 80,
+                      "height": 120,
+                      "fill": "#0D9488",
+                      "cornerRadius": [
+                        6,
+                        6,
+                        0,
+                        0
+                      ],
+                      "layout": "vertical",
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "H8F2eK",
+                          "name": "bar2Val",
+                          "fill": "#FFFFFF",
+                          "content": "8.5",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "oxjlH",
+                          "name": "bar2Lbl",
+                          "fill": "#64748B",
+                          "content": "Lý",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bbhtn",
+                      "name": "barG3",
+                      "width": 80,
+                      "height": 130,
+                      "fill": "#0D9488",
+                      "cornerRadius": [
+                        6,
+                        6,
+                        0,
+                        0
+                      ],
+                      "layout": "vertical",
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "lMmav",
+                          "name": "bar3Val",
+                          "fill": "#FFFFFF",
+                          "content": "8.8",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "c7x1XT",
+                          "name": "bar3Lbl",
+                          "fill": "#64748B",
+                          "content": "Hóa",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "rQkyx",
+                      "name": "barG4",
+                      "width": 80,
+                      "height": 110,
+                      "fill": "#0D9488",
+                      "cornerRadius": [
+                        6,
+                        6,
+                        0,
+                        0
+                      ],
+                      "layout": "vertical",
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "G785sS",
+                          "name": "bar4Val",
+                          "fill": "#FFFFFF",
+                          "content": "7.8",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Q830UD",
+                          "name": "bar4Lbl",
+                          "fill": "#64748B",
+                          "content": "Anh",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xlur2",
+                      "name": "barG5",
+                      "width": 80,
+                      "height": 100,
+                      "fill": "#0D9488",
+                      "cornerRadius": [
+                        6,
+                        6,
+                        0,
+                        0
+                      ],
+                      "layout": "vertical",
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "l11CbN",
+                          "name": "bar5Val",
+                          "fill": "#FFFFFF",
+                          "content": "7.5",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "s2rjBo",
+                          "name": "bar5Lbl",
+                          "fill": "#64748B",
+                          "content": "Văn",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "N0x8Lx",
+                  "name": "legend",
+                  "width": 1092,
+                  "height": 24,
+                  "gap": 24,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "zTQVB",
+                      "name": "leg1",
+                      "width": 100,
+                      "height": 24,
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "tCHzU",
+                          "name": "legDot1",
+                          "fill": "#0D9488",
+                          "width": 12,
+                          "height": 12
+                        },
+                        {
+                          "type": "text",
+                          "id": "h7d1jq",
+                          "name": "legText1",
+                          "fill": "#64748B",
+                          "content": "Điểm của bạn",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "imports": {
+    "4": "pencil:lunaris.lib.pen",
+    "Y": "pencil:shadcn.lib.pen",
+    "Q": "pencil:halo.lib.pen",
+    "v": "pencil:nitro.lib.pen"
+  }
+}

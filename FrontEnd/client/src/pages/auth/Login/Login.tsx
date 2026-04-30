@@ -18,7 +18,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import appConfig from '@/configs/app.config';
 import { login, saveSession } from '@/services/authApi';
-import { runExamSocketPoc } from '@/services/examSocketPoc';
 import InputText from '@/components/Input/InputText/InputText';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -29,50 +28,24 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
-  const [socketBanner, setSocketBanner] = useState<
-    null | { kind: 'loading' } | { kind: 'result'; ok: boolean; text: string }
-  >(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Vui lòng nhập email và mật khẩu');
+      setError(t('login.missing_fields'));
       return;
     }
     try {
       setLoading(true);
       setError('');
-      setSocketBanner(null);
-      const { token, user } = await login(email, password);
-      saveSession(token, user);
-
-      const examIdPoc =
-        import.meta.env.VITE_SOCKET_POC_EXAM_ID ||
-        '00000000-0000-0000-0000-000000000001';
-      const forcePolling = import.meta.env.VITE_SOCKET_FORCE_POLLING === 'true';
-
-      setSocketBanner({ kind: 'loading' });
-      const socketRes = await runExamSocketPoc({
-        apiBaseUrl: appConfig.apiURL,
-        token,
-        examId: examIdPoc,
-        forcePolling,
-      });
-
-      const resultText = socketRes.ok
-        ? `Kết nối realtime OK. Giờ server: ${socketRes.serverTimeIso ?? '—'}`
-        : `Chưa kết nối được realtime: ${socketRes.message}. (Đăng nhập vẫn thành công; kiểm tra proxy /socket.io trên API.)`;
-
-      setSocketBanner({
-        kind: 'result',
-        ok: socketRes.ok,
-        text: resultText,
-      });
-
-      const delayMs = socketRes.ok ? 2200 : 5000;
-      window.setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, delayMs);
+      setWarning('');
+      const result = await login(email, password);
+      if (result.hasExistingSession) {
+        setWarning(t('login.session_revoked_warning'));
+      }
+      saveSession(result.token, result.user);
+      navigate(appConfig.authenticatedEntryPath, { replace: true });
     } catch (err: unknown) {
       const msg =
         (typeof err === 'object' &&
@@ -82,7 +55,7 @@ function Login() {
             ?.data?.message === 'string' &&
           (err as { response?: { data?: { message?: string } } }).response?.data
             ?.message) ||
-        'Đăng nhập thất bại, thử lại sau';
+        t('login.login_failed');
       setError(msg);
     } finally {
       setLoading(false);
@@ -126,19 +99,9 @@ function Login() {
                 <Text color="red" size="sm" mb={8}>{error}</Text>
               )}
 
-              {socketBanner?.kind === 'loading' && (
-                <Alert color="blue" variant="light" mt="sm" title="Đang kiểm tra">
-                  Đang kiểm tra kết nối realtime (Socket.IO) tới API…
-                </Alert>
-              )}
-              {socketBanner?.kind === 'result' && (
-                <Alert
-                  color={socketBanner.ok ? 'green' : 'red'}
-                  variant="light"
-                  mt="sm"
-                  title={socketBanner.ok ? 'Realtime: thành công' : 'Realtime: lỗi'}
-                >
-                  {socketBanner.text}
+              {warning && (
+                <Alert color="yellow" variant="light" mb={8}>
+                  {warning}
                 </Alert>
               )}
 
@@ -176,13 +139,12 @@ function Login() {
                 >
                   <Carousel.Slide>
                     <Text size="lg" maw={500}>
-                      Experience a seamless examination environment designed to
-                      help you focus on what matters most — your performance.
+                      {t('login.hero_slide_1')}
                     </Text>
                   </Carousel.Slide>
                   <Carousel.Slide>
                     <Text size="lg" maw={500}>
-                      Add more slides with different messages here.
+                      {t('login.hero_slide_2')}
                     </Text>
                   </Carousel.Slide>
                 </Carousel>

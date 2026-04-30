@@ -15,7 +15,7 @@ export default function StandardNumeric({
   defaultValue = 2,
   onChange,
 }: StandardNumericProps) {
-  const isControlled = value !== undefined;
+  const isControlled = value !== undefined; 
   const [internalValue, setInternalValue] = useState(defaultValue);
 
   const currentValue = isControlled ? (value as number) : internalValue;

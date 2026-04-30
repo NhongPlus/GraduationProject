@@ -14,6 +14,16 @@ function parseCorsOrigins(): string[] {
   ];
 }
 
+function parseBool(raw: string | undefined, defaultVal: boolean): boolean {
+  if (raw === undefined || raw === "") return defaultVal;
+  return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
+}
+
+function parseIntEnv(raw: string | undefined, defaultVal: number): number {
+  const n = raw !== undefined && raw !== "" ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? n : defaultVal;
+}
+
 export const env = {
   APP_PORT: process.env.APP_PORT || process.env.PORT || 5000,
   APP_HOST: process.env.APP_HOST || "localhost",
@@ -23,4 +33,13 @@ export const env = {
   AUTHOR: process.env.AUTHOR || "NhongPlus",
   /** Dùng chung cho Express `cors` và Socket.IO */
   CORS_ORIGINS: parseCorsOrigins(),
+  /** SMTP — để job nhắc hạn thi gửi email (tùy chọn). */
+  SMTP_HOST: process.env.SMTP_HOST?.trim() || "",
+  SMTP_PORT: parseIntEnv(process.env.SMTP_PORT, 587),
+  SMTP_SECURE: parseBool(process.env.SMTP_SECURE, false),
+  SMTP_USER: process.env.SMTP_USER?.trim() || "",
+  SMTP_PASS: process.env.SMTP_PASS?.trim() || "",
+  MAIL_FROM: process.env.MAIL_FROM?.trim() || "",
+  /** Chu kỳ quét nhắc hạn thi (ms), mặc định 10 phút */
+  EXAM_REMINDER_INTERVAL_MS: parseIntEnv(process.env.EXAM_REMINDER_INTERVAL_MS, 600_000),
 };

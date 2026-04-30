@@ -1,31 +1,44 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Title, Table, Loader, Text } from '@mantine/core';
+import { Box, Title, Table, Loader, Text, Paper, Group, Badge, Stack, Alert } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
-import type { Result } from '@/services/examApi';
+import type { Exam, ExamSession } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const MyResults = () => {
-  const [results, setResults] = useState<Result[]>([]);
+  const { t, i18n } = useTranslation();
+  const [results, setResults] = useState<ExamSession[]>([]);
+  const [examNameMap, setExamNameMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const lang = i18n.resolvedLanguage || i18n.language;
+  const locale = lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'vi-VN';
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const data = await examApi.getAllResults();
-        setResults(data);
+        const [sessions, exams] = await Promise.all([
+          examApi.getMySessions(),
+          examApi.getExams(),
+        ]);
+        setResults(sessions);
+        const map = (exams as Exam[]).reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] = item.title;
+          return acc;
+        }, {});
+        setExamNameMap(map);
       } catch {
-        setError('Không tải được kết quả.');
+        setError(t('errors.result_load_failed'));
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, []);
+  }, [t]);
 
   if (loading) {
     return (
@@ -43,44 +56,80 @@ const MyResults = () => {
     );
   }
 
+  const completed = results.filter((s) => s.status !== 'active');
+
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
-      <Title order={2} mb="md">Kết quả của tôi</Title>
-      <Table verticalSpacing="sm" highlightOnHover>
-        <thead>
-          <tr>
-            <th>STT</th>
-            <th>Bài thi</th>
-            <th>Đúng</th>
-            <th>Tổng</th>
-            <th>%</th>
-            <th>Thời gian</th>
-            <th>Hành động</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((item, idx) => (
-            <tr key={item.examId}>
-              <td>{idx + 1}</td>
-              <td>{item.examId}</td>
-              <td>{item.correct}</td>
-              <td>{item.total}</td>
-              <td>{item.percentage}%</td>
-              <td>{new Date(item.takenAt).toLocaleString()}</td>
-              <td>
-                <ButtonFilled size="xs" label="Xem" disabled={false} onClick={() => navigate(`/result/${item.examId}`)} />
-              </td>
-            </tr>
-          ))}
-          {results.length === 0 && (
-            <tr>
-              <td colSpan={7}>
-                <Text style={{ textAlign: 'center' }}>Chưa có kết quả nào.</Text>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </Table>
+      <Stack gap="md">
+        <Title order={2}>{t('my_results.title')}</Title>
+
+        <Group grow>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('my_results.total_attempts')}</Text>
+            <Text fw={700} size="xl">{results.length}</Text>
+          </Paper>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('my_results.completed')}</Text>
+            <Text fw={700} size="xl">{completed.length}</Text>
+          </Paper>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('my_results.pending_manual')}</Text>
+            <Text fw={700} size="xl">
+              {completed.filter((s) => s.grading_status === 'pending_manual').length}
+            </Text>
+          </Paper>
+        </Group>
+
+        {completed.length === 0 ? (
+          <Alert color="blue" variant="light">
+            {t('my_results.empty')}
+          </Alert>
+        ) : (
+          <Paper withBorder radius="md" p="sm">
+            <Table verticalSpacing="sm" highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('my_results.index')}</Table.Th>
+                  <Table.Th>{t('my_results.exam')}</Table.Th>
+                  <Table.Th>{t('my_results.score')}</Table.Th>
+                  <Table.Th>{t('my_results.time')}</Table.Th>
+                  <Table.Th>{t('common.status')}</Table.Th>
+                  <Table.Th>{t('my_results.action')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {completed.map((item, idx) => (
+                  <Table.Tr key={item.id}>
+                    <Table.Td>{idx + 1}</Table.Td>
+                    <Table.Td>{examNameMap[item.exam_id] || item.exam_id}</Table.Td>
+                    <Table.Td>
+                      {item.score != null && item.max_points != null
+                        ? `${item.score}/${item.max_points}`
+                        : '—'}
+                    </Table.Td>
+                    <Table.Td>{new Date(item.started_at).toLocaleString(locale)}</Table.Td>
+                    <Table.Td>
+                      <Badge color={item.grading_status === 'pending_manual' ? 'yellow' : 'green'}>
+                        {item.grading_status === 'pending_manual'
+                          ? t('my_results.pending_manual')
+                          : t('my_results.done')}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <ButtonFilled
+                        size="xs"
+                        label={t('my_results.view')}
+                        disabled={false}
+                        onClick={() => navigate(`/result/${item.exam_id}`)}
+                      />
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Paper>
+        )}
+      </Stack>
     </Box>
   );
 };

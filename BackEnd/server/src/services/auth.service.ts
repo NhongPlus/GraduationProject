@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { createHash } from "crypto";
 import { env } from "~/config/enviroment";
 import {
   createUser,
@@ -8,6 +9,11 @@ import {
   getUserById,
   User,
 } from "~/models/user.model";
+import {
+  createUserSession,
+  revokeAllSessionsByUserId,
+  getActiveSessionByUserId,
+} from "~/models/user_session.model";
 
 if (!env.JWT_SECRET) {
   throw new Error("JWT_SECRET is required in environment variables");
@@ -15,9 +21,24 @@ if (!env.JWT_SECRET) {
 
 const DEFAULT_JWT_EXP = env.JWT_EXPIRES_IN || "1d";
 
+function parseExpiryToDate(exp: string): Date {
+  const match = exp.match(/^(\d+)([dhms])$/);
+  if (!match) return new Date(Date.now() + 86400000);
+  const [, value, unit] = match;
+  const msMap: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+  return new Date(Date.now() + Number(value) * (msMap[unit] || 86400000));
+}
+
 export interface TokenPayload {
   userId: string;
   role: User["role"];
+}
+
+export interface LoginResult {
+  token: string;
+  user: Omit<User, "hashed_password">;
+  deviceId: string;
+  hasExistingSession: boolean;
 }
 
 export const registerUser = async (
@@ -42,8 +63,10 @@ export const registerUser = async (
 
 export const loginUser = async (
   email: string,
-  password: string
-): Promise<{ token: string; user: Omit<User, "hashed_password"> }> => {
+  password: string,
+  deviceId: string,
+  deviceInfo?: string
+): Promise<LoginResult> => {
   const user = await getUserByEmail(email);
   if (!user) throw new Error("Email hoặc mật khẩu không đúng");
 
@@ -57,8 +80,18 @@ export const loginUser = async (
     expiresIn: DEFAULT_JWT_EXP,
   } as jwt.SignOptions);
 
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = parseExpiryToDate(DEFAULT_JWT_EXP);
+
+  const existingSession = await getActiveSessionByUserId(user.id);
+  const hasExistingSession = !!existingSession;
+
+  await revokeAllSessionsByUserId(user.id);
+
+  await createUserSession(user.id, deviceId, tokenHash, deviceInfo ?? null, expiresAt);
+
   const { hashed_password, ...publicUser } = user;
-  return { token, user: publicUser };
+  return { token, user: publicUser, deviceId, hasExistingSession };
 };
 
 export const verifyTokenPayload = async (token: string): Promise<TokenPayload> => {

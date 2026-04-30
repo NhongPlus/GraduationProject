@@ -16,22 +16,40 @@ export interface UserInfo {
 export interface LoginResponse {
   token: string;
   user: UserInfo;
+  deviceId: string;
+  hasExistingSession: boolean;
 }
 
 const ACCESS_TOKEN_KEY = 'access_token';
+const DEVICE_ID_KEY = 'device_id';
+
+export const getDeviceId = (): string => {
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+  if (!deviceId) {
+    deviceId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+  return deviceId;
+};
 
 export const login = async (
   email: string,
   password: string
 ): Promise<LoginResponse> => {
+  const deviceId = getDeviceId();
+  const deviceInfo = navigator.userAgent;
   const res = await apiClient.post<{ success: boolean; data: LoginResponse }>(
     '/auth/login',
-    { email, password }
+    { email, password, device_id: deviceId, device_info: deviceInfo }
   );
   return res.data.data;
 };
 
-export const register = async (
+/**
+ * Chỉ gọi khi đã đăng nhập **admin** (token gắn tự động).
+ * Sinh viên / giảng viên không tự đăng ký qua UI — tài khoản do admin tạo.
+ */
+export const registerUserAsAdmin = async (
   email: string,
   username: string,
   password: string,

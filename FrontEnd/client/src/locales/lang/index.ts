@@ -9,6 +9,10 @@ import errEn from './errors/en.json';
 import errVi from './errors/vi.json';
 import errJa from './errors/ja.json';
 
+const LANG_STORAGE_KEY = 'app_language';
+const savedLanguage =
+  (typeof window !== 'undefined' ? localStorage.getItem(LANG_STORAGE_KEY) : null) || 'vi';
+
 const resources = {
   en: {
     translation: {
@@ -32,7 +36,7 @@ const resources = {
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: 'vi',
+  lng: savedLanguage,
   fallbackLng: 'en',
   interpolation: {
     escapeValue: false,

@@ -64,6 +64,17 @@ export const getActiveSession = async (
   return (result.rows[0] as ExamSession) ?? null;
 };
 
+export const getActiveSessionsByExam = async (examId: string): Promise<ExamSession[]> => {
+  const result = await pool.query(
+    `SELECT *
+     FROM exam_sessions
+     WHERE exam_id = $1 AND status = 'active'
+     ORDER BY created_at ASC`,
+    [examId]
+  );
+  return result.rows as ExamSession[];
+};
+
 export const getSessionsByStudent = async (studentId: string): Promise<ExamSession[]> => {
   const result = await pool.query(
     "SELECT * FROM exam_sessions WHERE student_id = $1 ORDER BY created_at DESC",

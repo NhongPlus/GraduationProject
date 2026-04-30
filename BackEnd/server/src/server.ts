@@ -8,6 +8,8 @@ import { env } from "./config/enviroment";
 import RouterV1 from "./routes/v1/index";
 import { errorHandler } from "~/middlewares/error.middleware";
 import { registerExamSocket } from "~/socket/examSocket";
+import { setupSwaggerDocs } from "./docs/swagger";
+import { startExamDeadlineReminderScheduler } from "~/jobs/examDeadlineReminders.job";
 
 const START_SERVER = () => {
   const app = express();
@@ -18,6 +20,8 @@ const START_SERVER = () => {
     }),
   );
   app.use(express.json());
+
+  setupSwaggerDocs(app);
 
   app.use("/v1", RouterV1);
 
@@ -38,6 +42,8 @@ const START_SERVER = () => {
     path: "/socket.io",
   });
   registerExamSocket(io);
+
+  startExamDeadlineReminderScheduler();
 
   httpServer.listen(Number(env.APP_PORT), () => {
     console.log(

@@ -5,7 +5,8 @@ import { registerController, loginController } from "~/controllers/auth.controll
 
 const authRouter = Router();
 
-authRouter.post("/register", registerController);
+/** Đăng ký công khai tắt — chỉ admin tạo tài khoản (Bearer JWT). */
+authRouter.post("/register", authMiddleware, roleMiddleware(["admin"]), registerController);
 authRouter.post("/login", loginController);
 
 export default authRouter;

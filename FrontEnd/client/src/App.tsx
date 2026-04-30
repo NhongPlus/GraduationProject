@@ -1,5 +1,6 @@
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
+import '@mantine/charts/styles.css';
 import './global.scss';
 import 'dayjs/locale/vi';
 import { MantineProvider } from '@mantine/core';

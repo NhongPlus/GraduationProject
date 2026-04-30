@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import appConfig from '@/configs/app.config';
 
 const ACCESS_TOKEN_KEY = 'access_token';

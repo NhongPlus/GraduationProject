@@ -20,6 +20,8 @@ interface InputSelectProps {
   placeholder?: string;
   fullWidth?: boolean;
   error?: string;
+  disabled?: boolean;
+  clearable?: boolean;
 }
 
 export default function InputSelect({
@@ -29,6 +31,8 @@ export default function InputSelect({
   placeholder = "Search...",
   fullWidth,
   error,
+  disabled = false,
+  clearable = false,
 }: InputSelectProps) {
 
   const combobox = useCombobox();
@@ -44,6 +48,7 @@ export default function InputSelect({
   };
 
   const handleClear = () => {
+    if (!clearable) return;
     setSearch("");
     onChange?.(null);
   };
@@ -57,25 +62,28 @@ export default function InputSelect({
         <InputBase
           value={search}
           onChange={(e) => {
+            if (disabled) return;
             setSearch(e.currentTarget.value);
             combobox.openDropdown();
           }}
           onFocus={() =>
-            combobox.openDropdown()
+            !disabled && combobox.openDropdown()
           }
           placeholder={placeholder}
           radius="md"
           w={fullWidth ? "100%" : undefined}
           error={error}
+          disabled={disabled}
           leftSection={
             <IconSearch size={16} />
           }
           rightSection={
-            search ? (
+            clearable && search ? (
               <ActionIcon
                 size="sm"
                 variant="subtle"
                 onClick={handleClear}
+                disabled={disabled}
               >
                 <IconX size={14} />
               </ActionIcon>

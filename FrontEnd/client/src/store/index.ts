@@ -2,6 +2,7 @@ import { configureStore, createSlice } from '@reduxjs/toolkit';
 import { combineReducers } from 'redux';
 import { persistReducer, persistStore } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
+import authReducer from './authSlice';
 
 const appSlice = createSlice({
   name: 'app',
@@ -11,13 +12,14 @@ const appSlice = createSlice({
 
 const rootReducer = combineReducers({
   app: appSlice.reducer,
+  auth: authReducer,
 });
 
 const persistedReducer = persistReducer(
   {
     key: 'root',
     storage,
-    whitelist: ['app'],
+    whitelist: ['app', 'auth'],
   },
   rootReducer
 );

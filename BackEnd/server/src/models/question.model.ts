@@ -10,6 +10,7 @@ export interface Question {
   options: Record<string, string> | null;
   correct_answer: string | string[] | null;
   points: number;
+  display_order: number;
   created_at: string;
 }
 
@@ -40,13 +41,14 @@ function mapQuestionRow(row: any): Question {
         ? null
         : parseJson<string | string[]>(row.correct_answer, null as any),
     points: Number(row.points),
+    display_order: Number(row.display_order ?? 0),
     created_at: row.created_at,
   };
 }
 
 export const getQuestionsByExam = async (examId: string): Promise<Question[]> => {
   const result = await pool.query(
-    `SELECT * FROM questions WHERE exam_id = $1 ORDER BY created_at ASC`,
+    `SELECT * FROM questions WHERE exam_id = $1 ORDER BY display_order ASC, created_at ASC`,
     [examId]
   );
   return result.rows.map(mapQuestionRow);
@@ -54,8 +56,8 @@ export const getQuestionsByExam = async (examId: string): Promise<Question[]> =>
 
 export const getPublicQuestionsByExam = async (examId: string): Promise<PublicQuestion[]> => {
   const result = await pool.query(
-    `SELECT id, exam_id, content, question_type, options, points, created_at
-     FROM questions WHERE exam_id = $1 ORDER BY created_at ASC`,
+    `SELECT id, exam_id, content, question_type, options, points, display_order, created_at
+     FROM questions WHERE exam_id = $1 ORDER BY display_order ASC, created_at ASC`,
     [examId]
   );
   return result.rows.map((row) => {
@@ -77,7 +79,8 @@ export const createQuestion = async (
   questionType: QuestionType,
   points: number,
   options?: Record<string, string> | null,
-  correctAnswer?: string | string[] | null
+  correctAnswer?: string | string[] | null,
+  displayOrder?: number
 ): Promise<Question> => {
   const opts =
     questionType === "essay" ? null : options != null ? JSON.stringify(options) : JSON.stringify({});
@@ -89,9 +92,18 @@ export const createQuestion = async (
         : null;
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [examId, content, questionType, opts, correct, points]
+    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order)
+     VALUES (
+       $1,
+       $2,
+       $3,
+       $4,
+       $5,
+       $6,
+       COALESCE($7, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1))
+     )
+     RETURNING *`,
+    [examId, content, questionType, opts, correct, points, displayOrder ?? null]
   );
   return mapQuestionRow(result.rows[0]);
 };

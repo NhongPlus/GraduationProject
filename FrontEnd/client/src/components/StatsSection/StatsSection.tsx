@@ -1,62 +1,64 @@
 import { SimpleGrid } from '@mantine/core';
 import {
-  IconTrendingUp,
   IconChecklist,
+  IconStar,
   IconClock,
+  IconTrophy,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import StatCard from '../StatCard/StatCard';
-import { Paper, Stack, Text } from '@mantine/core';
+import type { DashboardStatCard } from '@/services/dashboardApi';
 
-export default function StatsSection() {
+const statKeysOrder = ['exams_taken', 'average_score', 'avg_time', 'class_rank'] as const;
+
+const icons = [
+  <IconChecklist key="i0" size={18} />,
+  <IconStar key="i1" size={18} />,
+  <IconClock key="i2" size={18} />,
+  <IconTrophy key="i3" size={18} />,
+];
+
+const accents = ['teal', 'green', 'cyan', 'amber'] as const;
+
+type StatsSectionProps = {
+  stats: DashboardStatCard[];
+};
+
+export default function StatsSection({ stats }: StatsSectionProps) {
+  const { t } = useTranslation();
+
+  const titleFor = (key: string) => {
+    switch (key) {
+      case 'exams_taken':
+        return t('stats.taken_total');
+      case 'average_score':
+        return t('stats.average_score');
+      case 'avg_time':
+        return t('stats.avg_time');
+      case 'class_rank':
+        return t('stats.class_rank');
+      default:
+        return key;
+    }
+  };
+
+  const ordered = statKeysOrder
+    .map((k) => stats.find((s) => s.key === k))
+    .filter((x): x is DashboardStatCard => Boolean(x));
+
   return (
     <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
-      <StatCard
-        title="Average Score"
-        value="85%"
-        subValue="+5%"
-        progress={85}
-        icon={<IconTrendingUp size={18} />}
-        color="green"
-      />
-
-      <StatCard
-        title="Exams Taken"
-        value="12"
-        subValue="Total"
-        progress={60}
-        icon={<IconChecklist size={18} />}
-        color="blue"
-      />
-
-      <StatCard
-        title="Study Hours"
-        value="42h"
-        subValue="+12%"
-        progress={75}
-        icon={<IconClock size={18} />}
-        color="violet"
-      />
-
-      {/* Special card */}
-      <Paper
-        radius="xl"
-        p="md"
-        className="bg-blue-600 text-white"
-      >
-        <Stack gap="sm">
-          <Text size="sm" fw={500} className="opacity-80">
-            Next Exam In
-          </Text>
-
-          <Text size="xl" fw={700}>
-            2d 4h
-          </Text>
-
-          <Text size="sm" className="opacity-80">
-            Physics 101 Midterm
-          </Text>
-        </Stack>
-      </Paper>
+      {ordered.map((s, idx) => (
+        <StatCard
+          key={s.key}
+          title={titleFor(s.key)}
+          value={s.value}
+          trend={t('stats.trend_flat')}
+          trendDirection={s.trend}
+          icon={icons[idx] ?? icons[0]}
+          accent={accents[idx] ?? 'teal'}
+        />
+      ))}
     </SimpleGrid>
   );
 }

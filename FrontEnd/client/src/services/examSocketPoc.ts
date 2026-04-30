@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
+import i18n from '@/locales';
 
 export type ExamSocketPocResult =
   | { ok: true; serverTimeIso?: string }
@@ -39,7 +40,7 @@ export function runExamSocketPoc(opts: {
     });
 
     const timer = setTimeout(() => {
-      finish({ ok: false, message: 'Hết thời gian chờ kết nối realtime' });
+      finish({ ok: false, message: i18n.t('errors.realtime_timeout') });
     }, timeoutMs);
 
     socket.on('connect', () => {
@@ -52,13 +53,13 @@ export function runExamSocketPoc(opts: {
     });
 
     socket.on('exam:error', (p: { message?: string }) => {
-      finish({ ok: false, message: p?.message ?? 'exam:error' });
+      finish({ ok: false, message: p?.message ?? i18n.t('errors.realtime_error') });
     });
 
     socket.on('connect_error', (err: Error) => {
       finish({
         ok: false,
-        message: err?.message || 'Không kết nối được tới máy chủ realtime',
+        message: err?.message || i18n.t('errors.realtime_connect_failed'),
       });
     });
   });

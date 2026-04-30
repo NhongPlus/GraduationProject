@@ -3,6 +3,7 @@ import {
   getExamsByClass,
   getExamById,
   createExam,
+  updateExam,
   deleteExam,
   Exam,
   ExamDetail,
@@ -18,6 +19,7 @@ import {
 } from "~/models/question.model";
 import {
   getActiveSession,
+  getActiveSessionsByExam,
   createSession,
   getSessionsByStudent,
   getSessionsByExam,
@@ -29,7 +31,23 @@ import {
   ExamSession,
   GradingStatus,
 } from "~/models/examsession.model";
+import {
+  insertIntegrityEvents,
+  IntegrityEventInput,
+  IntegrityEventType,
+} from "~/models/examIntegrity.model";
+import {
+  AutosaveAnswers,
+  getLatestAutosaveSnapshotBySession,
+  upsertAutosaveSnapshot,
+} from "~/models/examAutosave.model";
 import pool from "~/config/db";
+import {
+  isMalformedClosesAt,
+  isPastClosesAt,
+  normalizeClosesAtInput,
+} from "~/utils/examStartDeadline";
+import type { ImportedQuestionDraft } from "~/services/examImport.service";
 
 export function httpError(status: number, message: string): Error & { status: number } {
   const e = new Error(message) as Error & { status: number };
@@ -47,8 +65,47 @@ export const createExamService = async (
   classId: string,
   createdBy: string,
   durationMin: number,
-  description?: string
-): Promise<Exam> => createExam(title, classId, createdBy, durationMin, description);
+  description?: string,
+  closesAt?: string | null
+): Promise<Exam> => {
+  if (isMalformedClosesAt(closesAt)) throw httpError(400, "closes_at không hợp lệ");
+  const normalized = normalizeClosesAtInput(closesAt);
+  return createExam(title, classId, createdBy, durationMin, description, normalized);
+};
+
+export const updateExamService = async (
+  id: string,
+  payload: {
+    title?: string;
+    description?: string | null;
+    duration_min?: number;
+    closes_at?: string | null;
+  }
+): Promise<Exam | null> => {
+  const fields: Partial<Pick<Exam, "title" | "description" | "duration_min" | "closes_at">> = {};
+
+  if (payload.title !== undefined) {
+    const title = payload.title.trim();
+    if (!title) throw httpError(400, "title không hợp lệ");
+    fields.title = title;
+  }
+  if (payload.description !== undefined) {
+    fields.description = payload.description;
+  }
+  if (payload.duration_min !== undefined) {
+    const duration = Number(payload.duration_min);
+    if (!Number.isFinite(duration) || duration <= 0 || duration > 300) {
+      throw httpError(400, "duration_min phải từ 1 đến 300 phút");
+    }
+    fields.duration_min = Math.floor(duration);
+  }
+  if (payload.closes_at !== undefined) {
+    if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
+    fields.closes_at = normalizeClosesAtInput(payload.closes_at);
+  }
+
+  return updateExam(id, fields);
+};
 
 export const deleteExamService = async (id: string): Promise<boolean> => deleteExam(id);
 
@@ -64,7 +121,8 @@ export const addQuestion = async (
   points: number,
   questionType: QuestionType,
   options?: Record<string, string> | null,
-  correctAnswer?: string | string[] | null
+  correctAnswer?: string | string[] | null,
+  displayOrder?: number
 ): Promise<Question> => {
   if (questionType === "mcq") {
     if (!options || Object.keys(options).length === 0) {
@@ -80,11 +138,117 @@ export const addQuestion = async (
     questionType,
     points,
     options ?? null,
-    correctAnswer ?? null
+    correctAnswer ?? null,
+    displayOrder
   );
 };
 
 export const removeQuestion = async (id: string): Promise<boolean> => deleteQuestion(id);
+
+export interface CreateExamWithQuestionsPayload {
+  title: string;
+  class_id: string;
+  created_by: string;
+  duration_min: number;
+  description?: string | null;
+  closes_at?: string | null;
+  questions: ImportedQuestionDraft[];
+}
+
+function validateQuestionDraft(question: ImportedQuestionDraft, index: number) {
+  const label = `Câu ${index + 1}`;
+  if (!question.content?.trim()) throw httpError(400, `${label}: thiếu nội dung`);
+  if (question.question_type !== "mcq" && question.question_type !== "essay") {
+    throw httpError(400, `${label}: question_type không hợp lệ`);
+  }
+  if (!Number.isFinite(question.points) || question.points <= 0) {
+    throw httpError(400, `${label}: points phải lớn hơn 0`);
+  }
+  if (question.question_type === "mcq") {
+    if (!question.options || Object.keys(question.options).length < 2) {
+      throw httpError(400, `${label}: câu trắc nghiệm cần ít nhất 2 lựa chọn`);
+    }
+    if (question.correct_answer == null || question.correct_answer === "") {
+      throw httpError(400, `${label}: câu trắc nghiệm cần đáp án đúng`);
+    }
+  }
+}
+
+export const createExamWithQuestionsService = async (
+  payload: CreateExamWithQuestionsPayload
+): Promise<{ exam: Exam; questions: Question[] }> => {
+  if (!payload.title?.trim()) throw httpError(400, "title không hợp lệ");
+  if (!payload.class_id) throw httpError(400, "class_id là bắt buộc");
+  if (!Number.isFinite(payload.duration_min) || payload.duration_min <= 0 || payload.duration_min > 300) {
+    throw httpError(400, "duration_min phải từ 1 đến 300 phút");
+  }
+  if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
+  if (!Array.isArray(payload.questions) || payload.questions.length === 0) {
+    throw httpError(400, "questions là mảng bắt buộc");
+  }
+  payload.questions.forEach(validateQuestionDraft);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const examResult = await client.query(
+      `INSERT INTO exams (title, description, class_id, created_by, duration_min, closes_at)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        payload.title.trim(),
+        payload.description ?? null,
+        payload.class_id,
+        payload.created_by,
+        Math.floor(payload.duration_min),
+        normalizeClosesAtInput(payload.closes_at),
+      ]
+    );
+    const exam = examResult.rows[0] as Exam;
+    const insertedQuestions: Question[] = [];
+
+    for (let i = 0; i < payload.questions.length; i += 1) {
+      const q = payload.questions[i];
+      const opts = q.question_type === "essay" ? null : JSON.stringify(q.options ?? {});
+      const correct =
+        q.question_type === "essay" || q.correct_answer == null
+          ? null
+          : JSON.stringify(q.correct_answer);
+      const questionResult = await client.query(
+        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [
+          exam.id,
+          q.content.trim(),
+          q.question_type,
+          opts,
+          correct,
+          q.points,
+          q.display_order || i + 1,
+        ]
+      );
+      const row = questionResult.rows[0];
+      insertedQuestions.push({
+        id: row.id,
+        exam_id: row.exam_id,
+        content: row.content,
+        question_type: row.question_type === "essay" ? "essay" : "mcq",
+        options: row.options ?? null,
+        correct_answer: row.correct_answer ?? null,
+        points: Number(row.points),
+        display_order: Number(row.display_order ?? i + 1),
+        created_at: row.created_at,
+      });
+    }
+
+    await client.query("COMMIT");
+    return { exam, questions: insertedQuestions };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
 
 export const startSession = async (examId: string, studentId: string): Promise<ExamSession> => {
   const existing = await getActiveSession(examId, studentId);
@@ -104,6 +268,9 @@ export const startSessionWithMeta = async (
 ): Promise<StartSessionPayload> => {
   const exam = await getExamById(examId);
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");
+  if (exam.closes_at && isPastClosesAt(exam.closes_at, Date.now())) {
+    throw httpError(400, "Đã quá hạn bắt đầu bài thi");
+  }
   const session = await startSession(examId, studentId);
   const started = new Date(session.started_at).getTime();
   const deadline = started + exam.duration_min * 60 * 1000;
@@ -144,6 +311,161 @@ export interface SubmitResult {
   }>;
 }
 
+const MAX_INTEGRITY_BATCH = 200;
+const MAX_INTEGRITY_DETAILS_BYTES = 8 * 1024;
+const MAX_AUTOSAVE_BYTES = 2 * 1024 * 1024;
+
+const INTEGRITY_TYPES: Set<IntegrityEventType> = new Set([
+  "exam_opened",
+  "fullscreen_enter",
+  "fullscreen_exit",
+  "fullscreen_error",
+  "visibility_hidden",
+  "window_blur",
+  "window_focus",
+  "copy_attempt",
+  "paste_attempt",
+  "context_menu",
+  "before_unload",
+]);
+
+function isRecordObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isValidIsoDate(value: string): boolean {
+  const t = Date.parse(value);
+  if (Number.isNaN(t)) return false;
+  return new Date(t).toISOString() === value;
+}
+
+export function normalizeIntegrityEvents(events: unknown): IntegrityEventInput[] {
+  if (!Array.isArray(events) || events.length === 0) {
+    throw httpError(400, "events là mảng bắt buộc");
+  }
+  if (events.length > MAX_INTEGRITY_BATCH) {
+    throw httpError(400, `events vượt quá giới hạn ${MAX_INTEGRITY_BATCH}`);
+  }
+
+  const normalized: IntegrityEventInput[] = [];
+  for (const rawEvent of events) {
+    if (!isRecordObject(rawEvent)) {
+      throw httpError(400, "event không hợp lệ");
+    }
+
+    const type = rawEvent.type;
+    const at = rawEvent.at;
+
+    if (typeof type !== "string" || !INTEGRITY_TYPES.has(type as IntegrityEventType)) {
+      throw httpError(400, "event.type không hợp lệ");
+    }
+    if (typeof at !== "string" || !isValidIsoDate(at)) {
+      throw httpError(400, "event.at phải là ISO datetime hợp lệ");
+    }
+
+    const details = rawEvent.details;
+    if (details !== undefined && !isRecordObject(details)) {
+      throw httpError(400, "event.details phải là object");
+    }
+    if (details) {
+      const size = Buffer.byteLength(JSON.stringify(details), "utf8");
+      if (size > MAX_INTEGRITY_DETAILS_BYTES) {
+        throw httpError(413, "event.details vượt quá 8KB");
+      }
+    }
+
+    normalized.push({
+      type: type as IntegrityEventType,
+      at,
+      details,
+    });
+  }
+
+  return normalized;
+}
+
+export interface IntegrityPersistResult {
+  accepted: number;
+  rejected: number;
+}
+
+export const persistIntegrityEventsService = async (
+  examId: string,
+  studentId: string,
+  events: IntegrityEventInput[]
+): Promise<IntegrityPersistResult> => {
+  if (!examId) throw httpError(400, "exam_id là bắt buộc");
+
+  const session = await getActiveSession(examId, studentId);
+  if (!session) {
+    throw httpError(403, "Không tìm thấy phiên thi active hợp lệ");
+  }
+
+  const accepted = await insertIntegrityEvents(examId, session.id, studentId, events);
+  return {
+    accepted,
+    rejected: Math.max(0, events.length - accepted),
+  };
+};
+
+function normalizeAutosaveAnswers(rawAnswers: unknown): AutosaveAnswers {
+  if (!isRecordObject(rawAnswers)) {
+    throw httpError(400, "answers phải là object");
+  }
+
+  const out: AutosaveAnswers = {};
+  for (const [k, v] of Object.entries(rawAnswers)) {
+    if (typeof v !== "string") {
+      throw httpError(400, "answers chỉ chấp nhận giá trị string");
+    }
+    out[k] = v;
+  }
+
+  const payloadSize = Buffer.byteLength(JSON.stringify(out), "utf8");
+  if (payloadSize > MAX_AUTOSAVE_BYTES) {
+    throw httpError(413, "answers vượt quá giới hạn 2MB");
+  }
+
+  return out;
+}
+
+export interface AutosavePersistResult {
+  saved: true;
+  server_time: string;
+}
+
+export const persistAutosaveSnapshotService = async (payload: {
+  examId: string;
+  studentId: string;
+  savedAt: string;
+  answers: unknown;
+}): Promise<AutosavePersistResult> => {
+  if (!payload.examId) throw httpError(400, "exam_id là bắt buộc");
+  if (!payload.savedAt || !isValidIsoDate(payload.savedAt)) {
+    throw httpError(400, "saved_at phải là ISO datetime hợp lệ");
+  }
+
+  const session = await getActiveSession(payload.examId, payload.studentId);
+  if (!session) {
+    throw httpError(409, "Phiên thi không còn active");
+  }
+
+  const answers = normalizeAutosaveAnswers(payload.answers);
+
+  const snapshot = await upsertAutosaveSnapshot({
+    examId: payload.examId,
+    sessionId: session.id,
+    studentId: payload.studentId,
+    savedAt: payload.savedAt,
+    answers,
+  });
+
+  return {
+    saved: true,
+    server_time: snapshot.server_at,
+  };
+};
+
 function parseGradedDetails(raw: unknown): GradedDetailRow[] {
   if (raw == null) return [];
   if (typeof raw === "string") {
@@ -160,7 +482,8 @@ function parseGradedDetails(raw: unknown): GradedDetailRow[] {
 export const submitSessionService = async (
   sessionId: string,
   studentId: string,
-  answers: Record<string, string | string[]>
+  answers: Record<string, string | string[]>,
+  options?: { allowPastDeadline?: boolean }
 ): Promise<SubmitResult> => {
   const session = await getSessionById(sessionId);
   if (!session) throw httpError(404, "Phiên thi không tồn tại");
@@ -171,7 +494,10 @@ export const submitSessionService = async (
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");
 
   const deadline = new Date(session.started_at).getTime() + exam.duration_min * 60 * 1000;
-  if (Date.now() > deadline) throw httpError(400, "Đã hết thời gian làm bài");
+  const allowPastDeadline = options?.allowPastDeadline === true;
+  if (!allowPastDeadline && Date.now() > deadline) {
+    throw httpError(400, "Đã hết thời gian làm bài");
+  }
 
   const questions = await getQuestionsByExam(session.exam_id);
   let score = 0;
@@ -393,3 +719,92 @@ export const getStudentSessions = async (studentId: string): Promise<ExamSession
 
 export const getExamSessions = async (examId: string): Promise<ExamSession[]> =>
   getSessionsByExam(examId);
+
+export function normalizeAutosaveToSubmitAnswers(
+  raw: AutosaveAnswers,
+  orderedQuestionIds: string[]
+): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  if (!orderedQuestionIds.length) return out;
+
+  const idSet = new Set(orderedQuestionIds);
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== "string") continue;
+
+    if (idSet.has(key)) {
+      out[key] = value;
+      continue;
+    }
+
+    const match = /^q(\d+)$/.exec(key);
+    if (!match) continue;
+
+    const oneBasedIndex = Number(match[1]);
+    if (!Number.isInteger(oneBasedIndex) || oneBasedIndex < 1) continue;
+
+    const questionId = orderedQuestionIds[oneBasedIndex - 1];
+    if (questionId) {
+      out[questionId] = value;
+    }
+  }
+
+  return out;
+}
+
+export interface ForceSubmitSummary {
+  exam_id: string;
+  active_sessions: number;
+  submitted_sessions: number;
+  failed_sessions: number;
+}
+
+export const forceSubmitActiveSessionsByExamService = async (
+  examId: string
+): Promise<ForceSubmitSummary> => {
+  if (!examId) throw httpError(400, "exam_id là bắt buộc");
+
+  const activeSessions = await getActiveSessionsByExam(examId);
+  if (activeSessions.length === 0) {
+    return {
+      exam_id: examId,
+      active_sessions: 0,
+      submitted_sessions: 0,
+      failed_sessions: 0,
+    };
+  }
+
+  const questions = await getQuestionsByExam(examId);
+  const orderedQuestionIds = questions.map((q) => q.id);
+
+  let submittedSessions = 0;
+  let failedSessions = 0;
+
+  for (const session of activeSessions) {
+    try {
+      const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
+      const submitAnswers = normalizeAutosaveToSubmitAnswers(
+        snapshot?.answers ?? {},
+        orderedQuestionIds
+      );
+
+      await submitSessionService(session.id, session.student_id, submitAnswers, {
+        allowPastDeadline: true,
+      });
+      submittedSessions += 1;
+    } catch (error) {
+      failedSessions += 1;
+      console.error(
+        `[exam] force-submit failed exam=${examId} session=${session.id}`,
+        error
+      );
+    }
+  }
+
+  return {
+    exam_id: examId,
+    active_sessions: activeSessions.length,
+    submitted_sessions: submittedSessions,
+    failed_sessions: failedSessions,
+  };
+};

@@ -1,142 +1,105 @@
-import {
-  Paper,
-  Table,
-  Group,
-  Text,
-  Button,
-  Badge,
-  Box,
-  Stack,
-} from '@mantine/core';
-import {
-  IconCalendarEvent,
-  IconPlayerPlay,
-} from '@tabler/icons-react';
+import { Paper, Group, Text, Badge, Stack, Box } from '@mantine/core';
+import { IconCalendarEvent, IconClock, IconFileText } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import ButtonTransparent from '@/components/Button/ButtonTransparent/ButtonTransparent';
+import type { StudentUpcomingExamDto } from '@/services/dashboardApi';
+import styles from './UpcomingExamsTable.module.scss';
 
-export default function UpcomingExamsTable() {
+const badgeColors: Record<StudentUpcomingExamDto['badge'], string> = {
+  soon: 'yellow',
+  normal: 'gray',
+  active: 'green',
+};
+
+type UpcomingExamsTableProps = {
+  exams: StudentUpcomingExamDto[];
+};
+
+export default function UpcomingExamsTable({ exams }: UpcomingExamsTableProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
   return (
-    <Paper radius="xl" withBorder>
-      {/* Header */}
-      <Group justify="space-between" p="lg">
+    <Paper radius="xl" withBorder p="md" className={styles.wrapper}>
+      <Group justify="space-between" mb="md">
         <Group gap="xs">
-          <IconCalendarEvent size={20} />
+          <IconCalendarEvent size={20} color="#0D9488" />
           <Text fw={700} size="lg">
-            Upcoming Exams
+            {t('upcoming.title')}
           </Text>
         </Group>
 
-        <Button variant="subtle" size="sm">
-          See All
-        </Button>
+        <ButtonTransparent
+          size="sm"
+          label={t('common.view_all')}
+          disabled={false}
+          onClick={() => navigate('/exams')}
+        />
       </Group>
 
-      {/* Table */}
-      <Table
-        horizontalSpacing="lg"
-        verticalSpacing="md"
-        highlightOnHover
-      >
-        <Table.Thead className="bg-slate-50">
-          <Table.Tr>
-            <Table.Th>Subject</Table.Th>
-            <Table.Th>Exam Name</Table.Th>
-            <Table.Th>Date & Time</Table.Th>
-            <Table.Th>Status</Table.Th>
-            <Table.Th>Action</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-
-        <Table.Tbody>
-          {/* Row 1 */}
-          <Table.Tr>
-            <Table.Td>
-              <Group gap="sm">
-                <Box
-                  w={32}
-                  h={32}
-                  className="rounded-full bg-blue-100 flex items-center justify-center"
-                >
-                  <Text size="sm">🧪</Text>
-                </Box>
-                <Text fw={600}>Physics</Text>
+      {exams.length === 0 ? (
+        <Text size="sm" c="dimmed">
+          {t('dashboard.upcoming_empty')}
+        </Text>
+      ) : (
+        <Stack gap="sm">
+          {exams.map((exam) => (
+            <Box key={exam.exam_id} className={styles.card}>
+              <Group justify="space-between" align="flex-start" mb={6}>
+                <Text fw={600} size="sm" className={styles.subject}>
+                  {exam.subject}
+                </Text>
+                <Badge color={badgeColors[exam.badge]} variant="light" size="sm">
+                  {exam.badge === 'soon'
+                    ? t('upcoming.badge_soon')
+                    : exam.badge === 'active'
+                      ? t('upcoming.badge_active')
+                      : t('upcoming.badge_normal')}
+                </Badge>
               </Group>
-            </Table.Td>
 
-            <Table.Td>
-              <Text size="sm">Physics 101 Midterm</Text>
-            </Table.Td>
-
-            <Table.Td>
-              <Stack gap={2}>
-                <Text size="sm" fw={500}>
-                  Oct 24, 2023
-                </Text>
-                <Text size="xs" c="dimmed">
-                  10:00 AM
-                </Text>
-              </Stack>
-            </Table.Td>
-
-            <Table.Td>
-              <Badge color="yellow" variant="light">
-                Scheduled
-              </Badge>
-            </Table.Td>
-
-            <Table.Td>
-              <Button
-                size="xs"
-                leftSection={<IconPlayerPlay size={14} />}
-              >
-                Start Exam
-              </Button>
-            </Table.Td>
-          </Table.Tr>
-
-          {/* Row 2 */}
-          <Table.Tr>
-            <Table.Td>
-              <Group gap="sm">
-                <Box
-                  w={32}
-                  h={32}
-                  className="rounded-full bg-orange-100 flex items-center justify-center"
-                >
-                  <Text size="sm">📜</Text>
-                </Box>
-                <Text fw={600}>History</Text>
+              <Group className={styles.meta} gap="md">
+                <Group gap={6} className={styles.metaItem}>
+                  <IconCalendarEvent size={14} className={styles.metaIcon} />
+                  <Text size="xs" c="dimmed">
+                    {exam.date_label}
+                    {exam.time_label ? `, ${exam.time_label}` : ''}
+                  </Text>
+                </Group>
+                <Group gap={6} className={styles.metaItem}>
+                  <IconClock size={14} className={styles.metaIcon} />
+                  <Text size="xs" c="dimmed">
+                    {t('upcoming.duration_minutes', { count: exam.duration_min })}
+                  </Text>
+                </Group>
+                <Group gap={6} className={styles.metaItem}>
+                  <IconFileText size={14} className={styles.metaIcon} />
+                  <Text size="xs" c="dimmed">
+                    {t('upcoming.questions_count', { count: exam.questions })}
+                  </Text>
+                </Group>
               </Group>
-            </Table.Td>
 
-            <Table.Td>
-              <Text size="sm">World History Final</Text>
-            </Table.Td>
-
-            <Table.Td>
-              <Stack gap={2}>
-                <Text size="sm" fw={500}>
-                  Oct 28, 2023
+              <Group justify="space-between" mt="sm">
+                <Text size="xs" className={styles.countdown}>
+                  {exam.countdown_days != null
+                    ? t('upcoming.countdown_days', { count: exam.countdown_days })
+                    : t('upcoming.countdown_unknown')}
                 </Text>
-                <Text size="xs" c="dimmed">
-                  02:00 PM
-                </Text>
-              </Stack>
-            </Table.Td>
-
-            <Table.Td>
-              <Badge variant="light" color="gray">
-                Upcoming
-              </Badge>
-            </Table.Td>
-
-            <Table.Td>
-              <Button size="xs" variant="outline">
-                View Details
-              </Button>
-            </Table.Td>
-          </Table.Tr>
-        </Table.Tbody>
-      </Table>
+                <ButtonFilled
+                  size="xs"
+                  color={exam.can_start ? 'teal' : 'gray'}
+                  label={exam.can_start ? t('upcoming.start_exam') : t('upcoming.not_open')}
+                  disabled={!exam.can_start}
+                  onClick={() => exam.can_start && navigate(`/exam/${exam.exam_id}`)}
+                />
+              </Group>
+            </Box>
+          ))}
+        </Stack>
+      )}
     </Paper>
   );
 }

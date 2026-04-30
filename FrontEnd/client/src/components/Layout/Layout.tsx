@@ -22,7 +22,7 @@ export function Layout() {
   return (
       <Suspense
         fallback={
-          <div className="flex flex-auto flex-col h-[100vh]">
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw' }}>
             <LoadingScreen />
           </div>
         }

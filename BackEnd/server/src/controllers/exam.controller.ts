@@ -4,6 +4,7 @@ import {
   listExamsByClass,
   getExam,
   createExamService,
+  updateExamService,
   deleteExamService,
   getQuestionsForStudent,
   getQuestionsForTeacher,
@@ -16,7 +17,14 @@ import {
   getMySubmissionForExam,
   getSessionGradingView,
   gradeEssaySessionService,
+  forceSubmitActiveSessionsByExamService,
+  normalizeIntegrityEvents,
+  persistIntegrityEventsService,
+  persistAutosaveSnapshotService,
+  createExamWithQuestionsService,
 } from "~/services/exam.service";
+import { parseExamImportDocx } from "~/services/examImport.service";
+import { emitForceSubmitNotification, startExamRuntimeFromServer } from "~/socket/examSocket";
 import type { QuestionType } from "~/models/question.model";
 
 export const getExamListController = async (req: Request, res: Response, next: NextFunction) => {
@@ -43,13 +51,70 @@ export const getExamController = async (req: Request, res: Response, next: NextF
 
 export const createExamController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, class_id, duration_min, description } = req.body;
+    const { title, class_id, duration_min, description, closes_at } = req.body;
     if (!title || !class_id || !duration_min) {
       return res.status(400).json({ success: false, message: "title/class_id/duration_min là bắt buộc" });
     }
     const user = (req as any).user;
-    const exam = await createExamService(title, class_id, user.userId, Number(duration_min), description);
+    const exam = await createExamService(
+      title,
+      class_id,
+      user.userId,
+      Number(duration_min),
+      description,
+      closes_at
+    );
     res.status(201).json({ success: true, data: exam });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const previewWordImportController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, message: "file .docx là bắt buộc" });
+    }
+    const preview = await parseExamImportDocx(file.buffer);
+    res.json({ success: true, data: preview });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const commitWordImportController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const { title, class_id, duration_min, description, closes_at, questions } = req.body;
+    const data = await createExamWithQuestionsService({
+      title,
+      class_id,
+      duration_min: Number(duration_min),
+      description,
+      closes_at,
+      questions,
+      created_by: user.userId,
+    });
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateExamController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const exam = await updateExamService(req.params.id, req.body);
+    if (!exam) return res.status(404).json({ success: false, message: "Không tìm thấy bài thi" });
+    res.json({ success: true, data: exam });
   } catch (err) {
     next(err);
   }
@@ -155,6 +220,34 @@ export const getExamSessionsController = async (req: Request, res: Response, nex
   }
 };
 
+export const forceSubmitExamSessionsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const examId = req.params.examId;
+    const data = await forceSubmitActiveSessionsByExamService(examId);
+    emitForceSubmitNotification(examId, data);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const startExamRuntimeController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const data = await startExamRuntimeFromServer(req.params.examId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getMySubmissionController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
@@ -185,6 +278,55 @@ export const gradeSessionController = async (req: Request, res: Response, next: 
     const user = (req as any).user;
     const session = await gradeEssaySessionService(req.params.sessionId, user.userId, user.role, grades);
     res.json({ success: true, data: session });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const postIntegrityEventsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const { exam_id, events } = req.body;
+
+    if (!exam_id) {
+      return res.status(400).json({ success: false, message: "exam_id là bắt buộc" });
+    }
+
+    const normalized = normalizeIntegrityEvents(events);
+    const data = await persistIntegrityEventsService(String(exam_id), user.userId, normalized);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const postAutosaveController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const { exam_id, saved_at, answers } = req.body;
+
+    if (!exam_id || !saved_at || answers === undefined) {
+      return res
+        .status(400)
+        .json({ success: false, message: "exam_id/saved_at/answers là bắt buộc" });
+    }
+
+    const data = await persistAutosaveSnapshotService({
+      examId: String(exam_id),
+      studentId: user.userId,
+      savedAt: String(saved_at),
+      answers,
+    });
+
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

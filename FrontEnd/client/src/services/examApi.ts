@@ -7,6 +7,8 @@ export interface Exam {
   class_id: string;
   created_by: string;
   duration_min: number;
+  /** Hạn chót được phép bắt đầu phiên (ISO), null nếu không đặt */
+  closes_at?: string | null;
   created_at: string;
   subject_name?: string;
   class_semester?: string;
@@ -23,6 +25,7 @@ export interface Question {
   question_type: QuestionType;
   options: Record<string, string> | null;
   points: number;
+  display_order?: number;
   created_at: string;
   correct_answer?: string | string[];
 }
@@ -89,6 +92,40 @@ export interface GradingPayload {
   }>;
 }
 
+export interface ForceSubmitSummary {
+  exam_id: string;
+  active_sessions: number;
+  submitted_sessions: number;
+  failed_sessions: number;
+}
+
+export interface StartRuntimeResult {
+  examId: string;
+  startedAt: string;
+  endsAt: string;
+  durationMin: number;
+}
+
+export interface ImportedQuestionDraft {
+  content: string;
+  question_type: QuestionType;
+  points: number;
+  options?: Record<string, string> | null;
+  correct_answer?: string | string[] | null;
+  display_order: number;
+}
+
+export interface ExamImportPreview {
+  exam: {
+    title?: string;
+    duration_min?: number;
+    description?: string;
+  };
+  questions: ImportedQuestionDraft[];
+  errors: string[];
+  warnings: string[];
+}
+
 const examApi = {
   getExams: async (classId?: string): Promise<Exam[]> => {
     const params = classId ? { class_id: classId } : {};
@@ -106,8 +143,17 @@ const examApi = {
     class_id: string;
     duration_min: number;
     description?: string;
+    closes_at?: string | null;
   }): Promise<Exam> => {
     const res = await apiClient.post<{ success: boolean; data: Exam }>('/exams', payload);
+    return res.data.data;
+  },
+
+  updateExam: async (
+    id: string,
+    payload: Partial<Pick<Exam, 'title' | 'description' | 'duration_min' | 'closes_at'>>
+  ): Promise<Exam> => {
+    const res = await apiClient.patch<{ success: boolean; data: Exam }>(`/exams/${id}`, payload);
     return res.data.data;
   },
 
@@ -136,6 +182,32 @@ const examApi = {
       `/exams/${examId}/questions`,
       payload
     );
+    return res.data.data;
+  },
+
+  previewWordImport: async (file: File): Promise<ExamImportPreview> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<{ success: boolean; data: ExamImportPreview }>(
+      '/exams/import-word/preview',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return res.data.data;
+  },
+
+  commitWordImport: async (payload: {
+    title: string;
+    class_id: string;
+    duration_min: number;
+    description?: string | null;
+    closes_at?: string | null;
+    questions: ImportedQuestionDraft[];
+  }): Promise<{ exam: Exam; questions: Question[] }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { exam: Exam; questions: Question[] };
+    }>('/exams/import-word/commit', payload);
     return res.data.data;
   },
 
@@ -171,6 +243,20 @@ const examApi = {
   getExamSessions: async (examId: string): Promise<ExamSession[]> => {
     const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
       `/exams/${examId}/sessions`
+    );
+    return res.data.data;
+  },
+
+  forceSubmitExam: async (examId: string): Promise<ForceSubmitSummary> => {
+    const res = await apiClient.post<{ success: boolean; data: ForceSubmitSummary }>(
+      `/exams/${examId}/force-submit`
+    );
+    return res.data.data;
+  },
+
+  startExamRuntime: async (examId: string): Promise<StartRuntimeResult> => {
+    const res = await apiClient.post<{ success: boolean; data: StartRuntimeResult }>(
+      `/exams/${examId}/start-runtime`
     );
     return res.data.data;
   },

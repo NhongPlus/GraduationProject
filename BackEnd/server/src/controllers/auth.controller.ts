@@ -16,11 +16,11 @@ export const registerController = async (req: Request, res: Response, next: Next
 
 export const loginController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, device_id, device_info } = req.body;
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "email/password là bắt buộc" });
     }
-    const result = await loginUser(email, password);
+    const result = await loginUser(email, password, device_id || "unknown", device_info);
     return res.status(200).json({ success: true, data: result });
   } catch (err: any) {
     next(err);

@@ -1,7 +1,6 @@
 import React from "react";
 import {
   NumberInput,
-  Loader,
   type NumberInputProps,
 } from "@mantine/core";
 import type { ReactNode } from "react";
@@ -21,7 +20,6 @@ const InputNumber: React.FC<InputNumberProps> = ({
   rightIcon,
   fontWeight,
   fullWidth,
-  color = "primary",
   onClick,
   ...props
 }) => {

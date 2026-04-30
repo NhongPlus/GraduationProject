@@ -6,8 +6,8 @@ export const publicRoutes: Routes = [...authRoute];
 
 export const protectedRoutes: Routes = [
   {
-    key: 'dashboard',
-    path: '/dashboard',
+    key: 'main',
+    path: '/main',
     component: lazy(() => import('@/pages/main/Dashboard/Dashboard')),
     authority: ['user', 'admin'],
   },
@@ -16,6 +16,18 @@ export const protectedRoutes: Routes = [
     path: '/exams',
     component: lazy(() => import('@/pages/main/Exam/ExamList')),
     authority: ['user', 'admin'],
+  },
+  {
+    key: 'exam-authoring',
+    path: '/exams/new',
+    component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
+    authority: ['admin'],
+  },
+  {
+    key: 'exam-authoring-edit',
+    path: '/exams/:examId/edit',
+    component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
+    authority: ['admin'],
   },
   {
     key: 'exam-take',

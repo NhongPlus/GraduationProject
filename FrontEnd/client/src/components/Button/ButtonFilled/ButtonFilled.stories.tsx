@@ -1,7 +1,6 @@
 // eslint-disable-next-line storybook/no-renderer-packages
 import type { Meta, StoryObj } from '@storybook/react';
 import ButtonFilled from './ButtonFilled';
-import { IconArrowRight } from '@tabler/icons-react';
 
 const meta: Meta<typeof ButtonFilled> = {
   title: 'Button/Filled',

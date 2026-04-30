@@ -1,0 +1,2199 @@
+{
+  "version": "2.11",
+  "children": [
+    {
+      "type": "frame",
+      "id": "DhO08",
+      "x": -453,
+      "y": -340,
+      "name": "marketplace",
+      "width": 1440,
+      "height": 900,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "CtITg",
+          "x": 0,
+          "y": 0,
+          "name": "header",
+          "width": 1440,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#E9E9E9"
+          },
+          "children": [
+            {
+              "type": "frame",
+              "id": "r8Gl3",
+              "name": "headerLeft",
+              "width": 500,
+              "height": 64,
+              "gap": 32,
+              "padding": [
+                0,
+                24
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "LIZv8",
+                  "name": "logo",
+                  "fill": "#6366F1",
+                  "content": "PromptMarket",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "rGWVu",
+                  "name": "nav",
+                  "width": 300,
+                  "height": 40,
+                  "gap": 24,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "pEx4w",
+                      "name": "nav1",
+                      "fill": "#6366F1",
+                      "content": "Explore",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "AY4ZG",
+                      "name": "nav2",
+                      "fill": "#64748B",
+                      "content": "Categories",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "gAl0m",
+                      "name": "nav3",
+                      "fill": "#64748B",
+                      "content": "Sell",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "BWt1I",
+              "name": "headerRight",
+              "width": 500,
+              "height": 64,
+              "gap": 16,
+              "padding": [
+                0,
+                24
+              ],
+              "justifyContent": "end",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "n4u0mn",
+                  "name": "searchBox",
+                  "width": 280,
+                  "height": 40,
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 20,
+                  "gap": 8,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "r8qw4A",
+                      "name": "searchIcon",
+                      "content": "🔍",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "hs5oc",
+                      "name": "searchPlaceholder",
+                      "fill": "#94A3B8",
+                      "content": "Search AI prompts...",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "WxDOZ",
+                  "name": "cartBtn",
+                  "width": 40,
+                  "height": 40,
+                  "fill": "#6366F1",
+                  "cornerRadius": 20,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "f7iMK",
+                      "name": "cartIcon",
+                      "content": "🛒",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "M6v2jo",
+                  "name": "userBtn",
+                  "width": 100,
+                  "height": 40,
+                  "fill": "#F1F5F9",
+                  "cornerRadius": 20,
+                  "gap": 8,
+                  "padding": [
+                    6,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "nOcQH",
+                      "name": "userAvatar",
+                      "fill": "#6366F1",
+                      "width": 28,
+                      "height": 28
+                    },
+                    {
+                      "type": "text",
+                      "id": "GnXEn",
+                      "name": "userName",
+                      "fill": "#1E293B",
+                      "content": "Sign In",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Lul0Z",
+          "x": 681,
+          "y": -166,
+          "name": "hero",
+          "width": 1440,
+          "height": 280,
+          "fill": "#6366F1",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "I7phPy",
+              "name": "heroContent",
+              "width": 600,
+              "height": 200,
+              "layout": "vertical",
+              "gap": 16,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ckqWH",
+                  "name": "heroTitle",
+                  "fill": "#FFFFFF",
+                  "content": "Discover & Sell Premium AI Prompts",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 32,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "g49qw",
+                  "name": "heroSubtitle",
+                  "fill": "#E0E7FF",
+                  "content": "Access thousands of curated prompts for ChatGPT, Midjourney, Stable Diffusion & more",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "NfuTb",
+                  "name": "heroBtns",
+                  "width": 400,
+                  "height": 48,
+                  "gap": 16,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "OHkCy",
+                      "name": "exploreBtn",
+                      "width": 140,
+                      "height": 48,
+                      "fill": "#FFFFFF",
+                      "cornerRadius": 24,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Y0fZce",
+                          "name": "exploreText",
+                          "fill": "#6366F1",
+                          "content": "Explore Prompts",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "y6hLm8",
+                      "name": "sellBtn",
+                      "width": 120,
+                      "height": 48,
+                      "cornerRadius": 24,
+                      "stroke": {
+                        "thickness": 2,
+                        "fill": "#FFFFFF"
+                      },
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ISFD7",
+                          "name": "sellText",
+                          "fill": "#FFFFFF",
+                          "content": "Start Selling",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "chVFp",
+          "x": 0,
+          "y": 344,
+          "name": "sidebar",
+          "width": 240,
+          "height": 556,
+          "fill": "#FFFFFF",
+          "stroke": {
+            "thickness": 1,
+            "fill": "#E9E9E9"
+          },
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            20,
+            16
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "I7zrqf",
+              "name": "sidebarTitle",
+              "fill": "#1E293B",
+              "content": "Categories",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "k2uyeX",
+              "name": "catItem1",
+              "width": 208,
+              "height": 40,
+              "fill": "#6366F1",
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "UIWyn",
+                  "name": "cat1Icon",
+                  "content": "💬",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "wTU3u",
+                  "name": "cat1Text",
+                  "fill": "#FFFFFF",
+                  "content": "ChatGPT",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "XbQks",
+              "name": "catItem2",
+              "width": 208,
+              "height": 40,
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "JZlW2",
+                  "name": "cat2Icon",
+                  "content": "🎨",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "hDm6h",
+                  "name": "cat2Text",
+                  "fill": "#64748B",
+                  "content": "Midjourney",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "g4iIDC",
+              "name": "catItem3",
+              "width": 208,
+              "height": 40,
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Q8xkH",
+                  "name": "cat3Icon",
+                  "content": "🖼️",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "AvVyg",
+                  "name": "cat3Text",
+                  "fill": "#64748B",
+                  "content": "Stable Diffusion",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "P52PN",
+              "name": "catItem4",
+              "width": 208,
+              "height": 40,
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Qg3bU",
+                  "name": "cat4Icon",
+                  "content": "📝",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "QrhWV",
+                  "name": "cat4Text",
+                  "fill": "#64748B",
+                  "content": "Writing",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "b28WYW",
+              "name": "catItem5",
+              "width": 208,
+              "height": 40,
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "aT5is",
+                  "name": "cat5Icon",
+                  "content": "💻",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "PZRCD",
+                  "name": "cat5Text",
+                  "fill": "#64748B",
+                  "content": "Coding",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "mDFtF",
+              "name": "catItem6",
+              "width": 208,
+              "height": 40,
+              "cornerRadius": 8,
+              "gap": 12,
+              "padding": [
+                10,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "nCOfY",
+                  "name": "cat6Icon",
+                  "content": "📊",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "PM7fE",
+                  "name": "cat6Text",
+                  "fill": "#64748B",
+                  "content": "Marketing",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "A8Ofj",
+          "x": 240,
+          "y": 344,
+          "name": "mainGrid",
+          "width": 1200,
+          "height": 556,
+          "fill": "#F8FAFC",
+          "layout": "vertical",
+          "gap": 20,
+          "padding": [
+            20,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "C2zDw",
+              "name": "gridHeader",
+              "width": 1168,
+              "height": 40,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "WcrOi",
+                  "name": "gridTitle",
+                  "fill": "#1E293B",
+                  "content": "Trending Prompts",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "sgoH6",
+                  "name": "sortSelect",
+                  "width": 160,
+                  "height": 36,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "gap": 8,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Qd8Sm",
+                      "name": "sortText",
+                      "fill": "#64748B",
+                      "content": "Most Popular ▼",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "hLjVv",
+              "name": "productsRow1",
+              "width": 1168,
+              "height": 240,
+              "gap": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "mDVl3",
+                  "name": "product1",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "h0Smw",
+                      "name": "prod1Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#EEF2FF",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Ss7cD",
+                          "name": "prod1Icon",
+                          "content": "💬",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "LmotQ",
+                      "name": "prod1Title",
+                      "fill": "#1E293B",
+                      "content": "ChatGPT Viral Tweets Generator",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "mzcIZ",
+                      "name": "prod1Desc",
+                      "fill": "#64748B",
+                      "content": "Create engaging viral tweets instantly",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bXNoQ",
+                      "name": "prod1Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "gnnKU",
+                          "name": "prod1Price",
+                          "fill": "#6366F1",
+                          "content": "$29",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ZP2Pa",
+                          "name": "prod1Sales",
+                          "fill": "#94A3B8",
+                          "content": "1.2k sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "XuWIS",
+                  "name": "product2",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "wSl6e",
+                      "name": "prod2Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#FEF3C7",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "CR3bT",
+                          "name": "prod2Icon",
+                          "content": "🎨",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "L7QFD",
+                      "name": "prod2Title",
+                      "fill": "#1E293B",
+                      "content": "Midjourney Photo Realism Prompts",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "pEu09",
+                      "name": "prod2Desc",
+                      "fill": "#64748B",
+                      "content": "Ultra-realistic images every time",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Stmep",
+                      "name": "prod2Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Pld9w",
+                          "name": "prod2Price",
+                          "fill": "#6366F1",
+                          "content": "$49",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ng7ld",
+                          "name": "prod2Sales",
+                          "fill": "#94A3B8",
+                          "content": "856 sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "CcGQU",
+                  "name": "product3",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "T44fIa",
+                      "name": "prod3Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#DCFCE7",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "WIBKi",
+                          "name": "prod3Icon",
+                          "content": "📝",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "ExEUC",
+                      "name": "prod3Title",
+                      "fill": "#1E293B",
+                      "content": "Professional Email Writer Pro",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "U0JuWv",
+                      "name": "prod3Desc",
+                      "fill": "#64748B",
+                      "content": "Write emails that get responses",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "H4CpU",
+                      "name": "prod3Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "u8JYl",
+                          "name": "prod3Price",
+                          "fill": "#6366F1",
+                          "content": "$19",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Pr2qZ",
+                          "name": "prod3Sales",
+                          "fill": "#94A3B8",
+                          "content": "2.1k sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "LToNw",
+                  "name": "product4",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Znnmu",
+                      "name": "prod4Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#F3E8FF",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "p130S2",
+                          "name": "prod4Icon",
+                          "content": "💻",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "OkxuY",
+                      "name": "prod4Title",
+                      "fill": "#1E293B",
+                      "content": "React Component Generator",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Tj2vV",
+                      "name": "prod4Desc",
+                      "fill": "#64748B",
+                      "content": "Generate components from descriptions",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "lFRfh",
+                      "name": "prod4Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "tnR7F",
+                          "name": "prod4Price",
+                          "fill": "#6366F1",
+                          "content": "$39",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "P5Ezc",
+                          "name": "prod4Sales",
+                          "fill": "#94A3B8",
+                          "content": "943 sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "N3ueir",
+              "name": "productsRow2",
+              "width": 1168,
+              "height": 240,
+              "gap": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "L6NHR",
+                  "name": "product5",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "YnlWG",
+                      "name": "prod5Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#CFFAFE",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "bpDTD",
+                          "name": "prod5Icon",
+                          "content": "📊",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "OHyes",
+                      "name": "prod5Title",
+                      "fill": "#1E293B",
+                      "content": "SEO Content Strategy Prompts",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TjKlV",
+                      "name": "prod5Desc",
+                      "fill": "#64748B",
+                      "content": "Boost your content ranking",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "lYHd4",
+                      "name": "prod5Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TOz7S",
+                          "name": "prod5Price",
+                          "fill": "#6366F1",
+                          "content": "$24",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "XAwma",
+                          "name": "prod5Sales",
+                          "fill": "#94A3B8",
+                          "content": "567 sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vZmwh",
+                  "name": "product6",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "tJyae",
+                      "name": "prod6Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#FEE2E2",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "y2Vxm",
+                          "name": "prod6Icon",
+                          "content": "🎬",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "WwQ7v",
+                      "name": "prod6Title",
+                      "fill": "#1E293B",
+                      "content": "YouTube Script Writer Bundle",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "yeN4k",
+                      "name": "prod6Desc",
+                      "fill": "#64748B",
+                      "content": " viral video scripts in minutes",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Vx2UE",
+                      "name": "prod6Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Gcu9r",
+                          "name": "prod6Price",
+                          "fill": "#6366F1",
+                          "content": "$34",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "k6rfj",
+                          "name": "prod6Sales",
+                          "fill": "#94A3B8",
+                          "content": "1.8k sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G2zIK",
+                  "name": "product7",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "SQQhs",
+                      "name": "prod7Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#F0FDFA",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xtdHw",
+                          "name": "prod7Icon",
+                          "content": "🖼️",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "nC5hq",
+                      "name": "prod7Title",
+                      "fill": "#1E293B",
+                      "content": "Stable Diffusion Master Prompts",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FsrJT",
+                      "name": "prod7Desc",
+                      "fill": "#64748B",
+                      "content": "500+ art generation prompts",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "q4DLub",
+                      "name": "prod7Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "qfzsq",
+                          "name": "prod7Price",
+                          "fill": "#6366F1",
+                          "content": "$44",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "q8gfkb",
+                          "name": "prod7Sales",
+                          "fill": "#94A3B8",
+                          "content": "723 sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Na7Xf",
+                  "name": "product8",
+                  "width": 270,
+                  "height": 240,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 12,
+                  "stroke": {
+                    "thickness": 1,
+                    "fill": "#E9E9E9"
+                  },
+                  "layout": "vertical",
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "YcFFI",
+                      "name": "prod8Img",
+                      "width": 238,
+                      "height": 100,
+                      "fill": "#FEF9C3",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "vvFwH",
+                          "name": "prod8Icon",
+                          "content": "📱",
+                          "fontFamily": "Inter",
+                          "fontSize": 40,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "fPcrK",
+                      "name": "prod8Title",
+                      "fill": "#1E293B",
+                      "content": "Mobile App Idea Generator",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ELGZU",
+                      "name": "prod8Desc",
+                      "fill": "#64748B",
+                      "content": "Generate app concepts instantly",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Oyn3x",
+                      "name": "prod8Footer",
+                      "width": 238,
+                      "height": 40,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "IM3Hx",
+                          "name": "prod8Price",
+                          "fill": "#6366F1",
+                          "content": "$27",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "H5918p",
+                          "name": "prod8Sales",
+                          "fill": "#94A3B8",
+                          "content": "445 sales",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "f9nJ6s",
+      "x": -453,
+      "y": -340,
+      "name": "marketplace",
+      "width": 1440,
+      "height": 900,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "X4MWr5",
+          "x": 0,
+          "y": 0,
+          "name": "header",
+          "width": 1440,
+          "height": 80,
+          "fill": "#FFFFFF",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Ewqyq",
+              "name": "headerLeft",
+              "width": 500,
+              "height": 80,
+              "gap": 40,
+              "padding": [
+                0,
+                48
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "BfKPg",
+                  "name": "logo",
+                  "fill": "#1A1A1A",
+                  "content": "PROMPT",
+                  "fontFamily": "Anton",
+                  "fontSize": 28,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "K9vk2",
+                  "name": "logoAccent",
+                  "fill": "#7B61FF",
+                  "content": "FLOW",
+                  "fontFamily": "Anton",
+                  "fontSize": 28,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "y9uDc",
+                  "name": "nav",
+                  "width": 280,
+                  "height": 40,
+                  "gap": 32,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "QpF5x",
+                      "name": "nav1",
+                      "fill": "#7B61FF",
+                      "content": "Explore",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "D6Szjz",
+                      "name": "nav2",
+                      "fill": "#4B5563",
+                      "content": "Categories",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "q9jAv4",
+                      "name": "nav3",
+                      "fill": "#4B5563",
+                      "content": "Sell",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "d8EuKE",
+              "name": "headerRight",
+              "width": 500,
+              "height": 80,
+              "gap": 16,
+              "padding": [
+                0,
+                48
+              ],
+              "justifyContent": "end",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "G86JP3",
+                  "name": "searchBox",
+                  "width": 280,
+                  "height": 44,
+                  "fill": "#F3F4F6",
+                  "cornerRadius": 4,
+                  "gap": 12,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ZLOtV",
+                      "name": "searchIcon",
+                      "content": "🔍",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "AlON2",
+                      "name": "searchPlaceholder",
+                      "fill": "#9CA3AF",
+                      "content": "Search prompts...",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "KcuOD",
+                  "name": "cartBtn",
+                  "width": 44,
+                  "height": 44,
+                  "fill": "#7B61FF",
+                  "cornerRadius": 4,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "HVpNY",
+                      "name": "cartIcon",
+                      "content": "🛒",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "WpSBU",
+                  "name": "userBtn",
+                  "width": 100,
+                  "height": 44,
+                  "fill": "#7B61FF",
+                  "cornerRadius": 4,
+                  "padding": [
+                    10,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Wi2cN",
+                      "name": "userText",
+                      "fill": "#FFFFFF",
+                      "content": "Sign In",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "VxoIL",
+      "x": -453,
+      "y": 496,
+      "name": "zigzag1",
+      "width": 1440,
+      "height": 400
+    },
+    {
+      "type": "frame",
+      "id": "B0P36P",
+      "x": 1042,
+      "y": 145,
+      "name": "heroZone",
+      "width": 1440,
+      "height": 500,
+      "children": [
+        {
+          "type": "frame",
+          "id": "yhb0H",
+          "name": "heroLeft",
+          "width": 720,
+          "height": 500,
+          "fill": "#7B61FF",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            80,
+            60
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "MJXSm",
+              "name": "heroTitle",
+              "fill": "#FFFFFF",
+              "content": "DISCOVER",
+              "fontFamily": "Anton",
+              "fontSize": 64,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "oOk43",
+              "name": "heroTitle2",
+              "fill": "#FFFFFF",
+              "content": "PREMIUM AI",
+              "fontFamily": "Anton",
+              "fontSize": 64,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "QDKr3",
+              "name": "heroTitle3",
+              "fill": "#FFFFFF",
+              "content": "PROMPTS",
+              "fontFamily": "Anton",
+              "fontSize": 64,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "VWT88",
+              "name": "heroSubtitle",
+              "fill": "#E0E7FF",
+              "content": "Access thousands of curated prompts for ChatGPT, Midjourney, Stable Diffusion & more",
+              "fontFamily": "Geist",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "eO0hz",
+              "name": "heroCTA",
+              "width": 300,
+              "height": 56,
+              "gap": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Dnhly",
+                  "name": "ctaPrimary",
+                  "width": 160,
+                  "height": 56,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 4,
+                  "padding": [
+                    16,
+                    32
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vV2wQ",
+                      "name": "ctaPrimaryText",
+                      "fill": "#7B61FF",
+                      "content": "Start Exploring",
+                      "fontFamily": "Geist",
+                      "fontSize": 16,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gOisW",
+                  "name": "ctaSecondary",
+                  "width": 120,
+                  "height": 56,
+                  "cornerRadius": 4,
+                  "stroke": {
+                    "thickness": 2,
+                    "fill": "#FFFFFF"
+                  },
+                  "padding": [
+                    16,
+                    32
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "TMbWz",
+                      "name": "ctaSecondaryText",
+                      "fill": "#FFFFFF",
+                      "content": "Sell Now",
+                      "fontFamily": "Geist",
+                      "fontSize": 16,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "NzOOC",
+          "name": "heroRight",
+          "width": 720,
+          "height": 500,
+          "fill": "#FDE2D9",
+          "cornerRadius": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Y3Lvoc",
+              "name": "heroImgPlaceholder",
+              "width": 600,
+              "height": 400,
+              "fill": "#E0E7FF",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "fSCuY",
+                  "name": "heroImgText",
+                  "content": "📸",
+                  "fontFamily": "Inter",
+                  "fontSize": 80,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "fA6hD",
+                  "name": "heroImgCaption",
+                  "fill": "#9CA3AF",
+                  "content": "Candid Lifestyle Photography",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "yeHX6",
+      "x": 1117,
+      "y": 837,
+      "name": "accentBlock",
+      "width": 1440,
+      "height": 200,
+      "fill": "#7B61FF",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "tcKqL",
+          "name": "accentContent",
+          "width": 1440,
+          "height": 120,
+          "layout": "vertical",
+          "gap": 20,
+          "padding": [
+            40,
+            80
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "W078J",
+              "name": "accentTitle",
+              "fill": "#FFFFFF",
+              "content": "TRENDING CATEGORIES",
+              "fontFamily": "Anton",
+              "fontSize": 28,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "oNBom",
+              "name": "featureRow",
+              "width": 1280,
+              "height": 60,
+              "gap": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "w0yslf",
+                  "name": "feat1",
+                  "width": 200,
+                  "height": 60,
+                  "fill": "#FFFFFF30",
+                  "cornerRadius": 6,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "m0EBL",
+                      "name": "feat1Icon",
+                      "content": "💬",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kRJfS",
+                      "name": "feat1Text",
+                      "fill": "#FFFFFF",
+                      "content": "ChatGPT",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ImetR",
+                  "name": "feat2",
+                  "width": 240,
+                  "height": 60,
+                  "fill": "#FFFFFF30",
+                  "cornerRadius": 6,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "KcZbE",
+                      "name": "feat2Icon",
+                      "content": "🎨",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "rDqEn",
+                      "name": "feat2Text",
+                      "fill": "#FFFFFF",
+                      "content": "Midjourney",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "BzzQR",
+                  "name": "feat3",
+                  "width": 260,
+                  "height": 60,
+                  "fill": "#FFFFFF30",
+                  "cornerRadius": 6,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "S7TVTh",
+                      "name": "feat3Icon",
+                      "content": "🖼️",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ifoaS",
+                      "name": "feat3Text",
+                      "fill": "#FFFFFF",
+                      "content": "Stable Diffusion",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "hWShj",
+                  "name": "feat4",
+                  "width": 200,
+                  "height": 60,
+                  "fill": "#FFFFFF30",
+                  "cornerRadius": 6,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "URICN",
+                      "name": "feat4Icon",
+                      "content": "📝",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "UJelf",
+                      "name": "feat4Text",
+                      "fill": "#FFFFFF",
+                      "content": "Writing",
+                      "fontFamily": "Geist",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "xq6vg",
+          "name": "ticker",
+          "width": 1440,
+          "height": 40,
+          "fill": "#6B4FE0",
+          "padding": [
+            10,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "D1BBL0",
+              "name": "tickerText",
+              "fill": "#E0E7FF",
+              "content": "✦ PROMPTFLOW ✦ DISCOVER AI PROMPTS ✦ SELL YOUR CREATIVITY ✦ JOIN THOUSANDS OF CREATORS ✦ PROMPTFLOW ✦ DISCOVER AI PROMPTS ✦",
+              "fontFamily": "Geist",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "fEp1u",
+      "x": 1594,
+      "y": 937,
+      "name": "zig1Right",
+      "width": 840,
+      "height": 400,
+      "fill": "#E0F7FA",
+      "cornerRadius": 6,
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "T6T8u",
+          "name": "zig1Img",
+          "width": 700,
+          "height": 320,
+          "fill": "#FFFFFF",
+          "cornerRadius": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "bLph3",
+              "name": "zig1ImgIcon",
+              "content": "📱",
+              "fontFamily": "Inter",
+              "fontSize": 100,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "u8Md1",
+      "x": 1061,
+      "y": 1070,
+      "name": "zig1Left",
+      "width": 600,
+      "height": 400,
+      "fill": "#FDE2D9",
+      "layout": "vertical",
+      "gap": 16,
+      "padding": [
+        60,
+        40
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "KufUb",
+          "name": "zig1Label",
+          "fill": "#7B61FF",
+          "content": "FEATURED SELLER",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "puS8r",
+          "name": "zig1Title",
+          "fill": "#1A1A1A",
+          "content": "CREATE VIRAL",
+          "fontFamily": "Anton",
+          "fontSize": 48,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "cSyD2",
+          "name": "zig1Title2",
+          "fill": "#1A1A1A",
+          "content": "CONTENT",
+          "fontFamily": "Anton",
+          "fontSize": 48,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "d9OeO",
+          "name": "zig1Desc",
+          "fill": "#4B5563",
+          "content": "Our best-selling ChatGPT prompts helped 10,000+ creators generate engaging content that drives viral growth.",
+          "fontFamily": "Geist",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "f1H3ao",
+          "name": "zig1Price",
+          "fill": "#7B61FF",
+          "content": "From $29",
+          "fontFamily": "Anton",
+          "fontSize": 24,
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "m5xTAe",
+      "x": 593,
+      "y": 1231,
+      "name": "zigzag2",
+      "width": 1440,
+      "height": 400,
+      "children": [
+        {
+          "type": "frame",
+          "id": "HiA8F",
+          "name": "zig2Left",
+          "width": 840,
+          "height": 400,
+          "fill": "#F3E8FF",
+          "cornerRadius": 6,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Q4MjAy",
+              "name": "zig2Img",
+              "width": 700,
+              "height": 320,
+              "fill": "#FFFFFF",
+              "cornerRadius": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "lchcp",
+                  "name": "zig2ImgIcon",
+                  "content": "🎨",
+                  "fontFamily": "Inter",
+                  "fontSize": 100,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Mn0An",
+          "name": "zig2Right",
+          "width": 600,
+          "height": 400,
+          "fill": "#7B61FF",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            60,
+            40
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "gV5U8",
+              "name": "zig2Label",
+              "fill": "#E0E7FF",
+              "content": "EDITOR'S CHOICE",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "sNeZl",
+              "name": "zig2Title",
+              "fill": "#FFFFFF",
+              "content": "STUNNING",
+              "fontFamily": "Anton",
+              "fontSize": 48,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "ltG38",
+              "name": "zig2Title2",
+              "fill": "#FFFFFF",
+              "content": "IMAGES",
+              "fontFamily": "Anton",
+              "fontSize": 48,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "WRIK8",
+              "name": "zig2Desc",
+              "fill": "#E0E7FF",
+              "content": "Midjourney prompts that generate breathtaking, photorealistic images. Used by professional artists worldwide.",
+              "fontFamily": "Geist",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "su51I",
+              "name": "zig2Price",
+              "fill": "#FFFFFF",
+              "content": "From $49",
+              "fontFamily": "Anton",
+              "fontSize": 24,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

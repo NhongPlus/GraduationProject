@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Title, Text, Loader, Table, Badge } from '@mantine/core';
+import { Box, Title, Text, Loader, Table, Badge, Paper, Group, Alert, Stack } from '@mantine/core';
+import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
-import type { Result, Question } from '@/services/examApi';
+import type { MySubmission, Question } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
 const ExamResult = () => {
+  const { t } = useTranslation();
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<MySubmission | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,24 +20,24 @@ const ExamResult = () => {
       if (!examId) return;
       try {
         setLoading(true);
-        const data = await examApi.getExamResult(examId);
+        const data = await examApi.getMySubmission(examId);
         setResult(data);
-        const qs = await examApi.getExamQuestions(examId);
+        const qs = await examApi.getQuestions(examId);
         setQuestions(qs);
       } catch {
-        setError('Không tải được kết quả.');
+        setError(t('errors.result_load_failed'));
       } finally {
         setLoading(false);
       }
     };
 
     loadResult();
-  }, [examId]);
+  }, [examId, t]);
 
   if (!examId) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
-        <Title order={2}>Bài thi không hợp lệ</Title>
+        <Title order={2}>{t('exam_result.invalid_exam')}</Title>
       </Box>
     );
   }
@@ -59,10 +61,10 @@ const ExamResult = () => {
   if (!result) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
-        <Title order={2}>Chưa có kết quả cho bài thi này</Title>
+        <Title order={2}>{t('exam_result.no_result')}</Title>
         <ButtonFilled
           style={{ marginTop: 16 }}
-          label="Quay lại danh sách bài thi"
+          label={t('common.back_exam_list')}
           disabled={false}
           onClick={() => navigate('/exams')}
         />
@@ -70,52 +72,102 @@ const ExamResult = () => {
     );
   }
 
-  const perQuestion = questions.map((q) => {
-    const stored = localStorage.getItem(`exam_draft_${examId}`);
-    const draft = stored ? (JSON.parse(stored) as Record<number, number>) : {};
-    const selected = draft[q.id];
-    const isCorrect = selected === q.answer;
-    return { ...q, selected, isCorrect };
-  });
+  const detailsByQuestionId = new Map(result.details.map((d) => [d.question_id, d]));
+  const scorePct =
+    result.max_points && result.max_points > 0 && result.score != null
+      ? Math.round((result.score / result.max_points) * 100)
+      : null;
+  const correctCount = result.details.filter((d) => d.is_correct).length;
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
-      <Title order={2}>Kết quả bài thi {examId}</Title>
-      <Text mt="md">Số câu đúng: {result.correct} / {result.total}</Text>
-      <Text>Điểm (%): {result.percentage}%</Text>
-      <Text mt="sm">Thời gian làm: {new Date(result.takenAt).toLocaleString()}</Text>
+      <Stack gap="md">
+        <Title order={2}>{t('exam_result.title', { id: examId })}</Title>
 
-      <Table mt="md" striped>
-        <thead>
-          <tr>
-            <th>Câu</th>
-            <th>Đáp án bạn chọn</th>
-            <th>Đáp án đúng</th>
-            <th>Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          {perQuestion.map((row) => (
-            <tr key={row.id}>
-              <td>{row.id}</td>
-              <td>{row.selected !== undefined ? row.options[row.selected] : '—'}</td>
-              <td>{row.options[row.answer]}</td>
-              <td>
-                <Badge color={row.isCorrect ? 'green' : 'red'}>
-                  {row.isCorrect ? 'Đúng' : 'Sai'}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+        <Group grow>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('exam_result.correct_label')}</Text>
+            <Text fw={700} size="xl">
+              {correctCount}/{result.details.length}
+            </Text>
+          </Paper>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('exam_result.score_label')}</Text>
+            <Text fw={700} size="xl">
+              {result.score != null && result.max_points != null
+                ? `${result.score}/${result.max_points}`
+                : t('exam_result.pending_score')}
+            </Text>
+          </Paper>
+          <Paper withBorder radius="md" p="md">
+            <Text size="sm" c="dimmed">{t('exam_result.percentage_label')}</Text>
+            <Text fw={700} size="xl">{scorePct != null ? `${scorePct}%` : '—'}</Text>
+          </Paper>
+        </Group>
 
-      <ButtonFilled
-        style={{ marginTop: 16 }}
-        label="Xem dự đoán điểm AI"
-        disabled={false}
-        onClick={() => navigate('/prediction')}
-      />
+        {result.grading_status === 'pending_manual' && (
+          <Alert color="yellow" variant="light">
+            {t('exam_result.pending_manual')}
+          </Alert>
+        )}
+
+        <Paper withBorder radius="md" p="sm">
+          <Table striped>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('exam_result.question')}</Table.Th>
+                <Table.Th>{t('exam_result.selected_answer')}</Table.Th>
+                <Table.Th>{t('exam_result.correct_answer')}</Table.Th>
+                <Table.Th>{t('exam_result.status')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {questions.map((q, idx) => {
+                const detail = detailsByQuestionId.get(q.id);
+                const submitted = detail?.submitted;
+                const selectedText =
+                  submitted == null
+                    ? '—'
+                    : Array.isArray(submitted)
+                      ? submitted.join(', ')
+                      : String(submitted);
+                const correctText =
+                  q.correct_answer == null
+                    ? '—'
+                    : Array.isArray(q.correct_answer)
+                      ? q.correct_answer.join(', ')
+                      : String(q.correct_answer);
+                return (
+                  <Table.Tr key={q.id}>
+                    <Table.Td>{idx + 1}</Table.Td>
+                    <Table.Td>{selectedText}</Table.Td>
+                    <Table.Td>{correctText}</Table.Td>
+                    <Table.Td>
+                      <Badge color={detail?.is_correct ? 'green' : 'red'}>
+                        {detail?.is_correct ? t('exam_result.correct') : t('exam_result.wrong')}
+                      </Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </Paper>
+
+        <Group>
+          <ButtonFilled
+            label={t('exam_result.view_prediction')}
+            disabled={false}
+            onClick={() => navigate('/prediction')}
+          />
+          <ButtonFilled
+            label={t('common.back_exam_list')}
+            color="gray"
+            disabled={false}
+            onClick={() => navigate('/exams')}
+          />
+        </Group>
+      </Stack>
     </Box>
   );
 };

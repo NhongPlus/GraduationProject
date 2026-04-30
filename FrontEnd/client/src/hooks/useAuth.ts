@@ -1,25 +1,16 @@
-import { useEffect, useState } from 'react';
-
-const ACCESS_TOKEN_KEY = 'access_token';
-const USER_ROLE_KEY = 'user_role';
-
-// DB dùng 'teacher', admin/teacher → quyền admin trong FE
-const resolveRole = (): 'admin' | 'user' => {
-  const role = localStorage.getItem(USER_ROLE_KEY);
-  if (role === 'admin' || role === 'teacher') return 'admin';
-  return 'user';
-};
+import { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from './useAppStore';
+import { refreshAuthFromStorage } from '@/store/authSlice';
 
 const useAuth = () => {
-  const [authenticated, setAuthenticated] = useState(
-    () => Boolean(localStorage.getItem(ACCESS_TOKEN_KEY))
+  const dispatch = useAppDispatch();
+  const { authenticated, userRole, accessToken, userName, userEmail } = useAppSelector(
+    (state) => state.auth
   );
-  const [userRole, setUserRole] = useState<'admin' | 'user'>(resolveRole);
 
   useEffect(() => {
     const refresh = () => {
-      setAuthenticated(Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
-      setUserRole(resolveRole());
+      dispatch(refreshAuthFromStorage());
     };
 
     window.addEventListener('storage', refresh);
@@ -29,12 +20,15 @@ const useAuth = () => {
       window.removeEventListener('storage', refresh);
       window.removeEventListener('auth-change', refresh as EventListener);
     };
-  }, []);
+  }, [dispatch]);
 
   return {
     authenticated,
     userAuthority: userRole === 'admin' ? ['admin', 'user'] : ['user'],
     userRole,
+    accessToken,
+    userName,
+    userEmail,
   };
 };
 

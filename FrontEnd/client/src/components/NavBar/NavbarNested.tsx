@@ -18,6 +18,7 @@ import {
 } from '@mantine/core';
 import { useState, type ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import useAuth from '@/hooks/useAuth';
 import classes from './NavbarNested.module.css';
 
@@ -28,16 +29,29 @@ type LinksGroupProps = {
     icon: ComponentType<{ size?: number }>;
     links?: NavLink[];
     initiallyOpened?: boolean;
+    link?: string;
 };
 
-function LinksGroup({ label, icon: Icon, links, initiallyOpened = false }: LinksGroupProps) {
+function LinksGroup({ label, icon: Icon, links, initiallyOpened = false, link }: LinksGroupProps) {
+    const navigate = useNavigate();
     const hasLinks = Array.isArray(links);
     const [opened, setOpened] = useState(initiallyOpened);
+
+    const handleClick = () => {
+        if (hasLinks) {
+            setOpened((o) => !o);
+            return;
+        }
+
+        if (link) {
+            navigate(link);
+        }
+    };
 
     return (
         <>
             <UnstyledButton
-                onClick={() => hasLinks && setOpened((o) => !o)}
+                onClick={handleClick}
                 className={classes.control}
             >
                 <Group justify="space-between" gap={0}>
@@ -101,63 +115,68 @@ function UserButton() {
     );
 }
 
-/* ================== DATA ================== */
-const adminNav = [
-    { label: 'Dashboard', icon: IconGauge },
-    {
-        label: 'Bài thi',
-        icon: IconFileAnalytics,
-        initiallyOpened: true,
-        links: [
-            { label: 'Danh sách bài thi', link: '/exams' },
-            { label: 'Dự đoán điểm', link: '/prediction' },
-        ],
-    },
-    {
-        label: 'Quản lý sinh viên',
-        icon: IconCalendarStats,
-        links: [
-            { label: 'Danh sách sinh viên', link: '/admin/students' },
-        ],
-    },
-];
-
-const studentNav = [
-    { label: 'Dashboard', icon: IconGauge },
-    {
-        label: 'Bài thi',
-        icon: IconFileAnalytics,
-        initiallyOpened: true,
-        links: [
-            { label: 'Danh sách bài thi', link: '/exams' },
-            { label: 'Dự đoán điểm', link: '/prediction' },
-        ],
-    },
-    {
-        label: 'Sinh viên',
-        icon: IconNotes,
-        links: [
-            { label: 'Kết quả của tôi', link: '/my-results' },
-        ],
-    },
-    {
-        label: 'Security',
-        icon: IconLock,
-        links: [
-            { label: 'Enable 2FA', link: '/' },
-            { label: 'Change password', link: '/' },
-            { label: 'Recovery codes', link: '/' },
-        ],
-    },
-];
-
 /* ================== Navbar ================== */
 export function NavbarNested() {
+    const { t } = useTranslation();
     const { userAuthority } = useAuth();
     const isAdmin = userAuthority.includes('admin');
     const isClient = userAuthority.includes('user');
 
-    const links = isAdmin ? adminNav : isClient ? studentNav : [{ label: 'Dashboard', icon: IconGauge }];
+    const adminNav = [
+        { label: t('nav.main'), icon: IconGauge, link: '/main' },
+        {
+            label: t('nav.exams'),
+            icon: IconFileAnalytics,
+            initiallyOpened: true,
+            links: [
+                { label: t('nav.exam_list'), link: '/exams' },
+                { label: t('nav.exam_create'), link: '/exams/new' },
+                { label: t('nav.prediction'), link: '/prediction' },
+            ],
+        },
+        {
+            label: t('nav.student_management'),
+            icon: IconCalendarStats,
+            links: [
+                { label: t('nav.student_list'), link: '/admin/students' },
+            ],
+        },
+    ];
+
+    const studentNav = [
+        { label: t('nav.main'), icon: IconGauge, link: '/main' },
+        {
+            label: t('nav.exams'),
+            icon: IconFileAnalytics,
+            initiallyOpened: true,
+            links: [
+                { label: t('nav.exam_list'), link: '/exams' },
+                { label: t('nav.prediction'), link: '/prediction' },
+            ],
+        },
+        {
+            label: t('nav.student'),
+            icon: IconNotes,
+            links: [
+                { label: t('nav.my_results'), link: '/my-results' },
+            ],
+        },
+        {
+            label: t('nav.security'),
+            icon: IconLock,
+            links: [
+                { label: t('nav.enable_2fa'), link: '/' },
+                { label: t('nav.change_password'), link: '/' },
+                { label: t('nav.recovery_codes'), link: '/' },
+            ],
+        },
+    ];
+
+    const links = isAdmin
+        ? adminNav
+        : isClient
+            ? studentNav
+            : [{ label: t('nav.main'), icon: IconGauge, link: '/main' }];
 
     return (
         <nav className={classes.navbar}>

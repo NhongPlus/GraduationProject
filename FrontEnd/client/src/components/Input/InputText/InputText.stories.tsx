@@ -1,7 +1,7 @@
 // eslint-disable-next-line storybook/no-renderer-packages
 import type { Meta, StoryObj } from "@storybook/react";
 import InputText from "./InputText";
-import { IconMail, IconUser } from "@tabler/icons-react";
+import { IconMail } from "@tabler/icons-react";
 
 const meta: Meta<typeof InputText> = {
   title: "Input/Text",
