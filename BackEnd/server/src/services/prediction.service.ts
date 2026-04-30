@@ -190,8 +190,15 @@ Dựa trên điểm vừa thi, lịch sử học tập, hệ số tương quan P
     throw new Error(`MiniMax API error ${response.status}: ${text}`);
   }
 
-  const json = await response.json() as { choices?: Array<{ messages?: Array<{ content_string?: string }> }> };
-  const rawContent = json.choices?.[0]?.messages?.[0]?.content_string ?? "";
+  const json = await response.json() as {
+    choices?: Array<{
+      message?: {
+        content?: string;
+        role?: string;
+      };
+    }>;
+  };
+  const rawContent = json.choices?.[0]?.message?.content ?? "";
 
   // Extract JSON from markdown code block if present
   const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) ?? rawContent.match(/\{[\s\S]*\}/);

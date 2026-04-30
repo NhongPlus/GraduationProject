@@ -151,7 +151,14 @@
     "readiness_high": "High",
     "readiness_medium": "Medium",
     "readiness_low": "Needs improvement",
-    "no_data": "Not enough historical data for an accurate prediction yet."
+    "no_data": "Not enough historical data for an accurate prediction yet.",
+    "last_exam": "Last exam",
+    "advice_title": "Advice",
+    "all_predictions": "All subject predictions",
+    "semester": "Semester",
+    "credits": "Credits",
+    "history": "Score history",
+    "grade": "Grade"
   },
   "my_results": {
     "title": "My results",

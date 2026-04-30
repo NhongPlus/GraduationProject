@@ -151,7 +151,14 @@
     "readiness_high": "高い",
     "readiness_medium": "ふつう",
     "readiness_low": "改善が必要",
-    "no_data": "予測に十分な履歴データがありません。"
+    "no_data": "予測に十分な履歴データがありません。",
+    "last_exam": "さいごの しけん",
+    "advice_title": "提案",
+    "all_predictions": "すべてのがんすう よほう",
+    "semester": "きがっき",
+    "credits": "たんい",
+    "history": "れきし",
+    "grade": "かくにん"
   },
   "my_results": {
     "title": "じぶんの けっか",

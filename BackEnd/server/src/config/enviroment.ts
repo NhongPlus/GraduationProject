@@ -45,5 +45,5 @@ export const env = {
   /** MiniMax API — AI dự đoán điểm học phần */
   MINIMAX_API_KEY: process.env.MINIMAX_API_KEY?.trim() || "",
   MINIMAX_BASE_URL: process.env.MINIMAX_BASE_URL?.trim() || "https://api.minimax.chat/v1",
-  MINIMAX_MODEL: process.env.MINIMAX_MODEL?.trim() || "MiniMax-AB-06",
+  MINIMAX_MODEL: process.env.MINIMAX_MODEL?.trim() || "MiniMax-M2.7",
 };

@@ -1,15 +1,20 @@
 import { Router } from "express";
 import { predictScore, PredictionRequest } from "~/services/prediction.service";
+import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 
 const router = Router();
 
 // POST /v1/prediction — AI dự đoán điểm các môn tiếp theo
-router.post("/", roleMiddleware(["student", "teacher", "admin"]), async (req, res, next) => {
+router.post("/", authMiddleware, roleMiddleware(["student", "teacher", "admin"]), async (req, res, next) => {
   try {
     const { student_id, student_name, just_completed, history, target_subjects } = req.body as PredictionRequest;
 
-    if (!student_id || !just_completed || !history) {
+    // Lấy userId từ JWT token — không cần FE gửi student_id
+    const userIdFromToken = (req as any).user?.userId as string | undefined;
+    const effectiveStudentId = student_id || userIdFromToken;
+
+    if (!effectiveStudentId || !just_completed || !history) {
       return res.status(400).json({ success: false, message: "student_id, just_completed, history là bắt buộc" });
     }
     if (typeof just_completed.score !== "number" || just_completed.score < 0 || just_completed.score > 10) {
@@ -17,7 +22,7 @@ router.post("/", roleMiddleware(["student", "teacher", "admin"]), async (req, re
     }
 
     const result = await predictScore({
-      student_id,
+      student_id: effectiveStudentId,
       student_name,
       just_completed,
       history,

@@ -126,6 +126,32 @@ export interface ExamImportPreview {
   warnings: string[];
 }
 
+export interface PredictionSubject {
+  subject: string;
+  semester: number;
+  credits: number;
+  predicted_score: number;
+  grade: string;
+  confidence: number;
+  trend: 'up' | 'stable' | 'down';
+  correlation_r: number;
+  reasoning: string;
+}
+
+export interface JustCompleted {
+  subject: string;
+  score: number;
+  grade: string;
+  vs_class_avg?: string;
+  analysis?: string;
+}
+
+export interface PredictionResult {
+  just_completed: JustCompleted;
+  predictions: PredictionSubject[];
+  overall_advice: string;
+}
+
 const examApi = {
   getExams: async (classId?: string): Promise<Exam[]> => {
     const params = classId ? { class_id: classId } : {};
@@ -282,6 +308,20 @@ const examApi = {
     const res = await apiClient.patch<{ success: boolean; data: ExamSession }>(
       `/exams/sessions/${sessionId}/grade`,
       { grades }
+    );
+    return res.data.data;
+  },
+
+  getPrediction: async (payload: {
+    student_id: string;
+    student_name?: string;
+    just_completed: { subject: string; score: number; grade: string };
+    history: Array<{ subject: string; score: number; grade: string }>;
+    target_subjects?: string[];
+  }): Promise<PredictionResult> => {
+    const res = await apiClient.post<{ success: boolean; data: PredictionResult }>(
+      '/prediction',
+      payload
     );
     return res.data.data;
   },

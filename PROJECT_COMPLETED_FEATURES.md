@@ -66,6 +66,10 @@
 - [x] Tự động phát hiện môn phụ thuộc từ chuỗi prerequisites
 - [x] Fallback khi parse JSON lỗi
 
+#### Frontend — Prediction
+- [x] `Prediction.tsx` gọi `POST /v1/prediction` (MiniMax AI), hiển thị `predictions[]`, `overall_advice`, `just_completed`
+- [x] Fallback: hiển thị thông báo lỗi khi gọi BE thất bại
+
 ---
 
 ### Frontend — Đã hoàn thiện

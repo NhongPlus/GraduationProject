@@ -151,7 +151,14 @@
     "readiness_high": "Cao",
     "readiness_medium": "Trung bình",
     "readiness_low": "Cần cải thiện",
-    "no_data": "Chưa đủ dữ liệu lịch sử để đưa ra dự đoán chính xác."
+    "no_data": "Chưa đủ dữ liệu lịch sử để đưa ra dự đoán chính xác.",
+    "last_exam": "Môn vừa thi",
+    "advice_title": "Lời khuyên",
+    "all_predictions": "Dự đoán các môn tiếp theo",
+    "semester": "Học kỳ",
+    "credits": "Tín chỉ",
+    "history": "Lịch sử điểm",
+    "grade": "Xếp loại"
   },
   "my_results": {
     "title": "Kết quả của tôi",
