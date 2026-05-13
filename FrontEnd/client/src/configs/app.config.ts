@@ -9,7 +9,7 @@ export type AppConfig = {
   locale: string;
   layoutType: LayoutTypes;
 };
-// import.meta.env.VITE_API_URL ||
+/** Dev fallback only. Production builds must set `VITE_API_URL` on the host to the real API (never localhost). */
 const appConfig: AppConfig = {
   layoutType: LayoutTypes.SimpleSideBar,
   apiURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
