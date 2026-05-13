@@ -12,12 +12,30 @@ export type AppConfig = {
 /** Production API when no `VITE_API_URL`. Dev server (`vite`) uses localhost unless overridden. */
 const DEFAULT_PRODUCTION_API_URL = 'https://api.nhongplus.id.vn';
 
+function looksLikeLocalApiUrl(url: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
 function resolveApiUrl(): string {
-  const raw = import.meta.env.VITE_API_URL;
-  if (typeof raw === 'string' && raw.trim() !== '') {
-    return raw.trim().replace(/\/+$/, '');
+  const raw =
+    typeof import.meta.env.VITE_API_URL === 'string'
+      ? import.meta.env.VITE_API_URL.trim().replace(/\/+$/, '')
+      : '';
+
+  /** Đang mở app từ domain thật (vd. nhongplus.id.vn): không cho bundle/hosting nhầm nhúng localhost vào build. */
+  const onPublicHostname =
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1';
+
+  if (onPublicHostname) {
+    if (!raw || looksLikeLocalApiUrl(raw)) {
+      return DEFAULT_PRODUCTION_API_URL;
+    }
+    return raw;
   }
-  // Chỉ bundle production (`vite build`) dùng API public; dev server / vitest → localhost.
+
+  if (raw) return raw;
   return import.meta.env.PROD ? DEFAULT_PRODUCTION_API_URL : 'http://localhost:5000';
 }
 
