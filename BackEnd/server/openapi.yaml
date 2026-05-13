@@ -1,0 +1,1246 @@
+openapi: 3.0.3
+info:
+  title: Graduation Project Exam API
+  version: 1.0.0
+  description: REST API for the online exam system — authentication, exam management, proctoring, question bank, analytics, and prediction.
+
+servers:
+  - url: http://localhost:3000/v1
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Authentication and session management
+  - name: Users
+    description: User account management (admin only)
+  - name: Exams
+    description: Exam CRUD and runtime management
+  - name: Exam Sessions
+    description: Student exam sessions (start, submit, autosave)
+  - name: Proctoring
+    description: Real-time proctoring and integrity events
+  - name: Question Bank
+    description: Independent question pool management
+  - name: Subjects
+    description: Subject (course) management
+  - name: Exam Sharing
+    description: Multi-teacher exam sharing and grading assignments
+  - name: Dashboard
+    description: Dashboard data and health check
+  - name: Notifications
+    description: User and exam notifications
+  - name: Password Reset
+    description: Password reset request flow
+  - name: Export
+    description: CSV/Excel export of exam results
+  - name: Shuffle
+    description: Question shuffle within chapter groups
+  - name: Prediction
+    description: MiniMax AI score prediction
+
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: "#/components/schemas/PublicUser" }
+                  deviceId: { type: string }
+                  hasExistingSession: { type: boolean }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password, role]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string }
+                password: { type: string }
+                role: { type: string, enum: [admin, teacher, student] }
+                fullName: { type: string }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUser"
+        "409":
+          description: Email or username already exists
+
+  # ── Users ───────────────────────────────────────────────────────────────────
+  /users:
+    get:
+      tags: [Users]
+      summary: List all users (admin only)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of user objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PublicUser" } }
+    post:
+      tags: [Users]
+      summary: Create a new user (admin only)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password, role]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string }
+                password: { type: string }
+                role: { type: string, enum: [admin, teacher, student] }
+                fullName: { type: string }
+      responses:
+        "201":
+          description: User created
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID (admin only)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: User object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUser"
+    patch:
+      tags: [Users]
+      summary: Update user fields (admin only)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name: { type: string }
+                is_active: { type: boolean }
+                role: { type: string, enum: [admin, teacher, student] }
+      responses:
+        "200":
+          description: Updated user
+    delete:
+      tags: [Users]
+      summary: Delete user (admin only)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /users/{id}/password:
+    patch:
+      tags: [Users]
+      summary: Change user password (admin only)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                newPassword: { type: string }
+      responses:
+        "200":
+          description: Password changed
+
+  # ── Subjects ────────────────────────────────────────────────────────────────
+  /subjects:
+    get:
+      tags: [Subjects]
+      summary: List subjects (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of subject objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Subject" } }
+    post:
+      tags: [Subjects]
+      summary: Create a subject (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                code: { type: string }
+      responses:
+        "201":
+          description: Subject created
+
+  /subjects/{id}:
+    get:
+      tags: [Subjects]
+      summary: Get subject by ID (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Subject object
+    patch:
+      tags: [Subjects]
+      summary: Update subject (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: Updated subject
+    delete:
+      tags: [Subjects]
+      summary: Delete subject (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Question Bank ──────────────────────────────────────────────────────────
+  /question-bank:
+    get:
+      tags: [Question Bank]
+      summary: List questions with filters (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: query
+          name: subject_id
+          schema: { type: string }
+        - in: query
+          name: difficulty
+          schema: { type: string }
+        - in: query
+          name: chapter
+          schema: { type: integer }
+        - in: query
+          name: question_type
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: created_by
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: Paginated question list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Question" } }
+                  total: { type: integer }
+    post:
+      tags: [Question Bank]
+      summary: Create a question (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Question created
+
+  /question-bank/{id}:
+    get:
+      tags: [Question Bank]
+      summary: Get question by ID (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Question object
+    patch:
+      tags: [Question Bank]
+      summary: Update question (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Updated question
+    delete:
+      tags: [Question Bank]
+      summary: Delete question (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /question-bank/{id}/import/{examId}:
+    post:
+      tags: [Question Bank]
+      summary: Import question into an exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Imported successfully
+
+  # ── Exams ──────────────────────────────────────────────────────────────────
+  /exams:
+    get:
+      tags: [Exams]
+      summary: List exams (all roles)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of exam objects
+    post:
+      tags: [Exams]
+      summary: Create an exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                class_id: { type: string }
+                duration_min: { type: integer }
+                description: { type: string }
+                start_time: { type: string, format: date-time }
+                end_time: { type: string, format: date-time }
+                shuffle_questions: { type: boolean }
+                show_result: { type: boolean }
+                password: { type: string }
+      responses:
+        "201":
+          description: Exam created
+
+  /exams/{id}:
+    get:
+      tags: [Exams]
+      summary: Get exam by ID (all roles)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Exam object
+    patch:
+      tags: [Exams]
+      summary: Update exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                duration_min: { type: integer }
+                description: { type: string }
+                start_time: { type: string, format: date-time }
+                end_time: { type: string, format: date-time }
+                shuffle_questions: { type: boolean }
+                show_result: { type: boolean }
+                password: { type: string }
+      responses:
+        "200":
+          description: Updated exam
+    delete:
+      tags: [Exams]
+      summary: Delete exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+
+  /exams/{examId}/questions:
+    get:
+      tags: [Exams]
+      summary: Get exam questions (all roles)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Array of question objects
+    post:
+      tags: [Exams]
+      summary: Add question to exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Question added
+
+  /exams/{examId}/questions/{questionId}:
+    delete:
+      tags: [Exams]
+      summary: Remove question from exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: questionId
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Removed
+
+  /exams/{examId}/sessions:
+    get:
+      tags: [Exams]
+      summary: Get exam sessions (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Array of session objects
+    post:
+      tags: [Exam Sessions]
+      summary: Start an exam session (student)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Session started
+
+  /exams/{examId}/start-runtime:
+    post:
+      tags: [Exams]
+      summary: Start exam runtime timer (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Runtime started
+
+  /exams/{examId}/force-submit:
+    post:
+      tags: [Exams]
+      summary: Force-submit all active sessions (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Sessions force-submitted
+
+  /exams/{examId}/proctoring:
+    get:
+      tags: [Proctoring]
+      summary: Get proctoring data for exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Proctoring summary
+
+  /exams/{examId}/my-submission:
+    get:
+      tags: [Exams]
+      summary: Get student's own submission
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Submission object
+
+  /exams/import-word/preview:
+    post:
+      tags: [Exams]
+      summary: Preview a .docx exam file before import
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Preview with parsed questions and errors
+
+  /exams/import-word/commit:
+    post:
+      tags: [Exams]
+      summary: Commit imported questions to an exam
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [examId, questions]
+              properties:
+                examId: { type: string }
+                questions: { type: array }
+      responses:
+        "200":
+          description: Committed
+
+  /exams/import-word/ai-recompose:
+    post:
+      tags: [Exams]
+      summary: AI-recompose parsed questions via MiniMax
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: AI-recomposed questions
+
+  /exams/integrity-events:
+    post:
+      tags: [Proctoring]
+      summary: Submit an integrity event (student)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string }
+                event_type: { type: string }
+                screenshot_base64: { type: string }
+                webcam_base64: { type: string }
+                ip_address: { type: string }
+                severity: { type: integer }
+      responses:
+        "200":
+          description: Event recorded
+
+  /exams/autosave:
+    post:
+      tags: [Exam Sessions]
+      summary: Autosave exam answers (student)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id: { type: string }
+                answers: { type: array }
+      responses:
+        "200":
+          description: Autosaved
+
+  /exams/sessions/me:
+    get:
+      tags: [Exam Sessions]
+      summary: Get current user's exam sessions
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of session objects
+
+  /exams/sessions/{sessionId}/submit:
+    post:
+      tags: [Exam Sessions]
+      summary: Submit exam answers (student)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                answers: { type: array }
+      responses:
+        "200":
+          description: Submitted
+
+  /exams/sessions/{sessionId}/grading:
+    get:
+      tags: [Exam Sessions]
+      summary: Get grading data for a session (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Grading data
+    patch:
+      tags: [Exam Sessions]
+      summary: Grade a session (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score: { type: number }
+                feedback: { type: string }
+      responses:
+        "200":
+          description: Graded
+
+  # ── Exam Sharing ────────────────────────────────────────────────────────────
+  /exam-sharing/me:
+    get:
+      tags: [Exam Sharing]
+      summary: Get exams shared with current teacher
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of shared exam objects
+
+  /exam-sharing/exams/{examId}/shares:
+    get:
+      tags: [Exam Sharing]
+      summary: Get shares for an exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Array of share objects
+    post:
+      tags: [Exam Sharing]
+      summary: Share an exam with another teacher
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shared_with, role]
+              properties:
+                shared_with: { type: string }
+                role: { type: string, enum: [viewer, grader, co-owner] }
+      responses:
+        "201":
+          description: Share created
+    delete:
+      tags: [Exam Sharing]
+      summary: Remove a share (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Removed
+
+  /exam-sharing/grading/me:
+    get:
+      tags: [Exam Sharing]
+      summary: Get my grading assignments
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of grading assignment objects
+
+  /exam-sharing/grading/pending/count:
+    get:
+      tags: [Exam Sharing]
+      summary: Get count of pending grading assignments
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Count object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+
+  /exam-sharing/grading/exam/{examId}:
+    get:
+      tags: [Exam Sharing]
+      summary: Get grading assignments by exam
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Array of grading assignments
+
+  /exam-sharing/grading/assign:
+    post:
+      tags: [Exam Sharing]
+      summary: Assign a grader to an exam session (admin)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [exam_session_id, exam_id, teacher_id]
+              properties:
+                exam_session_id: { type: string }
+                exam_id: { type: string }
+                teacher_id: { type: string }
+      responses:
+        "201":
+          description: Assignment created
+
+  /exam-sharing/grading/{assignmentId}:
+    patch:
+      tags: [Exam Sharing]
+      summary: Update grading assignment status (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: assignmentId
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [pending, in_progress, completed, rejected] }
+                notes: { type: string }
+      responses:
+        "200":
+          description: Updated
+
+  # ── Dashboard ───────────────────────────────────────────────────────────────
+  /dashboard/ping:
+    get:
+      tags: [Dashboard]
+      summary: Health check ping
+      security: []
+      responses:
+        "200":
+          description: Pong
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  path: { type: string }
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard data (role-aware)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Dashboard data
+
+  # ── Notifications ────────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Get exam notifications (role-aware)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of notification objects
+
+  /notifications/user:
+    get:
+      tags: [Notifications]
+      summary: Get unread notifications for current user
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of unread notification objects
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Marked read
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: All marked read
+
+  # ── Password Reset ──────────────────────────────────────────────────────────
+  /password-reset/self:
+    post:
+      tags: [Password Reset]
+      summary: Request password reset (no auth)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Reset request created
+
+  /password-reset/me:
+    get:
+      tags: [Password Reset]
+      summary: Get my password reset requests
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of reset request objects
+
+  /password-reset:
+    post:
+      tags: [Password Reset]
+      summary: Create a password reset request (admin)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: string }
+                email: { type: string }
+      responses:
+        "201":
+          description: Request created
+
+  /password-reset/pending:
+    get:
+      tags: [Password Reset]
+      summary: Get pending reset requests (admin)
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Array of pending request objects
+
+  /password-reset/approve:
+    post:
+      tags: [Password Reset]
+      summary: Approve a password reset request (admin)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string }
+      responses:
+        "200":
+          description: Approved
+
+  /password-reset/reject:
+    post:
+      tags: [Password Reset]
+      summary: Reject a password reset request (admin)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string }
+      responses:
+        "200":
+          description: Rejected
+
+  # ── Export ──────────────────────────────────────────────────────────────────
+  /exports/exam-results:
+    get:
+      tags: [Export]
+      summary: Export exam results as CSV or JSON (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: query
+          name: exam_id
+          schema: { type: string }
+        - in: query
+          name: class_id
+          schema: { type: string }
+        - in: query
+          name: format
+          schema: { type: string, enum: [csv, json], default: json }
+      responses:
+        "200":
+          description: CSV file download or JSON array
+
+  /exports/exam-results/{examId}/summary:
+    get:
+      tags: [Export]
+      summary: Get summary statistics for an exam (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Summary statistics
+
+  # ── Shuffle ─────────────────────────────────────────────────────────────────
+  /shuffle/exams/{examId}:
+    post:
+      tags: [Shuffle]
+      summary: Shuffle questions within chapter groups (admin/teacher)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Shuffle result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated_count: { type: integer }
+                  updates: { type: array }
+
+  /shuffle/exams/{examId}/chapters:
+    get:
+      tags: [Shuffle]
+      summary: Get chapter distribution for an exam
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Chapter list with question map
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chapters: { type: array }
+                  question_chapter_map: { type: object }
+
+  # ── Prediction ──────────────────────────────────────────────────────────────
+  /prediction:
+    post:
+      tags: [Prediction]
+      summary: Get score predictions from MiniMax AI (student/teacher/admin)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                student_id: { type: string }
+                student_name: { type: string }
+                just_completed: { type: object }
+                history: { type: array }
+                target_subjects: { type: array }
+      responses:
+        "200":
+          description: Predicted scores from MiniMax AI
+
+# ── Components ────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    PublicUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        username: { type: string }
+        role: { type: string, enum: [admin, teacher, student] }
+        full_name: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Subject:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    Question:
+      type: object
+      properties:
+        id: { type: string }
+        content: { type: string }
+        question_type: { type: string, enum: [mcq, essay] }
+        options: { type: object, additionalProperties: { type: string }, nullable: true }
+        correct_answer: { type: string, nullable: true }
+        points: { type: number }
+        difficulty: { type: string }
+        chapter: { type: integer, nullable: true }
+        media_url: { type: string, nullable: true }
+        subject_id: { type: string, nullable: true }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+
+    QuestionInput:
+      type: object
+      required: [content, question_type, points]
+      properties:
+        content: { type: string }
+        question_type: { type: string, enum: [mcq, essay] }
+        options: { type: object, additionalProperties: { type: string } }
+        correct_answer: { type: string }
+        points: { type: number }
+        difficulty: { type: string }
+        chapter: { type: integer }
+        media_url: { type: string }
+        subject_id: { type: string }

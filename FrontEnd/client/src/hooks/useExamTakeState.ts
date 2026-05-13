@@ -26,6 +26,10 @@ export function useExamTakeState(activeExamId: string) {
   const [answers, setAnswers] = useState<Record<string, string>>(() => readDraftAnswers(activeExamId));
   const [flagged, setFlagged] = useState<Set<number>>(() => new Set());
   const [navFilter, setNavFilter] = useState<QuestionNavigatorFilter>('all');
+  const [versionCode, setVersionCode] = useState<string | null>(null);
+  const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
+  type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const remainingRef = useRef(remainingSeconds);
   const sessionStartingRef = useRef(false);
   const violationTriggeredRef = useRef(false);
@@ -43,6 +47,7 @@ export function useExamTakeState(activeExamId: string) {
     setSubmitFailed(false);
     setServerForceSummaryText('');
     setSessionId(null);
+    setConnectionStatus('connecting');
     violationTriggeredRef.current = false;
     lastViolationAtRef.current = 0;
   }, [activeExamId]);
@@ -50,6 +55,15 @@ export function useExamTakeState(activeExamId: string) {
   useEffect(() => {
     remainingRef.current = remainingSeconds;
   }, [remainingSeconds]);
+
+  // Sync timer from server authoritative deadline — drift-corrected
+  const syncServerTime = (serverNowMs: number, endsAt: string) => {
+    const endMs = Date.parse(endsAt);
+    if (Number.isNaN(endMs)) return;
+    const serverDelta = serverNowMs - Date.now(); // positive = server ahead
+    const adjustedRemaining = Math.max(0, Math.floor((endMs - (Date.now() + serverDelta)) / 1000));
+    setRemainingSeconds(adjustedRemaining);
+  };
 
   return {
     examData: {
@@ -77,6 +91,10 @@ export function useExamTakeState(activeExamId: string) {
       setBootLoading,
       bootError,
       setBootError,
+      versionCode,
+      setVersionCode,
+      deadlineAt,
+      setDeadlineAt,
     },
     runtime: {
       remainingSeconds,
@@ -89,6 +107,9 @@ export function useExamTakeState(activeExamId: string) {
       setIsFullscreen,
       focusLeaveCount,
       setFocusLeaveCount,
+      connectionStatus,
+      setConnectionStatus,
+      syncServerTime,
     },
     submit: {
       autoSubmitCountdown,

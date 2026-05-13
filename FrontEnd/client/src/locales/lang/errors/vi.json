@@ -11,5 +11,9 @@
   "user_delete_failed": "Xóa user thất bại.",
   "realtime_timeout": "Hết thời gian chờ kết nối realtime",
   "realtime_connect_failed": "Không kết nối được tới máy chủ realtime",
-  "realtime_error": "Lỗi realtime từ máy chủ"
+  "realtime_error": "Lỗi realtime từ máy chủ",
+  "change_password_failed": "Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu hiện tại.",
+  "grading_load_failed": "Không tải được thông tin chấm điểm.",
+  "grading_save_failed": "Lưu điểm thất bại.",
+  "session_list_failed": "Không tải được danh sách phiên thi."
 }

@@ -7,6 +7,16 @@ import dashboardRouter from "./dashboardRouter";
 import classRouter from "./classRouter";
 import boardRouter from "./boardRouter";
 import predictionRouter from "./predictionRouter";
+import passwordResetRouter from "./passwordResetRouter";
+import scoreAnalyticsRouter from "./scoreAnalyticsRouter";
+import auditLogRouter from "./auditLogRouter";
+import systemReportRouter from "./systemReportRouter";
+import notificationRouter from "./notificationRouter";
+import questionBankRouter from "./questionBankRouter";
+import subjectRouter from "./subjectRouter";
+import examSharingRouter from "./examSharingRouter";
+import exportRouter from "./exportRouter";
+import shuffleRouter from "./shuffleRouter";
 
 const RouterV1 = Router();
 
@@ -18,5 +28,15 @@ RouterV1.use("/exam-sessions", examSessionRouter);
 RouterV1.use("/classes", classRouter);
 RouterV1.use("/board", boardRouter);
 RouterV1.use("/prediction", predictionRouter);
+RouterV1.use("/password-reset", passwordResetRouter);
+RouterV1.use("/score-analytics", scoreAnalyticsRouter);
+RouterV1.use("/audit-logs", auditLogRouter);
+RouterV1.use("/system-report", systemReportRouter);
+RouterV1.use("/notifications", notificationRouter);
+RouterV1.use("/question-bank", questionBankRouter);
+RouterV1.use("/subjects", subjectRouter);
+RouterV1.use("/exam-sharing", examSharingRouter);
+RouterV1.use("/exports", exportRouter);
+RouterV1.use("/shuffle", shuffleRouter);
 
 export default RouterV1;

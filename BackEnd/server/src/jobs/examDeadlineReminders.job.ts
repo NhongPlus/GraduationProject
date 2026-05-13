@@ -25,7 +25,7 @@ async function loadExamsForReminder(kind: ExamDeadlineReminderKind): Promise<Exa
       AND NOW() >= e.closes_at - $2::interval
       AND NOT EXISTS (
         SELECT 1 FROM exam_deadline_notifications n
-        WHERE n.exam_id = e.id AND n.kind = $1
+        WHERE n.exam_id = e.id AND n.notification_type = $1
       )
     `,
     [kind, intervalLiteral]

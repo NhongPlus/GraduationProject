@@ -1,0 +1,200 @@
+import { useEffect, useState } from 'react';
+import {
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Button, Textarea, Modal,
+} from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import { getPendingPasswordResets, approvePasswordReset, rejectPasswordReset, type PasswordResetRequestItem } from '@/services/authApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
+import PageHeader from '@/components/PageHeader/PageHeader';
+
+const PasswordResetManagement = () => {
+  const { t } = useTranslation();
+  const [requests, setRequests] = useState<PasswordResetRequestItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [noteModal, setNoteModal] = useState<{ id: string; action: 'approve' | 'reject'; note: string } | null>(null);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const d = await getPendingPasswordResets();
+      setRequests(d);
+    } catch {
+      setError('Không tải được yêu cầu đặt lại mật khẩu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const handleApprove = async (id: string, note: string) => {
+    try {
+      setProcessingId(id);
+      setNoteModal(null);
+      const result = await approvePasswordReset(id, note || undefined);
+      setTempPassword(result.tempPassword);
+      setNotice(`Đã duyệt yêu cầu. Mật khẩu tạm thời: ${result.tempPassword}`);
+      await load();
+    } catch {
+      setError('Duyệt yêu cầu thất bại.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (id: string, note: string) => {
+    try {
+      setProcessingId(id);
+      setNoteModal(null);
+      await rejectPasswordReset(id, note || undefined);
+      setNotice('Đã từ chối yêu cầu.');
+      await load();
+    } catch {
+      setError('Từ chối yêu cầu thất bại.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box className="max-w-[1100px] mx-auto p-4">
+        <Loader />
+      </Box>
+    );
+  }
+
+  return (
+    <Box className="max-w-[1100px] mx-auto p-4">
+      <Stack gap="md">
+        <PageHeader
+          title={t('password_reset.title')}
+          subtitle={t('password_reset.subtitle')}
+          accent="teal"
+          action={
+            <ButtonLight size="sm" label="Làm mới" disabled={false} onClick={() => void load()} />
+          }
+        />
+
+        {notice && <Alert color="green" variant="light">{notice}</Alert>}
+        {error && <Alert color="red" variant="light">{error}</Alert>}
+        {tempPassword && (
+          <Alert color="blue" variant="light">
+            Mật khẩu tạm thời: <strong>{tempPassword}</strong> — gửi cho sinh viên.
+          </Alert>
+        )}
+
+        <Paper withBorder radius="md" p="sm">
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>#</Table.Th>
+                <Table.Th>{t('password_reset.user')}</Table.Th>
+                <Table.Th>Email</Table.Th>
+                <Table.Th>{t('password_reset.requested_by')}</Table.Th>
+                <Table.Th>{t('password_reset.requested_at')}</Table.Th>
+                <Table.Th>{t('password_reset.expires_at')}</Table.Th>
+                <Table.Th>{t('common.actions')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {requests.map((req, idx) => (
+                <Table.Tr key={req.id}>
+                  <Table.Td>{idx + 1}</Table.Td>
+                  <Table.Td>
+                    <Text size="sm" fw={500}>{req.user_full_name || req.user_id}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{req.user_email}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{req.requested_by_full_name || req.requested_by}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{new Date(req.created_at).toLocaleString()}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{new Date(req.expires_at).toLocaleString()}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4}>
+                      <ButtonLight
+                        size="xs"
+                        color="green"
+                        label="Duyệt"
+                        loading={processingId === req.id}
+                        disabled={processingId === req.id}
+                        onClick={() => setNoteModal({ id: req.id, action: 'approve', note: '' })}
+                      />
+                      <ButtonLight
+                        size="xs"
+                        color="red"
+                        label="Từ chối"
+                        loading={processingId === req.id}
+                        disabled={processingId === req.id}
+                        onClick={() => setNoteModal({ id: req.id, action: 'reject', note: '' })}
+                      />
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+              {requests.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={7}>
+                    <Text c="dimmed" ta="center">{t('password_reset.no_requests')}</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </Paper>
+      </Stack>
+
+      <Modal
+        opened={noteModal != null}
+        onClose={() => setNoteModal(null)}
+        title={noteModal?.action === 'approve' ? 'Duyệt yêu cầu' : 'Từ chối yêu cầu'}
+      >
+        <Stack gap="sm">
+          <Textarea
+            label="Ghi chú (tùy chọn)"
+            value={noteModal?.note ?? ''}
+            onChange={(e) =>
+              setNoteModal((prev) => prev ? { ...prev, note: e.currentTarget.value } : null)
+            }
+            rows={3}
+          />
+          <Group justify="flex-end">
+            <ButtonLight size="sm" color="gray" label="Hủy" disabled={false} onClick={() => setNoteModal(null)} />
+            {noteModal?.action === 'approve' ? (
+              <ButtonFilled
+                size="sm"
+                color="green"
+                label="Xác nhận duyệt"
+                disabled={false}
+                onClick={() => noteModal && void handleApprove(noteModal.id, noteModal.note)}
+              />
+            ) : (
+              <ButtonFilled
+                size="sm"
+                color="red"
+                label="Xác nhận từ chối"
+                disabled={false}
+                onClick={() => noteModal && void handleReject(noteModal.id, noteModal.note)}
+              />
+            )}
+          </Group>
+        </Stack>
+      </Modal>
+    </Box>
+  );
+};
+
+export default PasswordResetManagement;

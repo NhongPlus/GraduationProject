@@ -46,4 +46,6 @@ export const env = {
   MINIMAX_API_KEY: process.env.MINIMAX_API_KEY?.trim() || "",
   MINIMAX_BASE_URL: process.env.MINIMAX_BASE_URL?.trim() || "https://api.minimax.chat/v1",
   MINIMAX_MODEL: process.env.MINIMAX_MODEL?.trim() || "MiniMax-M2.7",
+  /** Cloudinary upload (cloudinary://<key>:<secret>@<cloud>) */
+  CLOUDINARY_URL: process.env.CLOUDINARY_URL?.trim() || "",
 };

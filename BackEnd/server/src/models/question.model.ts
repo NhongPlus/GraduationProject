@@ -9,6 +9,7 @@ export interface Question {
   question_type: QuestionType;
   options: Record<string, string> | null;
   correct_answer: string | string[] | null;
+  media_url: string | null;
   points: number;
   display_order: number;
   created_at: string;
@@ -40,6 +41,7 @@ function mapQuestionRow(row: any): Question {
       row.correct_answer == null
         ? null
         : parseJson<string | string[]>(row.correct_answer, null as any),
+    media_url: row.media_url ?? null,
     points: Number(row.points),
     display_order: Number(row.display_order ?? 0),
     created_at: row.created_at,
@@ -56,7 +58,7 @@ export const getQuestionsByExam = async (examId: string): Promise<Question[]> =>
 
 export const getPublicQuestionsByExam = async (examId: string): Promise<PublicQuestion[]> => {
   const result = await pool.query(
-    `SELECT id, exam_id, content, question_type, options, points, display_order, created_at
+    `SELECT id, exam_id, content, question_type, options, points, display_order, created_at, media_url
      FROM questions WHERE exam_id = $1 ORDER BY display_order ASC, created_at ASC`,
     [examId]
   );
@@ -80,6 +82,7 @@ export const createQuestion = async (
   points: number,
   options?: Record<string, string> | null,
   correctAnswer?: string | string[] | null,
+  mediaUrl?: string | null,
   displayOrder?: number
 ): Promise<Question> => {
   const opts =
@@ -92,7 +95,7 @@ export const createQuestion = async (
         : null;
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order)
+    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order)
      VALUES (
        $1,
        $2,
@@ -100,10 +103,11 @@ export const createQuestion = async (
        $4,
        $5,
        $6,
-       COALESCE($7, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1))
+       $7,
+       COALESCE($8, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1))
      )
      RETURNING *`,
-    [examId, content, questionType, opts, correct, points, displayOrder ?? null]
+    [examId, content, questionType, opts, correct, mediaUrl ?? null, points, displayOrder ?? null]
   );
   return mapQuestionRow(result.rows[0]);
 };
@@ -111,4 +115,57 @@ export const createQuestion = async (
 export const deleteQuestion = async (id: string): Promise<boolean> => {
   const result = await pool.query("DELETE FROM questions WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
+};
+
+export const updateQuestionForExam = async (
+  questionId: string,
+  examId: string,
+  data: {
+    content: string;
+    question_type: QuestionType;
+    points: number;
+    options: Record<string, string> | null;
+    correct_answer: string | string[] | null;
+    media_url: string | null;
+    display_order: number;
+  }
+): Promise<Question | null> => {
+  const opts =
+    data.question_type === "essay"
+      ? null
+      : data.options != null
+        ? JSON.stringify(data.options)
+        : JSON.stringify({});
+  const correct =
+    data.question_type === "essay"
+      ? null
+      : data.correct_answer != null
+        ? JSON.stringify(data.correct_answer)
+        : null;
+
+  const result = await pool.query(
+    `UPDATE questions SET
+      content = $1,
+      question_type = $2,
+      options = $3,
+      correct_answer = $4,
+      media_url = $5,
+      points = $6,
+      display_order = $7
+    WHERE id = $8 AND exam_id = $9
+    RETURNING *`,
+    [
+      data.content,
+      data.question_type,
+      opts,
+      correct,
+      data.media_url,
+      data.points,
+      data.display_order,
+      questionId,
+      examId,
+    ]
+  );
+  const row = result.rows[0];
+  return row ? mapQuestionRow(row) : null;
 };

@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 
-export interface ClassDetail {
+export interface ClassDto {
   id: string;
   subject_id: string;
   teacher_id: string;
@@ -14,8 +14,8 @@ export interface ClassDetail {
 }
 
 const classApi = {
-  getClasses: async (): Promise<ClassDetail[]> => {
-    const res = await apiClient.get<{ success: boolean; data: ClassDetail[] }>('/classes');
+  getClasses: async (): Promise<ClassDto[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ClassDto[] }>('/classes');
     return res.data.data;
   },
 };

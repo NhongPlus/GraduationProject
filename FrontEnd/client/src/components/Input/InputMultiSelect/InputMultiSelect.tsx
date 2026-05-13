@@ -4,6 +4,7 @@ import {
   Pill,
   PillsInput,
   CheckIcon,
+  CloseButton,
 } from "@mantine/core";
 
 import { useState } from "react";
@@ -11,12 +12,22 @@ import style from "./InputMultiSelect.module.scss";
 
 interface Props {
   data: string[];
+  value?: string[];
+  onChange?: (value: string[]) => void;
+  label?: string;
   placeholder?: string;
+  maxVisiblePills?: number;
+  clearAllLabel?: string;
 }
 
 export default function InputMultiSelect({
   data,
+  value,
+  onChange,
+  label,
   placeholder = "Add topic",
+  maxVisiblePills = 2,
+  clearAllLabel = "Clear",
 }: Props) {
   const combobox = useCombobox({
     onDropdownClose: () =>
@@ -24,15 +35,21 @@ export default function InputMultiSelect({
   });
 
   const [search, setSearch] = useState("");
-  const [value, setValue] = useState<string[]>([]);
+  const [internalValue, setInternalValue] = useState<string[]>([]);
+  const selectedValue = value ?? internalValue;
 
   // toggle select / unselect
   const toggle = (item: string) => {
-    setValue((prev) =>
+    const updater = (prev: string[]) =>
       prev.includes(item)
         ? prev.filter((v) => v !== item)
-        : [...prev, item]
-    );
+        : [...prev, item];
+
+    if (onChange) {
+      onChange(updater(selectedValue));
+      return;
+    }
+    setInternalValue((prev) => updater(prev));
   };
 
   // filter local search
@@ -44,7 +61,7 @@ export default function InputMultiSelect({
 
   // options render
   const options = filtered.map((item) => {
-    const selected = value.includes(item);
+    const selected = selectedValue.includes(item);
 
     return (
       <Combobox.Option
@@ -65,6 +82,16 @@ export default function InputMultiSelect({
     );
   });
 
+  const visiblePills = selectedValue.slice(0, maxVisiblePills);
+  const hiddenCount = Math.max(0, selectedValue.length - visiblePills.length);
+  const clearAll = () => {
+    if (onChange) {
+      onChange([]);
+      return;
+    }
+    setInternalValue([]);
+  };
+
   return (
     <Combobox
       store={combobox}
@@ -79,14 +106,15 @@ export default function InputMultiSelect({
     >
       <Combobox.Target>
         <PillsInput
+          label={label}
           className={style.pillsInput}
           onClick={() =>
             combobox.openDropdown()
           }
           radius="md"
         >
-          <Pill.Group>
-            {value.map((item) => (
+          <Pill.Group className={style.pillGroup}>
+            {visiblePills.map((item) => (
               <Pill
                 key={item}
                 withRemoveButton
@@ -98,8 +126,23 @@ export default function InputMultiSelect({
                 {item}
               </Pill>
             ))}
+            {hiddenCount > 0 && (
+              <Pill className={style.pill}>
+                +{hiddenCount}
+              </Pill>
+            )}
+            {selectedValue.length > 0 && (
+              <CloseButton
+                size="sm"
+                className={style.clearBtn}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={clearAll}
+                aria-label={clearAllLabel}
+              />
+            )}
             <Combobox.EventsTarget>
               <PillsInput.Field
+                className={style.field}
                 value={search}
                 placeholder={placeholder}
                 onFocus={() =>

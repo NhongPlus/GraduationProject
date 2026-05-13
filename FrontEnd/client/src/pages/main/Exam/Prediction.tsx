@@ -1,74 +1,152 @@
-import { useEffect, useState } from 'react';
-import { Box, Title, Text, Progress, Table, Loader, Paper, Group, Alert, Stack, Badge } from '@mantine/core';
+import { useEffect, useState, useCallback } from 'react';
+import { Box, Title, Text, Progress, Table, Loader, Paper, Group, Alert, Stack, Badge, Button } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import examApi, { PredictionResult, PredictionSubject } from '@/services/examApi';
+import examApi, { type PredictionResult, type PredictionSubject, type PredictionRecomputeSummary } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { useNavigate } from 'react-router-dom';
+import useAuth from '@/hooks/useAuth';
 
 type HistoryRow = { subject: string; score: number; grade: string };
 
 const Prediction = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [pastGrades, setPastGrades] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cacheEmptyHint, setCacheEmptyHint] = useState('');
+  const [recomputeLoading, setRecomputeLoading] = useState(false);
+  const [recomputeSummary, setRecomputeSummary] = useState<PredictionRecomputeSummary | null>(null);
+  const [recomputeError, setRecomputeError] = useState('');
+
+  const loadStudentView = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setCacheEmptyHint('');
+    try {
+      const [sessions, exams] = await Promise.all([examApi.getMySessions(), examApi.getExams()]);
+      const completed = sessions.filter(
+        (s) => s.status !== 'active' && s.score != null && s.max_points
+      );
+
+      const rows: HistoryRow[] = completed
+        .slice(0, 20)
+        .map((s) => {
+          const exam = exams.find((e) => e.id === s.exam_id);
+          const pct = s.max_points ? Math.round(((s.score || 0) / s.max_points) * 100) : 0;
+          const grade =
+            pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D+' : 'F';
+          return { subject: exam?.subject_name || exam?.title || s.exam_id, score: pct, grade };
+        })
+        .reverse();
+
+      setPastGrades(rows);
+
+      if (rows.length === 0) {
+        setError(t('prediction.no_data'));
+        setLoading(false);
+        return;
+      }
+
+      const cached = await examApi.getMyPredictionCache();
+      if (cached) {
+        setPredictionResult(cached);
+      } else {
+        setCacheEmptyHint(t('prediction.cache_empty'));
+      }
+    } catch {
+      setError(t('errors.prediction_failed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    const getPrediction = async () => {
-      try {
-        setLoading(true);
+    if (userRole === 'admin') {
+      setLoading(false);
+      return;
+    }
+    void loadStudentView();
+  }, [userRole, loadStudentView]);
 
-        const [sessions, exams] = await Promise.all([examApi.getMySessions(), examApi.getExams()]);
-        const completed = sessions.filter(
-          (s) => s.status !== 'active' && s.score != null && s.max_points
-        );
-
-        // Build history rows (most recent first)
-        const rows: HistoryRow[] = completed
-          .slice(0, 20)
-          .map((s) => {
-            const exam = exams.find((e) => e.id === s.exam_id);
-            const pct = s.max_points ? Math.round(((s.score || 0) / s.max_points) * 100) : 0;
-            const grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D+' : 'F';
-            return { subject: exam?.subject_name || exam?.title || s.exam_id, score: pct, grade };
-          })
-          .reverse(); // oldest first for history
-
-        setPastGrades(rows);
-
-        if (rows.length === 0) {
-          setError(t('prediction.no_data'));
-          setLoading(false);
-          return;
-        }
-
-        // The most recently completed exam is the last one in the array (after reverse = most recent)
-        const latest = rows[rows.length - 1];
-
-        // Call BE AI prediction endpoint — student_id lấy từ JWT token phía server
-        const result = await examApi.getPrediction({
-          just_completed: { subject: latest.subject, score: latest.score / 10, grade: latest.grade },
-          history: rows.map((r) => ({ subject: r.subject, score: r.score / 10, grade: r.grade })),
-        });
-
-        setPredictionResult(result);
-      } catch {
-        setError(t('errors.prediction_failed'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getPrediction();
-  }, [t]);
+  const handleRecompute = async () => {
+    setRecomputeLoading(true);
+    setRecomputeError('');
+    setRecomputeSummary(null);
+    try {
+      const summary = await examApi.adminRecomputeAllPredictions();
+      setRecomputeSummary(summary);
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' &&
+        e !== null &&
+        'response' in e &&
+        typeof (e as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+          ? (e as { response: { data: { message: string } } }).response.data.message
+          : t('errors.prediction_failed');
+      setRecomputeError(msg);
+    } finally {
+      setRecomputeLoading(false);
+    }
+  };
 
   if (loading) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Loader />
+      </Box>
+    );
+  }
+
+  if (userRole === 'admin') {
+    return (
+      <Box className="max-w-[1100px] mx-auto p-4">
+        <Stack gap="md">
+          <Title order={2}>{t('prediction.title')}</Title>
+          <Text c="dimmed">{t('prediction.admin_intro')}</Text>
+          <Alert color="blue" variant="light">
+            {t('prediction.admin_note')}
+          </Alert>
+          <Button loading={recomputeLoading} onClick={() => void handleRecompute()}>
+            {t('prediction.admin_recompute')}
+          </Button>
+          {recomputeError && (
+            <Alert color="red" variant="light">
+              {recomputeError}
+            </Alert>
+          )}
+          {recomputeSummary && (
+            <Paper withBorder radius="md" p="md">
+              <Text fw={600} mb="sm">{t('prediction.admin_summary_title')}</Text>
+              <Text size="sm">
+                {t('prediction.admin_summary_line', {
+                  total: recomputeSummary.total_students,
+                  computed: recomputeSummary.computed,
+                  skipped: recomputeSummary.skipped_no_data,
+                  failed: recomputeSummary.failed,
+                })}
+              </Text>
+              {recomputeSummary.errors.length > 0 && (
+                <Stack gap={4} mt="sm">
+                  {recomputeSummary.errors.map((line, i) => (
+                    <Text key={i} size="xs" c="red">
+                      {line}
+                    </Text>
+                  ))}
+                </Stack>
+              )}
+            </Paper>
+          )}
+          <ButtonFilled
+            style={{ marginTop: 8 }}
+            label={t('common.back_main')}
+            disabled={false}
+            onClick={() => navigate('/main')}
+          />
+        </Stack>
       </Box>
     );
   }
@@ -90,9 +168,14 @@ const Prediction = () => {
     <Box className="max-w-[1100px] mx-auto p-4">
       <Stack gap="md">
         <Title order={2}>{t('prediction.title')}</Title>
-        <Text c="dimmed">{t('prediction.subtitle')}</Text>
+        <Text c="dimmed">{t('prediction.subtitle_cached')}</Text>
 
-        {/* Just completed analysis */}
+        {cacheEmptyHint && (
+          <Alert color="yellow" variant="light">
+            {cacheEmptyHint}
+          </Alert>
+        )}
+
         {predictionResult?.just_completed && (
           <Paper withBorder radius="md" p="md">
             <Group justify="space-between" mb="xs">
@@ -111,7 +194,6 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {/* Top prediction */}
         {topPrediction && (
           <Group grow>
             <Paper withBorder radius="md" p="md">
@@ -137,14 +219,12 @@ const Prediction = () => {
           </Group>
         )}
 
-        {/* Advice */}
         {predictionResult?.overall_advice && (
           <Alert color="blue" variant="light" title={t('prediction.advice_title')}>
             {predictionResult.overall_advice}
           </Alert>
         )}
 
-        {/* All predictions */}
         {predictionResult?.predictions && predictionResult.predictions.length > 0 && (
           <Paper withBorder radius="md" p="sm">
             <Text fw={600} mb="sm">{t('prediction.all_predictions')}</Text>
@@ -189,7 +269,6 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {/* Past grades */}
         {pastGrades.length > 0 && (
           <Paper withBorder radius="md" p="sm">
             <Text fw={600} mb="sm">{t('prediction.history')}</Text>

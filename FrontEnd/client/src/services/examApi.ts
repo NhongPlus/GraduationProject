@@ -28,6 +28,7 @@ export interface Question {
   display_order?: number;
   created_at: string;
   correct_answer?: string | string[];
+  media_url?: string | null;
 }
 
 export interface ExamSession {
@@ -35,17 +36,33 @@ export interface ExamSession {
   exam_id: string;
   student_id: string;
   started_at: string;
-  finished_at: string | null;
+  /** BE: cột submitted_at khi nộp bài */
+  submitted_at?: string | null;
+  finished_at?: string | null;
   status: 'active' | 'submitted' | 'expired';
   score?: number | null;
   max_points?: number | null;
   grading_status?: 'pending_manual' | 'complete' | null;
+  /** Có khi GET /exams/:examId/sessions (JOIN accounts) */
+  full_name?: string | null;
+  email?: string | null;
 }
 
 export interface StartSessionData {
   session: ExamSession;
   deadline_at: string;
   duration_min: number;
+  version_code: string;
+  version_id: string;
+  questions: Array<{
+    id: string;
+    display_order: number;
+    content: string;
+    question_type: QuestionType;
+    options: Record<string, string> | null;
+    points: number;
+    media_url?: string | null;
+  }>;
 }
 
 export interface SubmitResult {
@@ -113,6 +130,15 @@ export interface ImportedQuestionDraft {
   options?: Record<string, string> | null;
   correct_answer?: string | string[] | null;
   display_order: number;
+  difficulty?: "DE" | "TRUNGBINH" | "KHO";
+  chapter?: number;
+  media?: { type: "image" | "audio" | "video"; filename: string; status: "found" | "missing" | "embedded"; url?: string } | null;
+  /** URL sau upload (Cloudinary); BE commit/import đọc kèm media.url */
+  media_url?: string | null;
+  answer_hint?: string | null;
+  ai_confidence?: number;
+  needs_review?: boolean;
+  review_reason?: string | null;
 }
 
 export interface ExamImportPreview {
@@ -124,6 +150,21 @@ export interface ExamImportPreview {
   questions: ImportedQuestionDraft[];
   errors: string[];
   warnings: string[];
+  parse_summary?: {
+    total_parsed: number;
+    auto_ok: number;
+    needs_review: number;
+    missing_media: number;
+    parse_time_ms: number;
+  };
+}
+
+export interface MediaUploadResult {
+  url: string;
+  public_id: string;
+  resource_type: 'image' | 'video' | 'raw';
+  bytes: number;
+  format?: string | null;
 }
 
 export interface PredictionSubject {
@@ -150,6 +191,14 @@ export interface PredictionResult {
   just_completed: JustCompleted;
   predictions: PredictionSubject[];
   overall_advice: string;
+}
+
+export interface PredictionRecomputeSummary {
+  total_students: number;
+  computed: number;
+  skipped_no_data: number;
+  failed: number;
+  errors: string[];
 }
 
 const examApi = {
@@ -202,10 +251,31 @@ const examApi = {
       question_type?: QuestionType;
       options?: Record<string, string>;
       correct_answer?: string | string[];
+      media_url?: string | null;
     }
   ): Promise<Question> => {
     const res = await apiClient.post<{ success: boolean; data: Question }>(
       `/exams/${examId}/questions`,
+      payload
+    );
+    return res.data.data;
+  },
+
+  updateQuestion: async (
+    examId: string,
+    questionId: string,
+    payload: {
+      content: string;
+      points: number;
+      question_type: QuestionType;
+      options?: Record<string, string> | null;
+      correct_answer?: string | string[] | null;
+      media_url?: string | null;
+      display_order: number;
+    }
+  ): Promise<Question> => {
+    const res = await apiClient.patch<{ success: boolean; data: Question }>(
+      `/exams/${examId}/questions/${questionId}`,
       payload
     );
     return res.data.data;
@@ -234,6 +304,32 @@ const examApi = {
       success: boolean;
       data: { exam: Exam; questions: Question[] };
     }>('/exams/import-word/commit', payload);
+    return res.data.data;
+  },
+
+  aiRecomposeExam: async (payload: {
+    file: File;
+    examInfo: { title?: string; duration_min?: number; description?: string };
+  }): Promise<ExamImportPreview> => {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('examInfo', JSON.stringify(payload.examInfo));
+    const res = await apiClient.post<{ success: boolean; data: ExamImportPreview }>(
+      '/exams/import-word/ai-recompose',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 180000 }
+    );
+    return res.data.data;
+  },
+
+  uploadExamMedia: async (file: File): Promise<MediaUploadResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<{ success: boolean; data: MediaUploadResult }>(
+      '/exams/upload-media',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
     return res.data.data;
   },
 
@@ -312,16 +408,76 @@ const examApi = {
     return res.data.data;
   },
 
-  getPrediction: async (payload: {
-    student_id: string;
-    student_name?: string;
-    just_completed: { subject: string; score: number; grade: string };
-    history: Array<{ subject: string; score: number; grade: string }>;
-    target_subjects?: string[];
-  }): Promise<PredictionResult> => {
-    const res = await apiClient.post<{ success: boolean; data: PredictionResult }>(
-      '/prediction',
-      payload
+  getExamProctoring: async (
+    examId: string
+  ): Promise<{
+    exam_id: string;
+    total_sessions: number;
+    active_sessions: number;
+    submitted_sessions: number;
+    expired_sessions: number;
+    sessions: Array<{
+      session_id: string;
+      student_id: string;
+      student_name: string | null;
+      student_email: string | null;
+      status: "active" | "submitted" | "expired";
+      started_at: string;
+      finished_at: string | null;
+      score: number | null;
+      max_points: number | null;
+      violation_count: number;
+      violations: Array<{
+        event_type: string;
+        client_at: string;
+        details: Record<string, unknown> | null;
+      }>;
+    }>;
+  }> => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: {
+        exam_id: string;
+        total_sessions: number;
+        active_sessions: number;
+        submitted_sessions: number;
+        expired_sessions: number;
+        sessions: Array<{
+          session_id: string;
+          student_id: string;
+          student_name: string | null;
+          student_email: string | null;
+          status: "active" | "submitted" | "expired";
+          started_at: string;
+          finished_at: string | null;
+          score: number | null;
+          max_points: number | null;
+          violation_count: number;
+          violations: Array<{
+            event_type: string;
+            client_at: string;
+            details: Record<string, unknown> | null;
+          }>;
+        }>;
+      };
+    }>(`/exams/${examId}/proctoring`);
+    return res.data.data;
+  },
+
+  /** Sinh viên / admin: đọc cache do admin tính batch (không gọi MiniMax từ trình duyệt). */
+  getMyPredictionCache: async (): Promise<PredictionResult | null> => {
+    const res = await apiClient.get<{ success: boolean; data: PredictionResult | null }>(
+      '/prediction/me'
+    );
+    return res.data.data;
+  },
+
+  /** Admin: tính lại dự đoán cho mọi sinh viên có dữ liệu, ghi cache. */
+  adminRecomputeAllPredictions: async (): Promise<PredictionRecomputeSummary> => {
+    const res = await apiClient.post<{ success: boolean; data: PredictionRecomputeSummary }>(
+      '/prediction/admin/recompute-all',
+      {},
+      { timeout: 300_000 }
     );
     return res.data.data;
   },

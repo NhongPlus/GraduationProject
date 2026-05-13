@@ -29,6 +29,8 @@ export type MockExamQuestion = {
   points?: number;
   type: 'mcq' | 'audio_mcq' | 'image_mcq' | 'essay' | 'fill_blank' | 'composite';
   prompt: string;
+  /** Ảnh / audio / video từ server (vd. Cloudinary) — mcq & essay */
+  media_url?: string | null;
   badge?: string;
   audioClipLabel?: string;
   imageSrc?: string;

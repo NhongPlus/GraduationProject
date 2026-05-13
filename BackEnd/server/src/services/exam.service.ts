@@ -13,6 +13,7 @@ import {
   getQuestionsByExam,
   createQuestion,
   deleteQuestion,
+  updateQuestionForExam,
   Question,
   PublicQuestion,
   QuestionType,
@@ -28,11 +29,23 @@ import {
   getLatestSubmittedSession,
   getSessionWithExam,
   updateSessionGrading,
+  getSessionsByExamWithStudent,
   ExamSession,
   GradingStatus,
+  SessionWithStudent,
 } from "~/models/examsession.model";
 import {
+  ExamVersion,
+  assignVersionIndex,
+  unshuffleAnswers,
+  generateVersionPool,
+  getVersionsByExam,
+  createVersion,
+  getVersionByIndex,
+} from "~/models/examVersion.model";
+import {
   insertIntegrityEvents,
+  getIntegrityEventsByExam,
   IntegrityEventInput,
   IntegrityEventType,
 } from "~/models/examIntegrity.model";
@@ -122,6 +135,7 @@ export const addQuestion = async (
   questionType: QuestionType,
   options?: Record<string, string> | null,
   correctAnswer?: string | string[] | null,
+  mediaUrl?: string | null,
   displayOrder?: number
 ): Promise<Question> => {
   if (questionType === "mcq") {
@@ -139,11 +153,47 @@ export const addQuestion = async (
     points,
     options ?? null,
     correctAnswer ?? null,
+    mediaUrl ?? null,
     displayOrder
   );
 };
 
 export const removeQuestion = async (id: string): Promise<boolean> => deleteQuestion(id);
+
+export const updateQuestionInExam = async (
+  examId: string,
+  questionId: string,
+  body: {
+    content: string;
+    points: number;
+    question_type: QuestionType;
+    options?: Record<string, string> | null;
+    correct_answer?: string | string[] | null;
+    media_url?: string | null;
+    display_order: number;
+  }
+): Promise<Question> => {
+  const qt = body.question_type;
+  if (qt === "mcq") {
+    if (!body.options || Object.keys(body.options).length === 0) {
+      throw httpError(400, "Câu trắc nghiệm cần options");
+    }
+    if (body.correct_answer === undefined || body.correct_answer === null) {
+      throw httpError(400, "Câu trắc nghiệm cần correct_answer");
+    }
+  }
+  const updated = await updateQuestionForExam(questionId, examId, {
+    content: body.content.trim(),
+    question_type: qt,
+    points: Number(body.points),
+    options: qt === "essay" ? null : body.options ?? null,
+    correct_answer: qt === "essay" ? null : body.correct_answer ?? null,
+    media_url: body.media_url ?? null,
+    display_order: body.display_order,
+  });
+  if (!updated) throw httpError(404, "Không tìm thấy câu hỏi");
+  return updated;
+};
 
 export interface CreateExamWithQuestionsPayload {
   title: string;
@@ -213,15 +263,22 @@ export const createExamWithQuestionsService = async (
         q.question_type === "essay" || q.correct_answer == null
           ? null
           : JSON.stringify(q.correct_answer);
+      const mediaUrl =
+        q.media?.url ??
+        ("media_url" in q && typeof (q as { media_url?: unknown }).media_url === "string"
+          ? (q as { media_url: string }).media_url
+          : null) ??
+        null;
       const questionResult = await client.query(
-        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [
           exam.id,
           q.content.trim(),
           q.question_type,
           opts,
           correct,
+          mediaUrl,
           q.points,
           q.display_order || i + 1,
         ]
@@ -234,6 +291,7 @@ export const createExamWithQuestionsService = async (
         question_type: row.question_type === "essay" ? "essay" : "mcq",
         options: row.options ?? null,
         correct_answer: row.correct_answer ?? null,
+        media_url: row.media_url ?? null,
         points: Number(row.points),
         display_order: Number(row.display_order ?? i + 1),
         created_at: row.created_at,
@@ -262,6 +320,23 @@ export interface StartSessionPayload {
   duration_min: number;
 }
 
+export interface StartSessionPayload {
+  session: ExamSession;
+  deadline_at: string;
+  duration_min: number;
+  version_code: string;
+  version_id: string;
+  questions: Array<{
+    id: string;
+    display_order: number;
+    content: string;
+    question_type: QuestionType;
+    options: Record<string, string> | null;
+    points: number;
+    media_url: string | null;
+  }>;
+}
+
 export const startSessionWithMeta = async (
   examId: string,
   studentId: string
@@ -271,15 +346,113 @@ export const startSessionWithMeta = async (
   if (exam.closes_at && isPastClosesAt(exam.closes_at, Date.now())) {
     throw httpError(400, "Đã quá hạn bắt đầu bài thi");
   }
-  const session = await startSession(examId, studentId);
+
+  // Ensure version pool exists (lazy-create)
+  await ensureVersionPool(examId);
+
+  // Get total versions
+  const versions = await getVersionsByExam(examId);
+  if (versions.length === 0) throw httpError(500, "Không có mã đề cho kỳ thi này");
+
+  // Deterministic assignment based on studentId
+  const versionIdx = assignVersionIndex(studentId, versions.length);
+  const version = versions[versionIdx];
+
+  // Create or reuse session (update version if already exists)
+  let session = await getActiveSession(examId, studentId);
+  if (session) {
+    // Update version on existing session if not already set
+    if (!session.version_id) {
+      await pool.query(
+        `UPDATE exam_sessions SET version_id = $1, version_code = $2 WHERE id = $3`,
+        [version.id, version.version_code, session.id]
+      );
+      session = await getSessionById(session.id);
+      if (!session) throw httpError(500, "Không thể cập nhật phiên thi");
+    }
+  } else {
+    session = await pool.query(
+      `INSERT INTO exam_sessions (exam_id, student_id, version_id, version_code, started_at, status)
+       VALUES ($1, $2, $3, $4, NOW(), 'active') RETURNING *`,
+      [examId, studentId, version.id, version.version_code]
+    ).then((r) => r.rows[0] as ExamSession);
+    if (!session) throw httpError(500, "Không thể tạo phiên thi");
+  }
+
   const started = new Date(session.started_at).getTime();
   const deadline = started + exam.duration_min * 60 * 1000;
+
+  // Return questions in shuffled order with shuffled options
+  const questions = await getQuestionsByExam(examId);
+  const shuffledQuestions = version.question_order
+    .map((qId) => questions.find((q) => q.id === qId))
+    .filter(Boolean) as Question[];
+
+  const shuffledPayload = shuffledQuestions.map((q) => ({
+    id: q.id,
+    display_order: 0, // will be set by FE based on array index
+    content: q.content,
+    question_type: q.question_type,
+    options: q.options
+      ? shuffleObject(q.options, version.option_maps[q.id] ?? {})
+      : null,
+    points: q.points,
+    media_url: q.media_url ?? null,
+  }));
+
   return {
     session,
     deadline_at: new Date(deadline).toISOString(),
     duration_min: exam.duration_min,
+    version_code: version.version_code,
+    version_id: version.id,
+    questions: shuffledPayload,
   };
 };
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+async function ensureVersionPool(examId: string): Promise<void> {
+  const existing = await getVersionsByExam(examId);
+  if (existing.length > 0) return; // already generated
+
+  const questions = await getQuestionsByExam(examId);
+  if (questions.length === 0) return;
+
+  const questionIds = questions.map((q) => q.id);
+  const questionOptions: Record<string, Record<string, string>> = {};
+  for (const q of questions) {
+    if (q.options) {
+      questionOptions[q.id] = { ...q.options };
+    } else {
+      questionOptions[q.id] = { A: "A", B: "B", C: "C", D: "D" };
+    }
+  }
+
+  const DEFAULT_NUM_VERSIONS = 4;
+  const pool = generateVersionPool(questionIds, questionOptions, DEFAULT_NUM_VERSIONS);
+
+  for (const v of pool) {
+    await createVersion(examId, v.versionCode, v.versionIndex, v.questionOrder, v.optionMaps);
+  }
+}
+
+function shuffleObject(
+  original: Record<string, string>,
+  optionMap: Record<string, string>
+): Record<string, string> {
+  // optionMap: { A→B, B→A, C→C, D→D }
+  // meaning: original key "B" becomes displayed as "A"
+  // We need to build a shuffled object: displayed_key → displayed_value
+  // where displayed_key comes from reverse of optionMap keys, and value is original[key]
+  const result: Record<string, string> = {};
+  for (const [shuffledKey, originalKey] of Object.entries(optionMap)) {
+    result[shuffledKey] = original[originalKey] ?? "";
+  }
+  return result;
+}
 
 export interface GradedDetailRow {
   question_id: string;
@@ -499,15 +672,49 @@ export const submitSessionService = async (
     throw httpError(400, "Đã hết thời gian làm bài");
   }
 
-  const questions = await getQuestionsByExam(session.exam_id);
+  const allQuestions = await getQuestionsByExam(session.exam_id);
+
+  // Determine question order and option maps from version
+  let questionOrder: string[];
+  let optionMaps: Record<string, Record<string, string>>;
+  let unshuffledAnswers: Record<string, string | string[]>;
+
+  if (session.version_id) {
+    const version = await getVersionByIndex(session.exam_id,
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      assignVersionIndex(studentId, 999) // we just need the version; look up by index from session
+    );
+    // Actually get by ID stored in session — query directly
+    const versionRow = await pool.query(
+      `SELECT * FROM exam_versions WHERE id = $1`, [session.version_id]
+    ).then(r => r.rows[0]);
+    if (versionRow) {
+      questionOrder = versionRow.question_order;
+      optionMaps = versionRow.option_maps;
+      // Unshuffle: answers keyed by display index (0,1,2...) → original question_id + original answer
+      unshuffledAnswers = unshuffleAnswers(answers, questionOrder, optionMaps);
+    } else {
+      questionOrder = allQuestions.map(q => q.id);
+      optionMaps = {};
+      unshuffledAnswers = answers;
+    }
+  } else {
+    // No versioning — use original order
+    questionOrder = allQuestions.map(q => q.id);
+    optionMaps = {};
+    unshuffledAnswers = answers;
+  }
+
   let score = 0;
   let totalPoints = 0;
   let correctCount = 0;
   let hasEssay = false;
 
-  const gradedRows: GradedDetailRow[] = questions.map((q) => {
+  const gradedRows: GradedDetailRow[] = questionOrder.map((qId) => {
+    const q = allQuestions.find(q => q.id === qId);
+    if (!q) return null;
     totalPoints += Number(q.points);
-    const submitted = answers[q.id] ?? null;
+    const submitted = unshuffledAnswers[qId] ?? null;
 
     if (q.question_type === "essay") {
       hasEssay = true;
@@ -548,14 +755,14 @@ export const submitSessionService = async (
       max_points: Number(q.points),
       pending_grading: false,
     };
-  });
+  }).filter(Boolean) as GradedDetailRow[];
 
   const gradingStatus: GradingStatus = hasEssay ? "pending_manual" : "complete";
 
   const updated = await finalizeSessionSubmit(sessionId, {
     score,
     max_points: totalPoints,
-    student_answers: answers,
+    student_answers: unshuffledAnswers, // store in original (unshuffled) format
     graded_details: gradedRows,
     grading_status: gradingStatus,
   });
@@ -577,7 +784,7 @@ export const submitSessionService = async (
     score,
     total_points: totalPoints,
     correct_count: correctCount,
-    total_questions: questions.length,
+    total_questions: allQuestions.length,
     grading_status: gradingStatus,
     details: studentDetails,
   };
@@ -621,6 +828,8 @@ export interface GradingViewPayload {
   student: { full_name: string | null; email: string | null };
   questions: Question[];
   graded_details: GradedDetailRow[];
+  version_code: string | null;
+  version_id: string | null;
 }
 
 export const getSessionGradingView = async (
@@ -652,6 +861,8 @@ export const getSessionGradingView = async (
     student: { full_name: studentRow.full_name ?? null, email: studentRow.email ?? null },
     questions,
     graded_details: parseGradedDetails(meta.graded_details),
+    version_code: (meta as any).version_code ?? null,
+    version_id: (meta as any).version_id ?? null,
   };
 };
 
@@ -806,5 +1017,76 @@ export const forceSubmitActiveSessionsByExamService = async (
     active_sessions: activeSessions.length,
     submitted_sessions: submittedSessions,
     failed_sessions: failedSessions,
+  };
+};
+
+export interface ProctoringEntry {
+  session_id: string;
+  student_id: string;
+  student_name: string | null;
+  student_email: string | null;
+  status: "active" | "submitted" | "expired";
+  started_at: string;
+  submitted_at: string | null;
+  score: number | null;
+  max_points: number | null;
+  violation_count: number;
+  violations: Array<{
+    event_type: string;
+    event_at: string;
+    details: Record<string, unknown> | null;
+  }>;
+}
+
+export interface ExamProctoringData {
+  exam_id: string;
+  total_sessions: number;
+  active_sessions: number;
+  submitted_sessions: number;
+  expired_sessions: number;
+  sessions: ProctoringEntry[];
+}
+
+export const getExamProctoringData = async (examId: string): Promise<ExamProctoringData> => {
+  if (!examId) throw httpError(400, "exam_id là bắt buộc");
+
+  const sessions = await getSessionsByExamWithStudent(examId);
+  const events = await getIntegrityEventsByExam(examId);
+
+  const eventsBySession = new Map<string, typeof events>();
+  for (const ev of events) {
+    const list = eventsBySession.get(ev.session_id) ?? [];
+    list.push(ev);
+    eventsBySession.set(ev.session_id, list);
+  }
+
+  const entries: ProctoringEntry[] = sessions.map((s) => {
+    const sessEvents = eventsBySession.get(s.id) ?? [];
+    return {
+      session_id: s.id,
+      student_id: s.student_id,
+      student_name: s.student_name,
+      student_email: s.student_email,
+      status: s.status,
+      started_at: s.started_at,
+      submitted_at: s.submitted_at,
+      score: s.score,
+      max_points: s.max_points,
+      violation_count: sessEvents.length,
+      violations: sessEvents.map((ev) => ({
+        event_type: ev.event_type,
+        event_at: ev.event_at,
+        details: ev.details,
+      })),
+    };
+  });
+
+  return {
+    exam_id: examId,
+    total_sessions: sessions.length,
+    active_sessions: sessions.filter((s) => s.status === "active").length,
+    submitted_sessions: sessions.filter((s) => s.status === "submitted").length,
+    expired_sessions: sessions.filter((s) => s.status === "expired").length,
+    sessions: entries,
   };
 };

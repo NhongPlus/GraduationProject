@@ -1,68 +1,275 @@
 import { lazy } from 'react';
+import {
+  IconBooks,
+  IconCalendarStats,
+  IconClipboardList,
+  IconFileAnalytics,
+  IconGauge,
+  IconLock,
+  IconNotes,
+  IconPencilCheck,
+} from '@tabler/icons-react';
 import authRoute from './authRoute';
-import type { Routes } from '@/@types/routes';
+import type { NavGroup, Routes } from '@/@types/routes';
 
 export const publicRoutes: Routes = [...authRoute];
+
+export const navGroups: NavGroup[] = [
+  {
+    key: 'exams',
+    labelKey: 'nav.exams',
+    icon: IconFileAnalytics,
+    order: 2,
+  },
+  {
+    key: 'student_management',
+    labelKey: 'nav.student_management',
+    icon: IconCalendarStats,
+    order: 7,
+  },
+  {
+    key: 'admin_tools',
+    labelKey: 'nav.admin_tools',
+    icon: IconGauge,
+    order: 8,
+  },
+  {
+    key: 'my_results',
+    labelKey: 'nav.my_results',
+    icon: IconNotes,
+    order: 10,
+  },
+  {
+    key: 'security',
+    labelKey: 'nav.security',
+    icon: IconLock,
+    order: 11,
+  },
+];
 
 export const protectedRoutes: Routes = [
   {
     key: 'main',
     path: '/main',
     component: lazy(() => import('@/pages/main/Dashboard/Dashboard')),
-    authority: ['user', 'admin'],
+    authority: ['user', 'admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.main',
+      position: 'main',
+      icon: IconGauge,
+      order: 1,
+    },
   },
   {
     key: 'exam-list',
     path: '/exams',
     component: lazy(() => import('@/pages/main/Exam/ExamList')),
-    authority: ['user', 'admin'],
+    authority: ['user', 'admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.exam_list',
+      position: 'sub',
+      groupKey: 'exams',
+      order: 1,
+    },
   },
   {
     key: 'exam-authoring',
     path: '/exams/new',
     component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
-    authority: ['admin'],
+    authority: ['admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.exam_create',
+      position: 'sub',
+      groupKey: 'exams',
+      order: 2,
+    },
   },
   {
     key: 'exam-authoring-edit',
     path: '/exams/:examId/edit',
     component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
-    authority: ['admin'],
+    authority: ['admin', 'teacher'],
   },
   {
     key: 'exam-take',
     path: '/exam/:examId',
     component: lazy(() => import('@/pages/main/Exam/ExamTake')),
-    authority: ['user', 'admin'],
+    authority: ['user', 'admin', 'teacher'],
   },
   {
     key: 'exam-result',
     path: '/result/:examId',
     component: lazy(() => import('@/pages/main/Exam/ExamResult')),
-    authority: ['user', 'admin'],
+    authority: ['user', 'admin', 'teacher'],
   },
   {
     key: 'prediction',
     path: '/prediction',
     component: lazy(() => import('@/pages/main/Exam/Prediction')),
     authority: ['user', 'admin'],
+    nav: {
+      labelKey: 'nav.prediction',
+      position: 'main',
+      icon: IconFileAnalytics,
+      order: 9,
+    },
   },
   {
     key: 'my-results',
     path: '/my-results',
     component: lazy(() => import('@/pages/main/Exam/MyResults')),
     authority: ['user', 'admin'],
+    nav: {
+      labelKey: 'nav.my_results',
+      position: 'sub',
+      groupKey: 'my_results',
+      order: 1,
+    },
   },
   {
     key: 'profile',
     path: '/profile',
     component: lazy(() => import('@/pages/main/Profile/Profile')),
-    authority: ['user', 'admin'],
+    authority: ['user', 'admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.change_password',
+      position: 'sub',
+      groupKey: 'security',
+      order: 1,
+    },
   },
   {
     key: 'student-management',
     path: '/admin/students',
     component: lazy(() => import('@/pages/main/Admin/StudentManagement')),
     authority: ['admin'],
+    nav: {
+      labelKey: 'nav.student_list',
+      position: 'sub',
+      groupKey: 'student_management',
+      order: 1,
+    },
+  },
+  // --- Index pages (no param, list view) ---
+  {
+    key: 'grading',
+    path: '/grading',
+    component: lazy(() => import('@/pages/main/Grading/GradingIndex')),
+    authority: ['admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.grading',
+      position: 'main',
+      icon: IconPencilCheck,
+      order: 5,
+    },
+  },
+  // --- Detail pages (with param) ---
+  {
+    key: 'grading-session',
+    path: '/grading/:sessionId',
+    component: lazy(() => import('@/pages/main/Grading/Grading')),
+    authority: ['admin', 'teacher'],
+  },
+  {
+    key: 'exam-sessions',
+    path: '/exam-sessions',
+    component: lazy(() => import('@/pages/main/Exam/ExamSessions')),
+    authority: ['admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.exam_sessions',
+      position: 'main',
+      icon: IconClipboardList,
+      order: 3,
+    },
+  },
+  {
+    key: 'question-bank',
+    path: '/question-bank',
+    component: lazy(() => import('@/pages/main/Exam/QuestionBank')),
+    authority: ['admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.question_bank',
+      position: 'main',
+      icon: IconBooks,
+      order: 4,
+    },
+  },
+  {
+    key: 'subject-management',
+    path: '/admin/subjects',
+    component: lazy(() => import('@/pages/main/Admin/SubjectManagement')),
+    authority: ['admin'],
+  },
+  {
+    key: 'exam-sessions-detail',
+    path: '/exam-sessions/:examId',
+    component: lazy(() => import('@/pages/main/Exam/ExamSessions')),
+    authority: ['admin', 'teacher'],
+  },
+  {
+    key: 'proctoring',
+    path: '/proctoring',
+    component: lazy(() => import('@/pages/main/Proctoring/ProctoringList')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.proctoring',
+      position: 'sub',
+      groupKey: 'admin_tools',
+      order: 4,
+    },
+  },
+  {
+    key: 'proctoring-detail',
+    path: '/proctoring/:examId',
+    component: lazy(() => import('@/pages/main/Proctoring/ProctoringDashboard')),
+    authority: ['admin'],
+  },
+  {
+    key: 'password-reset-management',
+    path: '/admin/password-resets',
+    component: lazy(() => import('@/pages/main/Admin/PasswordResetManagement')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.password_reset',
+      position: 'sub',
+      groupKey: 'admin_tools',
+      order: 3,
+    },
+  },
+  {
+    key: 'score-analytics',
+    path: '/score-analytics',
+    component: lazy(() => import('@/pages/main/Exam/ScoreAnalytics')),
+    authority: ['admin', 'teacher'],
+    nav: {
+      labelKey: 'nav.score_analytics',
+      position: 'main',
+      icon: IconFileAnalytics,
+      order: 6,
+    },
+  },
+  {
+    key: 'audit-log',
+    path: '/admin/audit-logs',
+    component: lazy(() => import('@/pages/main/Admin/AuditLogPage')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.audit_logs',
+      position: 'sub',
+      groupKey: 'admin_tools',
+      order: 1,
+    },
+  },
+  {
+    key: 'system-report',
+    path: '/admin/system-report',
+    component: lazy(() => import('@/pages/main/Admin/SystemReportPage')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.system_report',
+      position: 'sub',
+      groupKey: 'admin_tools',
+      order: 2,
+    },
   },
 ];

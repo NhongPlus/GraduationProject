@@ -24,7 +24,13 @@ const useAuth = () => {
 
   return {
     authenticated,
-    userAuthority: userRole === 'admin' ? ['admin', 'user'] : ['user'],
+    /** Teacher không gắn `user` — tránh mở các route chỉ dành cho sinh viên (vd. my-results, prediction). */
+    userAuthority:
+      userRole === 'admin'
+        ? ['admin', 'user']
+        : userRole === 'teacher'
+          ? ['teacher']
+          : ['user'],
     userRole,
     accessToken,
     userName,

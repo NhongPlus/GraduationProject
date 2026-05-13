@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Box, Button, Paper, Text } from '@mantine/core';
 import { modals } from '@mantine/modals';
@@ -31,12 +31,15 @@ function formatHms(totalSeconds: number) {
 }
 
 function toUiQuestion(question: ApiQuestion, number: number): MockExamQuestion {
+  const media_url = question.media_url?.trim() ? question.media_url : null;
+
   if (question.question_type === 'essay') {
     return {
       number,
       points: question.points,
       type: 'essay',
       prompt: question.content,
+      media_url,
       essay: {
         placeholder: 'Nhap cau tra loi cua ban...',
       },
@@ -63,19 +66,24 @@ function toUiQuestion(question: ApiQuestion, number: number): MockExamQuestion {
     points: question.points,
     type: 'mcq',
     prompt: question.content,
+    media_url,
     options,
   };
 }
+
+type RealtimeHandlers = NonNullable<Parameters<typeof createExamRealtimeSocket>[0]['handlers']>;
 
 function buildSubmitAnswers(
   answers: Record<string, string>,
   questionIdByNumber: Record<number, string>,
   questionByNumber: Map<number, MockExamQuestion>,
 ): Record<string, string | string[]> {
+  // Key by display index (0,1,2...) so BE can unshuffle using question_order
   const payload: Record<string, string | string[]> = {};
 
   for (const [rawNumber, questionId] of Object.entries(questionIdByNumber)) {
     const number = Number(rawNumber);
+    const displayIdx = String(number - 1); // 0-based display index
     const question = questionByNumber.get(number);
     if (!question) continue;
 
@@ -84,12 +92,12 @@ function buildSubmitAnswers(
 
     if (question.type === 'essay') {
       const essay = rawAnswer?.trim();
-      if (essay) payload[questionId] = essay;
+      if (essay) payload[displayIdx] = essay;
       continue;
     }
 
     if (question.type === 'mcq' && rawAnswer) {
-      payload[questionId] = rawAnswer;
+      payload[displayIdx] = rawAnswer;
     }
   }
 
@@ -103,6 +111,10 @@ const ExamTake = () => {
   const { examId } = useParams<{ examId: string }>();
   const activeExamId = examId ?? 'preview-exam';
   const [fullscreenError, setFullscreenError] = useState('');
+  const envDisableIntegrity = import.meta.env.VITE_DISABLE_INTEGRITY;
+  const integrityDisabled = envDisableIntegrity !== undefined
+    ? envDisableIntegrity === 'true'
+    : import.meta.env.DEV;
 
   const placeholderQuestion = (n: number): MockExamQuestion => ({
     number: n,
@@ -136,7 +148,7 @@ const ExamTake = () => {
       currentNumber,
       setCurrentNumber,
     },
-    boot: { sessionId, setSessionId, bootLoading, setBootLoading, bootError, setBootError },
+    boot: { sessionId, setSessionId, bootLoading, setBootLoading, bootError, setBootError, versionCode, setVersionCode, deadlineAt, setDeadlineAt },
     runtime: {
       remainingSeconds,
       setRemainingSeconds,
@@ -148,6 +160,9 @@ const ExamTake = () => {
       setIsFullscreen,
       focusLeaveCount,
       setFocusLeaveCount,
+      connectionStatus,
+      setConnectionStatus,
+      syncServerTime,
     },
     submit: {
       autoSubmitCountdown,
@@ -256,6 +271,8 @@ const ExamTake = () => {
     try {
       const startData = await examApi.startSession(activeExamId);
       setSessionId(startData.session.id);
+      setVersionCode(startData.version_code ?? null);
+      setDeadlineAt(startData.deadline_at ?? null);
       const deadlineMs = Date.parse(startData.deadline_at);
       if (!Number.isNaN(deadlineMs)) {
         setRemainingSeconds(Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000)));
@@ -276,6 +293,70 @@ const ExamTake = () => {
     }
     void submitCurrentSession('auto');
   }, [autoSubmitted, sessionId, submitting, submitCurrentSession]);
+
+  const handlersRef = useRef<RealtimeHandlers>({});
+
+  handlersRef.current = {
+    onState: (payload) => {
+      setConnectionStatus('connected');
+      if (payload.status === 'started' && payload.endsAt) {
+        syncServerTime(payload.serverNowMs ?? Date.now(), payload.endsAt);
+        setExamStarted(true);
+        setAutoSubmitted(false);
+        setSubmitFailed(false);
+        setViolationLocked(false);
+        setRealtimeMessage('');
+        violationTriggeredRef.current = false;
+        void ensureSessionStarted();
+      } else if (payload.status === 'not_started') {
+        setExamStarted(false);
+        setRealtimeMessage('Giang vien chua bat dau bai thi. Vui long cho...');
+      } else if (payload.status === 'ended') {
+        setExamStarted(false);
+        setRealtimeMessage('Bai thi da ket thuc.');
+        void forceAutoSubmit();
+      }
+    },
+    onStarted: (payload) => {
+      setConnectionStatus('connected');
+      syncServerTime(Date.now(), payload.endsAt);
+      setExamStarted(true);
+      setAutoSubmitted(false);
+      setSubmitFailed(false);
+      setViolationLocked(false);
+      violationTriggeredRef.current = false;
+      setRealtimeMessage('Bai thi da bat dau. Chuc ban lam bai tot.');
+      void ensureSessionStarted();
+    },
+    onFinal15: (payload) => {
+      const msg = payload?.message?.trim() || 'Con 15 phut cuoi. Vui long kiem tra va nop bai.';
+      setRealtimeMessage(msg);
+      modals.open({
+        centered: true,
+        title: 'Thong bao tu he thong',
+        children: <Text size="sm">{msg}</Text>,
+      });
+    },
+    onForceSubmit: (payload) => {
+      applyServerForceSubmit(payload);
+    },
+    onAlert: (payload) => {
+      const msg = payload?.message?.trim() || 'Thong bao tu giam thi';
+      setRealtimeMessage(msg);
+    },
+    onError: (message) => {
+      setRealtimeMessage(`Realtime loi: ${message}`);
+    },
+    onDisconnect: () => {
+      setConnectionStatus('disconnected');
+    },
+    onReconnecting: () => {
+      setConnectionStatus('reconnecting');
+    },
+    onConnect: () => {
+      setConnectionStatus('connected');
+    },
+  };
 
   const triggerViolationLock = useCallback((reason: string) => {
     const now = Date.now();
@@ -350,6 +431,7 @@ const ExamTake = () => {
   }, [examStarted, autoSubmitted]);
 
   useEffect(() => {
+    if (integrityDisabled) return;
     const onFullscreenChange = () => {
       const full = Boolean(document.fullscreenElement);
       setIsFullscreen(full);
@@ -373,9 +455,10 @@ const ExamTake = () => {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('fullscreenerror', onFullscreenError);
     };
-  }, [activeExamId, autoSubmitted, examStarted, isFullscreen, setIsFullscreen, t, triggerViolationLock]);
+  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, isFullscreen, setIsFullscreen, t, triggerViolationLock]);
 
   useEffect(() => {
+    if (integrityDisabled) return;
     const onVisibilityChange = () => {
       if (!examStarted || autoSubmitted) return;
       if (document.hidden) {
@@ -402,9 +485,20 @@ const ExamTake = () => {
       if (!examStarted || autoSubmitted) return;
       void trackIntegrityEvent(activeExamId, 'paste_attempt');
     };
-    const onContextMenu = () => {
+    const onContextMenu = (event: MouseEvent) => {
       if (!examStarted || autoSubmitted) return;
       void trackIntegrityEvent(activeExamId, 'context_menu');
+      event.preventDefault();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!examStarted || autoSubmitted) return;
+      const key = event.key.toUpperCase();
+      const isDevtools =
+        key === 'F12' ||
+        (event.ctrlKey && event.shiftKey && ['I', 'J', 'C'].includes(key)) ||
+        (event.metaKey && event.altKey && ['I', 'J', 'C'].includes(key));
+      if (!isDevtools) return;
+      event.preventDefault();
     };
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!examStarted || autoSubmitted) return;
@@ -420,6 +514,7 @@ const ExamTake = () => {
     document.addEventListener('copy', onCopy);
     document.addEventListener('paste', onPaste);
     document.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.removeEventListener('blur', onWindowBlur);
       window.removeEventListener('focus', onWindowFocus);
@@ -428,8 +523,9 @@ const ExamTake = () => {
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('paste', onPaste);
       document.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [activeExamId, autoSubmitted, examStarted]);
+  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled]);
   useEffect(() => {
     if (!examStarted || !sessionId || autoSubmitted) return;
     saveDraftAnswers(activeExamId, answers);
@@ -455,9 +551,10 @@ const ExamTake = () => {
   }, [activeExamId, autoSubmitted, examStarted, sessionId]);
 
   useEffect(() => {
+    if (integrityDisabled) return;
     if (!examStarted || !sessionId || autoSubmitted) return;
     void trackIntegrityEvent(activeExamId, 'exam_opened', { path: window.location.pathname });
-  }, [activeExamId, autoSubmitted, examStarted, sessionId]);
+  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, sessionId]);
 
   useEffect(() => {
     const token = accessToken;
@@ -469,68 +566,25 @@ const ExamTake = () => {
       examId: activeExamId,
       forcePolling: import.meta.env.VITE_SOCKET_FORCE_POLLING === 'true',
       handlers: {
-        onState: (payload) => {
-          if (payload.status === 'started' && payload.endsAt) {
-            const nowMs = payload.serverNowMs ?? Date.now();
-            const endMs = Date.parse(payload.endsAt);
-            if (!Number.isNaN(endMs)) {
-              setRemainingSeconds(Math.max(0, Math.floor((endMs - nowMs) / 1000)));
-            }
-            setExamStarted(true);
-            setAutoSubmitted(false);
-            setSubmitFailed(false);
-            setViolationLocked(false);
-            setRealtimeMessage('');
-            violationTriggeredRef.current = false;
-            void ensureSessionStarted();
-          } else if (payload.status === 'not_started') {
-            setExamStarted(false);
-            setRealtimeMessage('Giang vien chua bat dau bai thi. Vui long cho...');
-          }
-        },
-        onStarted: (payload) => {
-          const endMs = Date.parse(payload.endsAt);
-          if (!Number.isNaN(endMs)) {
-            setRemainingSeconds(Math.max(0, Math.floor((endMs - Date.now()) / 1000)));
-          }
-          setExamStarted(true);
-          setAutoSubmitted(false);
-          setSubmitFailed(false);
-          setViolationLocked(false);
-          violationTriggeredRef.current = false;
-          setRealtimeMessage('Bai thi da bat dau. Chuc ban lam bai tot.');
-          void ensureSessionStarted();
-        },
-        onFinal15: (payload) => {
-          const msg = payload?.message?.trim() || 'Con 15 phut cuoi. Vui long kiem tra va nop bai.';
-          setRealtimeMessage(msg);
-          modals.open({
-            centered: true,
-            title: 'Thong bao tu he thong',
-            children: <Text size="sm">{msg}</Text>,
-          });
-        },
-        onForceSubmit: (payload) => {
-          applyServerForceSubmit(payload);
-        },
-        onAlert: (payload) => {
-          const msg = payload?.message?.trim() || 'Thong bao tu giam thi';
-          setRealtimeMessage(msg);
-        },
-        onError: (message) => {
-          setRealtimeMessage(`Realtime loi: ${message}`);
-        },
+        onState: (payload) => handlersRef.current.onState?.(payload),
+        onStarted: (payload) => handlersRef.current.onStarted?.(payload),
+        onFinal15: (payload) => handlersRef.current.onFinal15?.(payload),
+        onForceSubmit: (payload) => handlersRef.current.onForceSubmit?.(payload),
+        onAlert: (payload) => handlersRef.current.onAlert?.(payload),
+        onError: (message) => handlersRef.current.onError?.(message),
+        onDisconnect: () => handlersRef.current.onDisconnect?.(),
+        onReconnecting: () => handlersRef.current.onReconnecting?.(),
+        onConnect: () => handlersRef.current.onConnect?.(),
       },
     });
 
     return () => {
-      if (socketRef) {
-        socketRef.emit('exam:leave', { examId: activeExamId });
-        socketRef.close();
-        socketRef = null;
-      }
+      if (!socketRef) return;
+      socketRef.emit('exam:leave', { examId: activeExamId });
+      socketRef.close();
+      socketRef = null;
     };
-  }, [activeExamId, accessToken, applyServerForceSubmit, ensureSessionStarted]);
+  }, [activeExamId, accessToken]);
 
   useEffect(() => {
     if (!violationLocked || autoSubmitted) return;
@@ -556,10 +610,14 @@ const ExamTake = () => {
   useEffect(() => {
     if (!autoSubmitted) return;
     const id = window.setTimeout(() => {
-      navigate('/main');
+      if (examId) {
+        navigate(`/result/${examId}`);
+      } else {
+        navigate('/main');
+      }
     }, 5000);
     return () => window.clearTimeout(id);
-  }, [autoSubmitted, navigate]);
+  }, [autoSubmitted, navigate, examId]);
 
   const currentQuestion = resolveQuestion(currentNumber);
 
@@ -669,6 +727,8 @@ const ExamTake = () => {
     );
   }
 
+  const effectiveFullscreen = integrityDisabled ? true : isFullscreen;
+
   return (
     <Box className={classes.root}>
       {autoSubmitted && (
@@ -703,13 +763,14 @@ const ExamTake = () => {
         </Paper>
       )}
 
-      {!autoSubmitted && !violationLocked && !isFullscreen && (
+      {!autoSubmitted && !violationLocked && !effectiveFullscreen && (
         <Paper
           withBorder
           radius="md"
           p="xl"
           mb="md"
-          style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center' }}
+          style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center', cursor: 'pointer' }}
+          onClick={requestFullscreen}
         >
           <Text fw={700} size="lg" mb={8}>
             {t('exam_take.fullscreen_title')}
@@ -722,22 +783,35 @@ const ExamTake = () => {
               {fullscreenError}
             </Text>
           )}
-          <Button leftSection={<IconArrowsMaximize size={16} />} onClick={requestFullscreen}>
+          <Button leftSection={<IconArrowsMaximize size={16} />} onClick={(e) => { e.stopPropagation(); requestFullscreen(); }}>
             {t('exam_take.fullscreen_button')}
           </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && isFullscreen && !examStarted && (
+      {!autoSubmitted && !violationLocked && effectiveFullscreen && !examStarted && (
         <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
           <Text fw={700} size="lg" mb={8}>
             Dang cho giang vien bat dau
           </Text>
-          <Text c="dimmed" size="sm">
+          <Text c="dimmed" size="sm" mb="md">
             {realtimeMessage || 'He thong dang dong bo trang thai bai thi...'}
           </Text>
+          <Button
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => {
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              }
+              navigate('/exams');
+            }}
+          >
+            Thoat phong thi
+          </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && isFullscreen && examStarted && (
+      {!autoSubmitted && !violationLocked && effectiveFullscreen && examStarted && (
         <div className={classes.shell}>
           <ExamTakeHeader
             title={examTitle}
@@ -745,6 +819,8 @@ const ExamTake = () => {
             remainingLabel={formatHms(remainingSeconds)}
             onSubmit={handleSubmit}
             submitting={submitting}
+            versionCode={versionCode}
+            connectionStatus={connectionStatus}
           />
 
           <div>

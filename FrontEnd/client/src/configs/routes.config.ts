@@ -1,1 +1,1 @@
-export { protectedRoutes, publicRoutes } from './routes.config/index';
+export { protectedRoutes, publicRoutes, navGroups } from './routes.config/index';

@@ -8,21 +8,24 @@ export interface ExamSession {
   exam_id: string;
   student_id: string;
   started_at: string;
-  finished_at: string | null;
+  submitted_at: string | null;
   status: SessionStatus;
   created_at: string;
-  updated_at: string;
   score: number | null;
   max_points: number | null;
   student_answers: Record<string, string | string[]> | null;
   graded_details: unknown | null;
   grading_status: GradingStatus | null;
+  version_id: string | null;
+  version_code: string | null;
 }
 
 export interface SessionWithExamMeta extends ExamSession {
   exam_created_by: string;
   exam_title: string;
   exam_duration_min: number;
+  version_id: string | null;
+  version_code: string | null;
 }
 
 export const getSessionById = async (id: string): Promise<ExamSession | null> => {
@@ -50,6 +53,8 @@ export const getSessionWithExam = async (
     exam_created_by: row.exam_created_by,
     exam_title: row.exam_title,
     exam_duration_min: row.exam_duration_min,
+    version_id: row.version_id ?? null,
+    version_code: row.version_code ?? null,
   };
 };
 
@@ -119,8 +124,7 @@ export const finalizeSessionSubmit = async (
   const result = await pool.query(
     `UPDATE exam_sessions
      SET status = 'submitted',
-         finished_at = NOW(),
-         updated_at = NOW(),
+         submitted_at = NOW(),
          score = $2,
          max_points = $3,
          student_answers = $4::jsonb,
@@ -148,8 +152,7 @@ export const updateSessionGrading = async (
     `UPDATE exam_sessions
      SET score = $2,
          graded_details = $3::jsonb,
-         grading_status = $4,
-         updated_at = NOW()
+         grading_status = $4
      WHERE id = $1 AND status = 'submitted'
      RETURNING *`,
     [id, payload.score, JSON.stringify(payload.graded_details), payload.grading_status]
@@ -164,7 +167,7 @@ export const getLatestSubmittedSession = async (
   const result = await pool.query(
     `SELECT * FROM exam_sessions
      WHERE exam_id = $1 AND student_id = $2 AND status = 'submitted'
-     ORDER BY finished_at DESC NULLS LAST, updated_at DESC
+     ORDER BY submitted_at DESC NULLS LAST
      LIMIT 1`,
     [examId, studentId]
   );
@@ -174,9 +177,28 @@ export const getLatestSubmittedSession = async (
 export const expireSession = async (id: string): Promise<ExamSession | null> => {
   const result = await pool.query(
     `UPDATE exam_sessions
-     SET status = 'expired', finished_at = NOW(), updated_at = NOW()
+     SET status = 'expired', submitted_at = NOW()
      WHERE id = $1 RETURNING *`,
     [id]
   );
   return (result.rows[0] as ExamSession) ?? null;
+};
+
+export interface SessionWithStudent extends ExamSession {
+  student_name: string | null;
+  student_email: string | null;
+}
+
+export const getSessionsByExamWithStudent = async (
+  examId: string
+): Promise<SessionWithStudent[]> => {
+  const result = await pool.query(
+    `SELECT es.*, a.full_name AS student_name, a.email AS student_email
+     FROM exam_sessions es
+     JOIN accounts a ON a.id = es.student_id
+     WHERE es.exam_id = $1
+     ORDER BY es.created_at ASC`,
+    [examId]
+  );
+  return result.rows as SessionWithStudent[];
 };

@@ -12,6 +12,7 @@ import classes from './ExamTake.module.scss';
 import type { CompositePart, FillSegment, MockExamQuestion } from './types';
 import { ExamAudioPlayer } from './ExamAudioPlayer';
 import { ExamVideoPlayer } from './ExamVideoPlayer';
+import { ExamQuestionMedia } from './ExamQuestionMedia';
 import { McqOptionList } from './McqOptionList';
 
 type Props = {
@@ -183,6 +184,7 @@ export function ExamQuestionPanel({
         return (
           <>
             <div className={classes.questionText}>{question.prompt}</div>
+            {question.media_url ? <ExamQuestionMedia url={question.media_url} /> : null}
             {question.options && renderMcq(question.options, qPrefix)}
           </>
         );
@@ -254,6 +256,7 @@ export function ExamQuestionPanel({
         return (
           <>
             <div className={classes.questionText}>{question.prompt}</div>
+            {question.media_url ? <ExamQuestionMedia url={question.media_url} /> : null}
             <Textarea
               minRows={6}
               radius="md"

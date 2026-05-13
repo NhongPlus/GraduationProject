@@ -1,5 +1,5 @@
-import { Avatar, Button, Group, Text } from '@mantine/core';
-import { IconCheck, IconClock, IconSchool } from '@tabler/icons-react';
+import { Avatar, Badge, Button, Group, Text } from '@mantine/core';
+import { IconCheck, IconClock, IconSchool, IconWifi, IconWifiOff } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import classes from './ExamTake.module.scss';
 
@@ -9,10 +9,21 @@ type Props = {
   remainingLabel: string;
   onSubmit: () => void;
   submitting?: boolean;
+  versionCode?: string | null;
+  connectionStatus?: 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 };
 
-export function ExamTakeHeader({ title, section, remainingLabel, onSubmit, submitting = false }: Props) {
+const statusConfig = {
+  connected: { color: 'green', label: 'Kết nối', icon: IconWifi },
+  connecting: { color: 'yellow', label: 'Đang kết nối', icon: IconWifi },
+  disconnected: { color: 'red', label: 'Mất kết nối', icon: IconWifiOff },
+  reconnecting: { color: 'orange', label: 'Đang kết nối lại', icon: IconWifiOff },
+};
+
+export function ExamTakeHeader({ title, section, remainingLabel, onSubmit, submitting = false, versionCode, connectionStatus = 'connected' }: Props) {
   const { t } = useTranslation();
+  const status = statusConfig[connectionStatus];
+  const StatusIcon = status.icon;
 
   return (
     <header className={classes.header}>
@@ -22,11 +33,20 @@ export function ExamTakeHeader({ title, section, remainingLabel, onSubmit, submi
           <div style={{ minWidth: 0 }}>
             <div className={classes.title}>{title}</div>
             <div className={classes.subtitle}>{section}</div>
+            {versionCode && (
+              <Text size="xs" c="primary" fw={700} style={{ letterSpacing: 2 }}>
+                ĐỀ {versionCode}
+              </Text>
+            )}
           </div>
         </div>
       </Group>
 
       <Group gap="md" wrap="wrap" justify="flex-end">
+        <Group gap={6}>
+          <StatusIcon size={14} color={`var(--mantine-color-${status.color}-6)`} />
+          <Badge size="xs" color={status.color} variant="light">{status.label}</Badge>
+        </Group>
         <div className={classes.timerPill}>
           <IconClock size={18} />
           <Text span fw={700} style={{ fontVariantNumeric: 'tabular-nums' }}>

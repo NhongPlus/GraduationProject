@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "~/config/enviroment";
 import { getExamById } from "~/models/exam.model";
 import { forceSubmitActiveSessionsByExamService } from "~/services/exam.service";
+import { saveExamRuntimeStart, saveExamRuntimeEnd } from "~/models/examRuntimeState.model";
 
 interface JwtPayloadShape {
   userId: string;
@@ -32,6 +33,42 @@ type ExamRuntimeState = {
 };
 
 const examStateStore = new Map<string, ExamRuntimeState>();
+
+// --- Proctoring presence tracking ---
+type ProctorSession = {
+  socketId: string;
+  userId: string;
+  role: string;
+  joinedAt: number;
+};
+
+const proctoringPresence = new Map<string, ProctorSession[]>(); // examId -> sessions
+
+function getPresenceCount(examId: string): number {
+  return (proctoringPresence.get(examId) ?? []).length;
+}
+function addPresence(examId: string, session: ProctorSession): void {
+  const list = proctoringPresence.get(examId) ?? [];
+  // Avoid duplicate socketId
+  if (!list.find(s => s.socketId === session.socketId)) {
+    list.push(session);
+    proctoringPresence.set(examId, list);
+  }
+}
+function removePresence(examId: string, socketId: string): void {
+  const list = proctoringPresence.get(examId) ?? [];
+  proctoringPresence.set(examId, list.filter(s => s.socketId !== socketId));
+}
+function getProctoringPresence(examId: string): { total: number; teachers: number; admins: number; students: number } {
+  const list = proctoringPresence.get(examId) ?? [];
+  return {
+    total: list.length,
+    teachers: list.filter(s => s.role === 'teacher').length,
+    admins: list.filter(s => s.role === 'admin').length,
+    students: list.filter(s => s.role === 'student').length,
+  };
+}
+// ----------------------------------------
 let ioInstance: Server | null = null;
 
 function sanitizeDuration(raw: unknown): number {
@@ -87,6 +124,7 @@ async function finalizeExamRuntime(io: Server, state: ExamRuntimeState): Promise
   } finally {
     clearExamTimers(state);
     examStateStore.delete(examId);
+    void saveExamRuntimeEnd(examId).catch(console.error);
   }
 }
 
@@ -118,6 +156,7 @@ function startExamRuntime(io: Server, examId: string, durationMin: number): Exam
   }, msUntilEnd);
 
   examStateStore.set(examId, state);
+  void saveExamRuntimeStart(examId, new Date(startedAtMs), new Date(endsAtMs), durationMin).catch(console.error);
   emitExamState(io, examId);
   return state;
 }
@@ -173,8 +212,94 @@ export function registerExamSocket(io: Server): void {
       const examId = payload?.examId;
       if (!examId) return;
       void socket.leave(roomForExam(examId));
+      // Clean up presence
+      removePresence(examId, socket.id);
+      // Broadcast updated presence
+      io.to(roomForExam(examId)).emit("proctor:presence_update", {
+        examId,
+        ...getProctoringPresence(examId),
+      });
       socket.emit("exam:left", { examId });
     });
+
+    // --- Proctoring presence ---
+    socket.on("proctor:join", (payload: { examId?: string }) => {
+      const examId = payload?.examId;
+      if (!examId || typeof examId !== "string") {
+        socket.emit("exam:error", { code: "BAD_EXAM_ID", message: "examId (string) bắt buộc" });
+        return;
+      }
+      if (role !== "admin" && role !== "teacher") {
+        socket.emit("exam:error", { code: "FORBIDDEN", message: "Chỉ admin hoặc teacher" });
+        return;
+      }
+      const room = roomForExam(examId);
+      void socket.join(room);
+      addPresence(examId, { socketId: socket.id, userId, role, joinedAt: Date.now() });
+      // Notify all in room of updated presence
+      io.to(room).emit("proctor:presence_update", {
+        examId,
+        ...getProctoringPresence(examId),
+      });
+      socket.emit("proctor:joined", { examId, room });
+      console.log(`[proctor] ${socket.id} (${role}) joined monitoring room ${room}`);
+    });
+
+    socket.on("proctor:leave", (payload: { examId?: string }) => {
+      const examId = payload?.examId;
+      if (!examId) return;
+      void socket.leave(roomForExam(examId));
+      removePresence(examId, socket.id);
+      io.to(roomForExam(examId)).emit("proctor:presence_update", {
+        examId,
+        ...getProctoringPresence(examId),
+      });
+      socket.emit("proctor:left", { examId });
+    });
+
+    socket.on("proctor:request_presence", (payload: { examId?: string }) => {
+      const examId = payload?.examId;
+      if (!examId) return;
+      socket.emit("proctor:presence_update", {
+        examId,
+        ...getProctoringPresence(examId),
+      });
+    });
+
+    // Broadcast cảnh báo theo nhóm
+    // payload: { examId, group: 'all' | 'violators' | 'active', message }
+    socket.on("proctor:broadcast_group", (payload: {
+      examId?: string;
+      group?: string;
+      message?: string;
+    }) => {
+      if (role !== "admin" && role !== "teacher") {
+        socket.emit("exam:error", { code: "FORBIDDEN", message: "Chỉ admin hoặc teacher" });
+        return;
+      }
+      const examId = payload?.examId;
+      const group = payload?.group;
+      const message = payload?.message;
+      if (!examId || !message?.trim()) {
+        socket.emit("exam:error", { code: "BAD_PAYLOAD", message: "examId và message bắt buộc" });
+        return;
+      }
+      if (!['all', 'violators', 'active'].includes(group ?? '')) {
+        socket.emit("exam:error", { code: "BAD_GROUP", message: "group phải là 'all' | 'violators' | 'active'" });
+        return;
+      }
+      const room = roomForExam(examId);
+      io.to(room).emit("proctor:group_alert", {
+        examId,
+        group: group!,
+        message: message.trim(),
+        fromRole: role,
+        fromUserId: userId,
+        at: new Date().toISOString(),
+      });
+      socket.emit("proctor:broadcast_sent", { examId, group, recipients: group });
+    });
+    // --------------------------
 
     socket.on("exam:ping", () => {
       const serverNowMs = Date.now();
@@ -242,6 +367,21 @@ export function registerExamSocket(io: Server): void {
 
     socket.on("disconnect", (reason) => {
       console.log(`[socket] disconnect id=${socket.id} reason=${reason}`);
+      // Clean up presence from all rooms this socket was in
+      for (const [examId, list] of proctoringPresence.entries()) {
+        const idx = list.findIndex(s => s.socketId === socket.id);
+        if (idx !== -1) {
+          list.splice(idx, 1);
+          proctoringPresence.set(examId, list);
+          // Notify room of updated presence
+          if (ioInstance) {
+            ioInstance.to(roomForExam(examId)).emit("proctor:presence_update", {
+              examId,
+              ...getProctoringPresence(examId),
+            });
+          }
+        }
+      }
     });
   });
 }

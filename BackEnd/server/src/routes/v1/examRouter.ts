@@ -10,6 +10,7 @@ import {
   deleteExamController,
   getQuestionsController,
   addQuestionController,
+  updateQuestionController,
   deleteQuestionController,
   startSessionController,
   submitSessionController,
@@ -20,10 +21,13 @@ import {
   getMySubmissionController,
   getSessionGradingController,
   gradeSessionController,
+  getExamProctoringController,
   postIntegrityEventsController,
   postAutosaveController,
   previewWordImportController,
   commitWordImportController,
+  aiRecomposeExamController,
+  uploadExamMediaController,
 } from "~/controllers/exam.controller";
 
 const examRouter = Router();
@@ -31,10 +35,14 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
 
 examRouter.use(authMiddleware);
 
-examRouter.get("/sessions/me", roleMiddleware(["student"]), getMySessionsController);
+examRouter.get("/sessions/me", roleMiddleware(["admin", "teacher", "student"]), getMySessionsController);
 examRouter.post("/sessions/:sessionId/submit", roleMiddleware(["student"]), submitSessionController);
 examRouter.get(
   "/sessions/:sessionId/grading",
@@ -72,16 +80,38 @@ examRouter.post(
   roleMiddleware(["admin", "teacher"]),
   commitWordImportController
 );
+examRouter.post(
+  "/import-word/ai-recompose",
+  roleMiddleware(["admin", "teacher"]),
+  upload.single("file"),
+  aiRecomposeExamController
+);
+examRouter.post(
+  "/upload-media",
+  roleMiddleware(["admin", "teacher"]),
+  mediaUpload.single("file"),
+  uploadExamMediaController
+);
 examRouter.get("/:id", roleMiddleware(["admin", "teacher", "student"]), getExamController);
 examRouter.patch("/:id", roleMiddleware(["admin", "teacher"]), updateExamController);
 examRouter.delete("/:id", roleMiddleware(["admin", "teacher"]), deleteExamController);
 
 examRouter.get("/:examId/questions", roleMiddleware(["admin", "teacher", "student"]), getQuestionsController);
 examRouter.post("/:examId/questions", roleMiddleware(["admin", "teacher"]), addQuestionController);
+examRouter.patch(
+  "/:examId/questions/:questionId",
+  roleMiddleware(["admin", "teacher"]),
+  updateQuestionController
+);
 examRouter.delete("/:examId/questions/:questionId", roleMiddleware(["admin", "teacher"]), deleteQuestionController);
 
 examRouter.post("/:examId/sessions", roleMiddleware(["student"]), startSessionController);
 examRouter.get("/:examId/sessions", roleMiddleware(["admin", "teacher"]), getExamSessionsController);
+examRouter.get(
+  "/:examId/proctoring",
+  roleMiddleware(["admin", "teacher"]),
+  getExamProctoringController
+);
 examRouter.post(
   "/:examId/start-runtime",
   roleMiddleware(["admin", "teacher"]),

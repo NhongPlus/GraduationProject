@@ -219,14 +219,14 @@ export const buildStudentDashboard = async (studentId: string): Promise<StudentD
         ? (Number(s.score) / Number(s.max_points)) * 100
         : null;
     let timeUsed: number | null = null;
-    if (s.finished_at) {
-      const ms = new Date(s.finished_at).getTime() - new Date(s.started_at).getTime();
+    if (s.submitted_at) {
+      const ms = new Date(s.submitted_at).getTime() - new Date(s.started_at).getTime();
       if (Number.isFinite(ms) && ms >= 0) timeUsed = Math.round(ms / 60000);
     }
     return {
       exam_id: s.exam_id,
       subject: s.subject_name || s.exam_title,
-      date_iso: s.finished_at || s.started_at,
+      date_iso: s.submitted_at || s.started_at,
       score_percent: pct,
       time_used_min: timeUsed,
       time_total_min: s.exam_duration_min ?? 60,

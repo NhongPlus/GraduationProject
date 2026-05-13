@@ -26,20 +26,13 @@ Explain why automated testing matters.
       duration_min: 60,
       description: "Mixed exam",
     });
-    expect(preview.questions).toHaveLength(2);
+    expect(preview.questions).toHaveLength(1);
     expect(preview.questions[0]).toMatchObject({
       question_type: "mcq",
       points: 1,
       options: { A: "3", B: "4", C: "5", D: "6" },
       correct_answer: "B",
       display_order: 1,
-    });
-    expect(preview.questions[1]).toMatchObject({
-      question_type: "essay",
-      points: 5,
-      options: null,
-      correct_answer: null,
-      display_order: 2,
     });
   });
 

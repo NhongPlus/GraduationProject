@@ -7,10 +7,12 @@ vi.mock("~/config/db", () => ({
   default: { query: vi.fn(), connect: vi.fn() },
 }));
 
+// Must mock BEFORE importing auth.service
 vi.mock("~/models/user_session.model", () => ({
   createUserSession: vi.fn().mockResolvedValue({ id: "sess-1" }),
   getActiveSessionByUserId: vi.fn().mockResolvedValue(null),
   revokeAllSessionsByUserId: vi.fn().mockResolvedValue(undefined),
+  verifySession: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock env
@@ -181,14 +183,18 @@ describe("auth.service", () => {
         { userId: "user-1", role: "teacher" },
         "test-secret-key-for-unit-tests"
       );
-      mockedPool.query.mockResolvedValueOnce({
-        rows: [{ id: "user-1", is_active: true }],
-      });
+      mockedPool.query
+        .mockResolvedValueOnce({
+          rows: [{ id: "user-1", is_active: true }],
+        })
+        .mockResolvedValueOnce({
+          rows: [],
+          rowCount: 0,
+        });
 
-      const result = await verifyTokenPayload(token);
-
-      expect(result.userId).toBe("user-1");
-      expect(result.role).toBe("teacher");
+      await expect(verifyTokenPayload(token)).rejects.toThrow(
+        "Session đã hết hạn hoặc bị thu hồi từ thiết bị khác"
+      );
     });
   });
 });

@@ -3,10 +3,12 @@ import { useLocation } from 'react-router-dom';
 import Sidebar from '@/components/SideBar/SideBar';
 import { NavbarNested } from '@/components/NavBar/NavbarNested';
 import Views from '@/components/Layout/Views';
+import { useState } from 'react';
 
 const DefaultLayout = () => {
   const { pathname } = useLocation();
   const isExamMode = pathname.startsWith('/exam/');
+  const [navbarCollapsed, setNavbarCollapsed] = useState(false);
 
   if (isExamMode) {
     return (
@@ -21,8 +23,9 @@ const DefaultLayout = () => {
   return (
     <AppShell
       navbar={{
-        width: 260,
-        breakpoint: 'md',
+        width: navbarCollapsed ? 72 : 260,
+        /* md (~992px) khiến navbar chuyển overlay full-width rất sớm; xs chỉ ẩn sidebar dưới ~576px */
+        breakpoint: 'xs',
       }}
       header={{
         height: 60,
@@ -30,7 +33,7 @@ const DefaultLayout = () => {
       padding="md"
     >
       <AppShell.Navbar style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <NavbarNested />
+        <NavbarNested collapsed={navbarCollapsed} onCollapsedChange={setNavbarCollapsed} />
       </AppShell.Navbar>
 
       <AppShell.Header>

@@ -35,7 +35,7 @@ export interface StudentSessionSummaryRow {
   exam_title: string;
   subject_name: string;
   exam_duration_min: number;
-  finished_at: string | null;
+  submitted_at: string | null;
   started_at: string;
   score: number | null;
   max_points: number | null;
@@ -57,8 +57,8 @@ export const getStudentDashboardStats = async (
       )::float AS average_score_percent,
       AVG(
         CASE
-          WHEN finished_at IS NOT NULL
-          THEN EXTRACT(EPOCH FROM (finished_at - started_at)) / 60.0
+          WHEN submitted_at IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (submitted_at - started_at)) / 60.0
         END
       )::float AS average_duration_minutes
     FROM exam_sessions
@@ -137,7 +137,7 @@ export const getStudentRecentSessions = async (
       e.title AS exam_title,
       s.name AS subject_name,
       e.duration_min AS exam_duration_min,
-      es.finished_at,
+      es.submitted_at,
       es.started_at,
       es.score,
       es.max_points,
@@ -148,7 +148,7 @@ export const getStudentRecentSessions = async (
     JOIN subjects s ON s.id = c.subject_id
     WHERE es.student_id = $1
       AND es.status IN ('submitted', 'expired')
-    ORDER BY COALESCE(es.finished_at, es.created_at) DESC
+    ORDER BY COALESCE(es.submitted_at, es.created_at) DESC
     LIMIT $2
     `,
     [studentId, limit]
@@ -310,7 +310,7 @@ export const getTeacherRecentSessions = async (
     JOIN classes c ON c.id = e.class_id
     JOIN accounts a ON a.id = es.student_id
     WHERE c.teacher_id = $1
-    ORDER BY COALESCE(es.finished_at, es.created_at) DESC
+    ORDER BY COALESCE(es.submitted_at, es.created_at) DESC
     LIMIT $2
     `,
     [teacherId, limit]
@@ -331,7 +331,7 @@ export const getAdminRecentSessions = async (limit = 12): Promise<TeacherRecentS
     FROM exam_sessions es
     JOIN exams e ON e.id = es.exam_id
     JOIN accounts a ON a.id = es.student_id
-    ORDER BY COALESCE(es.finished_at, es.created_at) DESC
+    ORDER BY COALESCE(es.submitted_at, es.created_at) DESC
     LIMIT $1
     `,
     [limit]

@@ -9,27 +9,36 @@ import {
   Box,
   Anchor,
   Alert,
+  Modal,
+  Stack,
 } from '@mantine/core';
 import { Carousel } from '@mantine/carousel';
-import image from '@/assets/img/login.jpg';
-import classes from './Login.module.scss';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import image from '@/assets/img/login.jpg';
+import classes from './Login.module.scss';
 import appConfig from '@/configs/app.config';
-import { login, saveSession } from '@/services/authApi';
+import { login, saveSession, requestSelfPasswordReset } from '@/services/authApi';
 import InputText from '@/components/Input/InputText/InputText';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import { useAppDispatch } from '@/hooks/useAppStore';
+import { refreshAuthFromStorage } from '@/store/authSlice';
 
 function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotOpened, setForgotOpened] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStatus, setForgotStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [forgotMsg, setForgotMsg] = useState('');
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -41,21 +50,29 @@ function Login() {
       setError('');
       setWarning('');
       const result = await login(email, password);
+      if (!result?.token || !result?.user?.id) {
+        setError(t('login.login_failed'));
+        return;
+      }
       if (result.hasExistingSession) {
         setWarning(t('login.session_revoked_warning'));
       }
       saveSession(result.token, result.user);
+      dispatch(refreshAuthFromStorage());
       navigate(appConfig.authenticatedEntryPath, { replace: true });
     } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
       const msg =
-        (typeof err === 'object' &&
-          err !== null &&
-          'response' in err &&
-          typeof (err as { response?: { data?: { message?: string } } }).response
-            ?.data?.message === 'string' &&
-          (err as { response?: { data?: { message?: string } } }).response?.data
-            ?.message) ||
-        t('login.login_failed');
+        axiosErr?.response?.status === 401 && axiosErr?.response?.data?.message
+          ? axiosErr.response.data.message
+          : (typeof err === 'object' &&
+              err !== null &&
+              'response' in err &&
+              typeof (err as { response?: { data?: { message?: string } } }).response
+                ?.data?.message === 'string' &&
+              (err as { response?: { data?: { message?: string } } }).response?.data
+                ?.message) ||
+            t('login.login_failed');
       setError(msg);
     } finally {
       setLoading(false);
@@ -64,6 +81,25 @@ function Login() {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter') handleLogin();
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.trim()) {
+      setForgotStatus('error');
+      setForgotMsg(t('login.forgot_email_required'));
+      return;
+    }
+    setForgotStatus('loading');
+    setForgotMsg('');
+    try {
+      await requestSelfPasswordReset(forgotEmail);
+      setForgotStatus('success');
+      setForgotMsg(t('login.forgot_success'));
+    } catch (err: unknown) {
+      setForgotStatus('error');
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setForgotMsg(axiosErr?.response?.data?.message || t('login.forgot_failed'));
+    }
   };
 
   return (
@@ -116,7 +152,8 @@ function Login() {
 
               <Anchor
                 underline="never"
-                style={{ marginTop: 12, display: 'inline-block' }}
+                style={{ marginTop: 12, display: 'inline-block', cursor: 'pointer' }}
+                onClick={() => setForgotOpened(true)}
               >
                 {t('login.forgot_password')}
               </Anchor>
@@ -153,6 +190,38 @@ function Login() {
           </BackgroundImage>
         </SimpleGrid>
       </Paper>
+
+      <Modal
+        opened={forgotOpened}
+        onClose={() => { setForgotOpened(false); setForgotStatus('idle'); setForgotMsg(''); setForgotEmail(''); }}
+        title={t('login.forgot_password')}
+        centered
+      >
+        <Stack gap="sm">
+          <Text size="sm" c="dimmed">{t('login.forgot_desc')}</Text>
+          {forgotStatus === 'success' ? (
+            <Alert color="green" variant="light">{forgotMsg}</Alert>
+          ) : (
+            <>
+              <InputText
+                label={t('login.email')}
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                fullWidth
+                placeholder={t('login.email_placeholder')}
+              />
+              {forgotStatus === 'error' && <Text c="red" size="sm">{forgotMsg}</Text>}
+              <ButtonFilled
+                label={t('login.forgot_submit')}
+                disabled={forgotStatus === 'loading'}
+                loading={forgotStatus === 'loading'}
+                onClick={handleForgotPassword}
+                fullWidth
+              />
+            </>
+          )}
+        </Stack>
+      </Modal>
     </Center>
   );
 }

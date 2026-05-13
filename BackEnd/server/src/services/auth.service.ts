@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { createHash } from "crypto";
 import { env } from "~/config/enviroment";
+import pool from "~/config/db";
 import {
   createUser,
   getUserByEmail,
@@ -13,6 +14,7 @@ import {
   createUserSession,
   revokeAllSessionsByUserId,
   getActiveSessionByUserId,
+  verifySession,
 } from "~/models/user_session.model";
 
 if (!env.JWT_SECRET) {
@@ -101,5 +103,33 @@ export const verifyTokenPayload = async (token: string): Promise<TokenPayload> =
   if (!user) throw new Error("Người dùng không tồn tại");
   if (!user.is_active) throw new Error("Tài khoản đã bị vô hiệu hóa");
 
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const sessionValid = await verifySession(decoded.userId, tokenHash);
+  if (!sessionValid) {
+    throw new Error("Session đã hết hạn hoặc bị thu hồi từ thiết bị khác");
+  }
+
   return decoded;
+};
+
+export const changePasswordService = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  const user = await getUserById(userId);
+  if (!user) throw new Error("Người dùng không tồn tại");
+
+  const isValid = await bcrypt.compare(currentPassword, user.hashed_password);
+  if (!isValid) throw new Error("Mật khẩu hiện tại không đúng");
+
+  if (newPassword.length < 8) {
+    throw new Error("Mật khẩu mới phải có ít nhất 8 ký tự");
+  }
+
+  const hashed = await bcrypt.hash(newPassword, 12);
+  await pool.query(
+    "UPDATE accounts SET hashed_password = $1, updated_at = NOW() WHERE id = $2",
+    [hashed, userId]
+  );
 };

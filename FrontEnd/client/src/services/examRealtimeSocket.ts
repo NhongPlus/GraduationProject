@@ -28,6 +28,9 @@ type RealtimeHandlers = {
   onForceSubmit?: (payload: ForceSubmitPayload) => void;
   onAlert?: (payload: { examId: string; message?: string; at?: string }) => void;
   onError?: (message: string) => void;
+  onDisconnect?: () => void;
+  onReconnecting?: () => void;
+  onConnect?: () => void;
 };
 
 export function createExamRealtimeSocket(opts: {
@@ -45,8 +48,20 @@ export function createExamRealtimeSocket(opts: {
   });
 
   socket.on('connect', () => {
+    handlers?.onConnect?.();
     socket.emit('exam:join', { examId });
     socket.emit('exam:ping');
+  });
+
+  socket.on('disconnect', () => {
+    handlers?.onDisconnect?.();
+  });
+
+  socket.on('reconnect_attempt', () => {
+    handlers?.onReconnecting?.();
+  });
+  socket.on('reconnect_failed', () => {
+    handlers?.onReconnecting?.();
   });
 
   socket.on('exam:state', (p) => handlers?.onState?.(p));

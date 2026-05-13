@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 
 export type AuthorityGuardProps = {
   authority?: string[];
@@ -22,7 +23,11 @@ const AuthorityGuard = ({ authority, userAuthority, children }: AuthorityGuardPr
   const userRoles = normalizeAuthority(userAuthority);
   const isAllowed = required.some((role) => userRoles.includes(role));
 
-  return isAllowed ? <>{children}</> : null;
+  if (!isAllowed) {
+    return <Navigate to="/main" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 export default AuthorityGuard;

@@ -124,14 +124,13 @@ Chạy trong **Neon → SQL Editor** (hoặc bất kỳ client Postgres nào tr�
 | Role | Email |
 
 
-13	admin01@system.local
-14	admin02@system.local
-15	teacher01@system.local
-16	teacher02@system.local
-17	student01@system.local
-18	student02@system.local
-pass Test@123
+## Tài Khoản Test
 
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin01@system.local` | `Test@123` |
+| Teacher | `gv01@system.local` | `Test@123` |
+| Student | `sv01@system.local` | `Test@123` |
 
 sinh viên và teacher chỉ có login ko có register 
 deadline cho bài thi 

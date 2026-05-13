@@ -1,0 +1,258 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider,
+} from '@mantine/core';
+import { useTranslation } from 'react-i18next';
+import examApi from '@/services/examApi';
+import type { GradingPayload } from '@/services/examApi';
+import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
+import InputNumber from '@/components/Input/InputNumber/InputNumber';
+import InputTextarea from '@/components/Input/InputTextarea/InputTextarea';
+import PageHeader from '@/components/PageHeader/PageHeader';
+
+type GradeDraft = Record<string, { points_awarded: number; comment?: string }>;
+
+const Grading = () => {
+  const { t } = useTranslation();
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+  const [data, setData] = useState<GradingPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [draft, setDraft] = useState<GradeDraft>({});
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const d = await examApi.getSessionGrading(sessionId);
+        setData(d);
+        // Initialize draft from existing grades
+        const init: GradeDraft = {};
+        d.graded_details.forEach((detail) => {
+          if (detail.question_type === 'essay') {
+            init[detail.question_id] = {
+              points_awarded: detail.points_earned ?? 0,
+              comment: detail.teacher_comment ?? '',
+            };
+          }
+        });
+        setDraft(init);
+      } catch {
+        setError(t('errors.grading_load_failed'));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [sessionId, t]);
+
+  const handleGradeChange = (questionId: string, field: 'points_awarded' | 'comment', value: number | string) => {
+    setDraft((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!sessionId) return;
+    try {
+      setSaving(true);
+      await examApi.gradeSession(sessionId, draft);
+      setSaveMsg(t('grading.saved'));
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (err: any) {
+      setSaveMsg(err?.response?.data?.message || t('errors.grading_save_failed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box className="max-w-[1100px] mx-auto p-4">
+        <Loader />
+      </Box>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Box className="max-w-[1100px] mx-auto p-4">
+        <Alert color="red" variant="light">{error || t('errors.grading_load_failed')}</Alert>
+        <ButtonFilled style={{ marginTop: 16 }} label={t('common.back')} onClick={() => navigate(-1)} />
+      </Box>
+    );
+  }
+
+  const essayQuestions = data.graded_details.filter((d) => d.question_type === 'essay');
+  const mcqQuestions = data.graded_details.filter((d) => d.question_type === 'mcq');
+
+  return (
+    <Box className="max-w-[1100px] mx-auto p-4">
+      <Stack gap="md">
+        <Group justify="space-between">
+          <Box>
+            <PageHeader
+              title={t('grading.title')}
+              subtitle={data.exam.title}
+              accent="teal"
+            />
+          </Box>
+          <Badge color={data.session.grading_status === 'complete' ? 'green' : 'yellow'} size="lg">
+            {data.session.grading_status === 'complete' ? t('grading.graded') : t('grading.pending')}
+          </Badge>
+        </Group>
+
+        {/* Student info */}
+        <Paper withBorder radius="md" p="md">
+          <Text fw={600}>{data.student.full_name || data.student.email || 'Student'}</Text>
+          <Text size="sm" c="dimmed">{data.student.email}</Text>
+          <Divider my="sm" />
+          <Group gap="xl">
+            <Box>
+              <Text size="sm" c="dimmed">{t('grading.score')}</Text>
+              <Text fw={700} size="lg">
+                {data.session.score != null ? `${data.session.score}/${data.session.max_points}` : '—'}
+              </Text>
+            </Box>
+            <Box>
+              <Text size="sm" c="dimmed">{t('grading.submitted_at')}</Text>
+              <Text fw={500}>{data.session.submitted_at ? new Date(data.session.submitted_at).toLocaleString() : '—'}</Text>
+            </Box>
+          </Group>
+        </Paper>
+
+        {/* MCQ summary */}
+        {mcqQuestions.length > 0 && (
+          <Paper withBorder radius="md" p="md">
+            <Text fw={600} mb="sm">{t('grading.mcq_summary')}</Text>
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>#</Table.Th>
+                  <Table.Th>{t('grading.question')}</Table.Th>
+                  <Table.Th>{t('grading.answer')}</Table.Th>
+                  <Table.Th>{t('grading.status')}</Table.Th>
+                  <Table.Th>{t('grading.points')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {mcqQuestions.map((detail, idx) => {
+                  const q = data.questions.find((q) => q.id === detail.question_id);
+                  return (
+                    <Table.Tr key={detail.question_id}>
+                      <Table.Td>{idx + 1}</Table.Td>
+                      <Table.Td style={{ maxWidth: 250 }}>
+                        <Text size="sm" lineClamp={2}>{q?.content || '...'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">{Array.isArray(detail.submitted) ? detail.submitted.join(', ') : detail.submitted ?? '—'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge color={detail.is_correct ? 'green' : 'red'}>
+                          {detail.is_correct ? t('grading.correct') : t('grading.wrong')}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td fw={500}>
+                        {detail.points_earned ?? 0}/{detail.max_points}
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </Paper>
+        )}
+
+        {/* Essay grading */}
+        {essayQuestions.length > 0 && (
+          <Paper withBorder radius="md" p="md">
+            <Text fw={600} mb="md">{t('grading.essay_grading')}</Text>
+            <Stack gap="lg">
+              {essayQuestions.map((detail, idx) => {
+                const q = data.questions.find((question) => question.id === detail.question_id);
+                return (
+                  <Box key={detail.question_id} p="md" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}>
+                    <Group justify="space-between" mb="xs">
+                      <Group gap="xs">
+                        <Badge variant="light">{t('grading.essay')} {idx + 1}</Badge>
+                        <Text size="sm" c="dimmed">{t('grading.max_points')}: {detail.max_points}</Text>
+                      </Group>
+                      {detail.pending_grading && (
+                        <Badge color="yellow" variant="light">{t('grading.pending')}</Badge>
+                      )}
+                    </Group>
+
+                    <Text fw={500} mb="xs">{q?.content}</Text>
+
+                    {/* Student answer */}
+                    <Box mb="sm" p="xs" style={{ background: 'var(--mantine-color-gray-0)', borderRadius: 4 }}>
+                      <Text size="sm" c="dimmed" mb={4}>{t('grading.student_answer')}:</Text>
+                      <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                        {detail.submitted || t('grading.not_answered')}
+                      </Text>
+                    </Box>
+
+                    {/* Grading inputs */}
+                    <Group grow align="flex-start">
+                      <InputNumber
+                        label={t('grading.points_awarded')}
+                        value={draft[detail.question_id]?.points_awarded ?? detail.points_earned ?? 0}
+                        min={0}
+                        max={detail.max_points}
+                        onChange={(val) => handleGradeChange(detail.question_id, 'points_awarded', typeof val === 'number' ? val : 0)}
+                        suffix={` / ${detail.max_points}`}
+                      />
+                      <InputTextarea
+                        label={t('grading.teacher_comment')}
+                        value={draft[detail.question_id]?.comment ?? detail.teacher_comment ?? ''}
+                        onChange={(e) => handleGradeChange(detail.question_id, 'comment', e.currentTarget.value)}
+                        minRows={2}
+                      />
+                    </Group>
+                  </Box>
+                );
+              })}
+            </Stack>
+
+            {saveMsg && (
+              <Alert color={saveMsg.includes(t('grading.saved')) ? 'green' : 'red'} variant="light" mt="md">
+                {saveMsg}
+              </Alert>
+            )}
+
+            <ButtonFilled
+              label={t('grading.save_grades')}
+              style={{ marginTop: 16 }}
+              loading={saving}
+              onClick={handleSave}
+            />
+          </Paper>
+        )}
+
+        {essayQuestions.length === 0 && mcqQuestions.length === 0 && (
+          <Alert color="blue" variant="light">{t('grading.no_questions')}</Alert>
+        )}
+
+        <Group>
+          <ButtonFilled
+            label={t('common.back')}
+            color="gray"
+            onClick={() => navigate(-1)}
+          />
+        </Group>
+      </Stack>
+    </Box>
+  );
+};
+
+export default Grading;

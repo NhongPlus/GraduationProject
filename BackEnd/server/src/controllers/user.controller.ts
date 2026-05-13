@@ -6,6 +6,7 @@ import {
   updateUserService,
   deleteUserService,
 } from "~/services/user.service";
+import { changePasswordService } from "~/services/auth.service";
 
 export const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -48,4 +49,29 @@ export const deleteUserController = async (req: Request, res: Response, next: Ne
     if (!ok) return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
     res.json({ success: true, message: "Đã xóa người dùng" });
   } catch (err) { next(err); }
+};
+
+export const changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ success: false, message: "current_password và new_password là bắt buộc" });
+    }
+
+    const actor = (req as any).user;
+    const targetId = req.params.id;
+
+    // Student chỉ được đổi password của chính mình. Admin được đổi của ai cũng được.
+    if (actor.role !== "admin" && actor.userId !== targetId) {
+      return res.status(403).json({ success: false, message: "Không có quyền đổi password này" });
+    }
+
+    await changePasswordService(targetId, current_password, new_password);
+    res.json({ success: true, message: "Đã đổi mật khẩu thành công" });
+  } catch (err: any) {
+    if (err.message?.includes("hiện tại không đúng") || err.message?.includes("ít nhất 8")) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
 };

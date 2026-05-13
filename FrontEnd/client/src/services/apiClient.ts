@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import appConfig from '@/configs/app.config';
+import { clearClientSession } from '@/services/clearClientSession';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
@@ -21,16 +22,12 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Xử lý 401 → redirect về login
+// Xử lý 401 → xóa session đầy đủ (kể cả redux-persist)
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem('user_role');
-      localStorage.removeItem('user_name');
-      localStorage.removeItem('user_email');
-      window.dispatchEvent(new Event('auth-change'));
+      await clearClientSession();
     }
     return Promise.reject(error);
   }

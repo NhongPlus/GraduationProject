@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { clearClientSession } from './clearClientSession';
 
 export type UserRole = 'admin' | 'teacher' | 'student';
 
@@ -71,10 +72,81 @@ export const saveSession = (token: string, user: UserInfo) => {
   window.dispatchEvent(new Event('auth-change'));
 };
 
-export const clearSession = () => {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem('user_role');
-  localStorage.removeItem('user_name');
-  localStorage.removeItem('user_email');
-  window.dispatchEvent(new Event('auth-change'));
+export const clearSession = (): Promise<void> => clearClientSession();
+
+export const changePassword = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  await apiClient.patch(`/users/${userId}/password`, {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+};
+
+export interface PasswordResetRequestItem {
+  id: string;
+  user_id: string;
+  requested_by: string;
+  status: "pending" | "approved" | "rejected" | "expired";
+  admin_note: string | null;
+  approved_by: string | null;
+  expires_at: string;
+  created_at: string;
+  user_full_name: string | null;
+  user_email: string;
+  requested_by_full_name: string | null;
+  approved_by_full_name: string | null;
+}
+
+export const getMyPasswordResetRequests = async (): Promise<PasswordResetRequestItem[]> => {
+  const res = await apiClient.get<{ success: boolean; data: PasswordResetRequestItem[] }>(
+    "/password-reset/me"
+  );
+  return res.data.data;
+};
+
+export const requestSelfPasswordReset = async (email: string): Promise<{ requestId: string }> => {
+  const res = await apiClient.post<{ success: boolean; data: { requestId: string } }>(
+    "/password-reset/self",
+    { email }
+  );
+  return res.data.data;
+};
+
+export const getPendingPasswordResets = async (): Promise<PasswordResetRequestItem[]> => {
+  const res = await apiClient.get<{ success: boolean; data: PasswordResetRequestItem[] }>(
+    "/password-reset/pending"
+  );
+  return res.data.data;
+};
+
+export const createPasswordResetRequest = async (userId: string): Promise<{ requestId: string }> => {
+  const res = await apiClient.post<{ success: boolean; data: { requestId: string } }>(
+    "/password-reset",
+    { user_id: userId }
+  );
+  return res.data.data;
+};
+
+export const approvePasswordReset = async (
+  requestId: string,
+  adminNote?: string
+): Promise<{ tempPassword: string }> => {
+  const res = await apiClient.post<{ success: boolean; data: { tempPassword: string } }>(
+    "/password-reset/approve",
+    { request_id: requestId, admin_note: adminNote }
+  );
+  return res.data.data;
+};
+
+export const rejectPasswordReset = async (
+  requestId: string,
+  adminNote?: string
+): Promise<void> => {
+  await apiClient.post("/password-reset/reject", {
+    request_id: requestId,
+    admin_note: adminNote,
+  });
 };

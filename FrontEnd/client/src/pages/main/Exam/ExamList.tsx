@@ -23,7 +23,7 @@ const ExamList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { userRole } = useAuth();
-  const isStaff = userRole === 'admin';
+  const isStaff = userRole === 'admin' || userRole === 'teacher';
   const {
     exams,
     loading,

@@ -9,13 +9,10 @@ export type AppConfig = {
   locale: string;
   layoutType: LayoutTypes;
 };
+// import.meta.env.VITE_API_URL ||
 const appConfig: AppConfig = {
   layoutType: LayoutTypes.SimpleSideBar,
-  apiURL: import.meta.env.VITE_API_URL || (
-    window.location.hostname === 'localhost'
-      ? 'http://localhost:5000'
-      : 'https://api.nhongplus.id.vn'
-  ),
+  apiURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   apiPrefix: '/v1',
   authenticatedEntryPath: '/main',
   unAuthenticatedEntryPath: '/login',
