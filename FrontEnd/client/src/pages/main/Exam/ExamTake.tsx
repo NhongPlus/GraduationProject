@@ -662,14 +662,13 @@ const ExamTake = () => {
   useEffect(() => {
     if (!autoSubmitted) return;
     const id = window.setTimeout(() => {
-      if (examId) {
-        navigate(`/result/${examId}`);
-      } else {
-        navigate('/main');
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
       }
-    }, 5000);
+      navigate('/main', { replace: true });
+    }, 3000);
     return () => window.clearTimeout(id);
-  }, [autoSubmitted, navigate, examId]);
+  }, [autoSubmitted, navigate]);
 
   const currentQuestion = resolveQuestion(currentNumber);
 
@@ -799,13 +798,16 @@ const ExamTake = () => {
       {autoSubmitted && (
         <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
           <Text fw={700} size="lg" mb={8}>
-            {submitFailed ? 'Bai thi da ket thuc nhung nop bai that bai' : 'Bai thi da duoc nop'}
+            {submitFailed ? t('exam_take.submit_failed_title') : t('exam_take.submit_success_title')}
           </Text>
           <Text c="dimmed" size="sm">
-            {submitFailed
-              ? 'He thong khong gui duoc bai lam len server. Vui long lien he giam thi de xu ly.'
-              : 'He thong da ghi nhan bai lam va ket thuc phien thi.'}
+            {submitFailed ? t('exam_take.submit_failed_desc') : t('exam_take.submit_success_desc')}
           </Text>
+          {!submitFailed && (
+            <Text size="xs" c="dimmed" mt="sm">
+              {t('exam_take.submit_redirect_hint')}
+            </Text>
+          )}
           {!!serverForceSummaryText && (
             <Text size="sm" mt={8}>
               {serverForceSummaryText}
