@@ -22,6 +22,8 @@ export interface Exam {
   class_semester?: string;
   class_year?: number;
   creator_name?: string | null;
+  /** true khi GV đã bật thi (start-runtime) và chưa hết giờ */
+  runtime_is_active?: boolean;
 }
 
 export type QuestionType = 'mcq' | 'essay';

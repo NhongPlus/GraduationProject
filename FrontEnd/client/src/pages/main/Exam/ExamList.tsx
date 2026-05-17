@@ -52,6 +52,7 @@ const ExamList = () => {
     forceSubmittingExamId,
     latestSessionByExam,
     activeSessionCountByExam,
+    runtimeActiveByExam,
     filteredExams,
     doneCount,
     handleStartExam,
@@ -181,7 +182,11 @@ const ExamList = () => {
                 {filteredExams.map((item, idx) => {
                   const latest = latestSessionByExam.get(item.id);
                   const activeCount = isStaff ? activeSessionCountByExam[item.id] ?? 0 : 0;
-                  const done = isStaff ? activeCount === 0 : Boolean(latest && latest.status !== 'active');
+                  const runtimeActive = isStaff ? Boolean(runtimeActiveByExam[item.id]) : false;
+                  const examInProgress = runtimeActive || activeCount > 0;
+                  const done = isStaff
+                    ? !examInProgress
+                    : Boolean(latest && latest.status !== 'active');
                   const pastDeadline = isPastExamStartDeadline(item, latest);
                   const deadlineLabel =
                     item.closes_at != null && item.closes_at !== ''
@@ -220,16 +225,16 @@ const ExamList = () => {
                       <Table.Td>
                         {isStaff ? (
                           <Group gap={4} wrap="nowrap">
-                            {activeCount > 0 ? (
+                            {examInProgress ? (
                               <Button
                                 size="xs"
                                 color="red"
-                                variant="light"
+                                variant="filled"
                                 leftSection={<IconPlayerStop size={13} />}
                                 loading={forceSubmittingExamId === item.id}
                                 onClick={(e) => { e.stopPropagation(); void handleForceSubmit(item.id); }}
                               >
-                                {t('exam_list.action_stop', 'Dừng')}
+                                {t('exam_list.action_force_submit', 'Ép nộp bài')}
                               </Button>
                             ) : (
                               <Button
@@ -241,7 +246,7 @@ const ExamList = () => {
                                 disabled={startingExamId === item.id}
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
                               >
-                                {t('exam_list.action_start', 'Start')}
+                                {t('exam_list.action_start', 'Bắt đầu thi')}
                               </Button>
                             )}
                             <Menu shadow="md" width={170} position="bottom-end">

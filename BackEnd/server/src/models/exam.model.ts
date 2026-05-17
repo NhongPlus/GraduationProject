@@ -22,6 +22,8 @@ export interface ExamDetail extends Exam {
   class_semester: string | null;
   class_year: number | null;
   creator_name: string | null;
+  /** GV đã start-runtime và chưa hết giờ lớp */
+  runtime_is_active?: boolean;
 }
 
 const examSelectBase = `
@@ -31,13 +33,15 @@ const examSelectBase = `
          ac.display_name AS admin_class_name,
          c.semester AS class_semester,
          c.year AS class_year,
-         a.full_name AS creator_name
+         a.full_name AS creator_name,
+         (rs.is_active = true AND rs.ends_at > NOW()) AS runtime_is_active
   FROM exams e
   LEFT JOIN admin_classes ac ON ac.id = e.admin_class_id
   LEFT JOIN subjects s ON s.id = e.subject_id
   LEFT JOIN classes c ON c.id = e.class_id
   LEFT JOIN subjects s2 ON s2.id = c.subject_id
   LEFT JOIN accounts a ON a.id = e.created_by
+  LEFT JOIN exam_runtime_state rs ON rs.exam_id = e.id
 `;
 
 export const getAllExams = async (): Promise<ExamDetail[]> => {

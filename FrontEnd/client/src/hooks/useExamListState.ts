@@ -11,6 +11,7 @@ export function useExamListState(opts: {
   const [exams, setExams] = useState<Exam[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [activeSessionCountByExam, setActiveSessionCountByExam] = useState<Record<string, number>>({});
+  const [runtimeActiveByExam, setRuntimeActiveByExam] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -50,6 +51,11 @@ export function useExamListState(opts: {
         const examData = await examApi.getExams(undefined, params);
         const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
         setExams(fetchedExams);
+        setRuntimeActiveByExam(
+          Object.fromEntries(
+            fetchedExams.map((exam) => [exam.id, Boolean(exam.runtime_is_active)])
+          )
+        );
         setTotalPages(Math.max(1, Math.ceil(fetchedExams.length / LIMIT)));
 
         if (isStaff) {
@@ -95,10 +101,12 @@ export function useExamListState(opts: {
   const filteredExams = useMemo(() => {
     return exams.filter((exam) => {
       const matchesText = exam.title.toLowerCase().includes(searchText.toLowerCase());
+      const inProgress =
+        Boolean(runtimeActiveByExam[exam.id]) || (activeSessionCountByExam[exam.id] ?? 0) > 0;
       const status = isStaff
-        ? (activeSessionCountByExam[exam.id] ?? 0) === 0
-          ? 'done'
-          : 'not_done'
+        ? inProgress
+          ? 'not_done'
+          : 'done'
         : (() => {
             const latest = latestSessionByExam.get(exam.id);
             return latest && latest.status !== 'active' ? 'done' : 'not_done';
@@ -106,14 +114,18 @@ export function useExamListState(opts: {
       const matchesStatus = statusFilter === 'all' || status === statusFilter;
       return matchesText && matchesStatus;
     });
-  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam, searchText, statusFilter]);
+  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam, runtimeActiveByExam, searchText, statusFilter]);
 
   const doneCount = useMemo(() => {
     if (isStaff) {
-      return exams.filter((exam) => (activeSessionCountByExam[exam.id] ?? 0) === 0).length;
+      return exams.filter((exam) => {
+        const inProgress =
+          Boolean(runtimeActiveByExam[exam.id]) || (activeSessionCountByExam[exam.id] ?? 0) > 0;
+        return !inProgress;
+      }).length;
     }
     return Array.from(latestSessionByExam.values()).filter((s) => s.status !== 'active').length;
-  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam]);
+  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam, runtimeActiveByExam]);
 
   const handleForceSubmit = async (examId: string) => {
     const ok = window.confirm(t('exam_list.force_submit_confirm'));
@@ -124,9 +136,10 @@ export function useExamListState(opts: {
 
     try {
       const summary: ForceSubmitSummary = await examApi.forceSubmitExam(examId);
+      setRuntimeActiveByExam((prev) => ({ ...prev, [examId]: false }));
       setActiveSessionCountByExam((prev) => ({
         ...prev,
-        [examId]: summary.failed_sessions,
+        [examId]: 0,
       }));
       setNotice(
         t('exam_list.force_submit_done', {
@@ -149,9 +162,9 @@ export function useExamListState(opts: {
     setStartingExamId(exam.id);
     setError('');
     try {
-      const started = await examApi.startExamRuntime(exam.id);
-      setNotice(`Đã start bài thi "${exam.title}" (${exam.duration_min} phút).`);
-      console.info('[exam] started runtime', started);
+      await examApi.startExamRuntime(exam.id);
+      setRuntimeActiveByExam((prev) => ({ ...prev, [exam.id]: true }));
+      setNotice(`Đã bắt đầu bài thi "${exam.title}" (${exam.duration_min} phút). Sinh viên có thể vào làm bài.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Start bài thi thất bại.';
       setError(message);
@@ -196,6 +209,7 @@ export function useExamListState(opts: {
     forceSubmittingExamId,
     latestSessionByExam,
     activeSessionCountByExam,
+    runtimeActiveByExam,
     filteredExams,
     doneCount,
     handleStartExam,
