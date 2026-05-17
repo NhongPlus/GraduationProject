@@ -163,6 +163,34 @@ export function mcqAnswersEqual(
   return sub === cor;
 }
 
+function findMcqKeyByOptionText(
+  answer: unknown,
+  options?: Record<string, string> | null
+): string | null {
+  if (!options || answer == null) return null;
+  const needle = String(Array.isArray(answer) ? answer[0] : answer).trim();
+  if (!needle) return null;
+  for (const [key, label] of Object.entries(options)) {
+    if (String(label).trim() === needle) return normalizeLetterKey(key);
+  }
+  return null;
+}
+
+/** Đáp án đúng hiển thị trên trang review (ưu tiên graded_details, rồi question bank). */
+export function resolveReviewCorrectKey(
+  correctAnswer: string | string[] | null | undefined,
+  options?: Record<string, string> | null,
+  gradedDetailCorrect?: unknown
+): string | null {
+  const fromGraded = normalizeLetterKey(gradedDetailCorrect);
+  if (fromGraded) return fromGraded;
+  const fromQuestion = resolveCorrectAnswerKey(correctAnswer);
+  if (fromQuestion) return fromQuestion;
+  const fromText = findMcqKeyByOptionText(correctAnswer, options);
+  if (fromText) return fromText;
+  return resolveMcqAnswerKey(correctAnswer, options);
+}
+
 /** @deprecated Chỉ dùng để hiển thị UI — không dùng khi chấm điểm. */
 export function resolveMcqAnswerKey(
   answer: string | string[] | null | undefined,

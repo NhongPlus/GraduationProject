@@ -69,6 +69,21 @@ export const getActiveSession = async (
   return (result.rows[0] as ExamSession) ?? null;
 };
 
+/** Ghi integrity sau khi nộp: không còn active nhưng vẫn có phiên submitted. */
+export const getSessionForIntegrityLogging = async (
+  examId: string,
+  studentId: string
+): Promise<ExamSession | null> => {
+  const active = await getActiveSession(examId, studentId);
+  if (active) return active;
+  return getLatestSubmittedSession(examId, studentId);
+};
+
+export function sessionAllowsStudentReview(session: ExamSession): boolean {
+  if (session.status === "submitted" || session.status === "expired") return true;
+  return Boolean(session.submitted_at);
+}
+
 export const getActiveSessionsByExam = async (examId: string): Promise<ExamSession[]> => {
   const result = await pool.query(
     `SELECT *

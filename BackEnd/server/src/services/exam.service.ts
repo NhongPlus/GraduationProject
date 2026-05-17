@@ -30,6 +30,8 @@ import {
   getSessionById,
   finalizeSessionSubmit,
   getLatestSubmittedSession,
+  getSessionForIntegrityLogging,
+  sessionAllowsStudentReview,
   getSessionWithExam,
   updateSessionGrading,
   getSessionsByExamWithStudent,
@@ -66,6 +68,7 @@ import {
   mcqAnswersEqual,
   pickRecomputeMcqInput,
   resolveCorrectAnswerKey,
+  resolveReviewCorrectKey,
 } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
 import {
@@ -698,9 +701,9 @@ export const persistIntegrityEventsService = async (
 ): Promise<IntegrityPersistResult> => {
   if (!examId) throw httpError(400, "exam_id là bắt buộc");
 
-  const session = await getActiveSession(examId, studentId);
+  const session = await getSessionForIntegrityLogging(examId, studentId);
   if (!session) {
-    throw httpError(403, "Không tìm thấy phiên thi active hợp lệ");
+    throw httpError(403, "Không tìm thấy phiên thi của bạn cho kỳ thi này");
   }
 
   const accepted = await insertIntegrityEvents(examId, session.id, studentId, events);
@@ -1232,7 +1235,9 @@ async function buildReviewQuestionsForSession(
     if (!q) continue;
     const detail = gradedDetails.find((d) => d.question_id === qId);
     const correctKey =
-      q.question_type === "mcq" ? resolveCorrectAnswerKey(q.correct_answer) : null;
+      q.question_type === "mcq"
+        ? resolveReviewCorrectKey(q.correct_answer, q.options, detail?.correct)
+        : null;
     const submittedRaw = detail?.submitted ?? null;
     const isCorrect =
       q.question_type === "mcq"
@@ -1263,7 +1268,9 @@ export const getSessionReview = async (
   const session = await getSessionById(sessionId);
   if (!session) throw httpError(404, "Không tìm thấy phiên thi");
   if (session.student_id !== studentId) throw httpError(403, "Không có quyền xem bài này");
-  if (session.status === "active") throw httpError(400, "Phiên thi chưa kết thúc");
+  if (!sessionAllowsStudentReview(session)) {
+    throw httpError(400, "Phiên thi chưa kết thúc — hãy nộp bài trước khi xem kết quả");
+  }
 
   const exam = await getExamById(session.exam_id);
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");

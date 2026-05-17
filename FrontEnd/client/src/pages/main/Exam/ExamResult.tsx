@@ -29,8 +29,12 @@ const ExamResult = () => {
         }
         const data = await examApi.getSessionReview(submission.session.id);
         setReview(data);
-      } catch {
-        setError(t('errors.result_load_failed'));
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined;
+        setError(msg?.trim() || t('errors.result_load_failed'));
       } finally {
         setLoading(false);
       }

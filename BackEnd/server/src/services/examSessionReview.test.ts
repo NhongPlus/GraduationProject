@@ -45,7 +45,10 @@ describe("getSessionReview", () => {
 
     await expect(
       getSessionReview("session-1", "my-student")
-    ).rejects.toMatchObject({ status: 400, message: "Phiên thi chưa kết thúc" });
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "Phiên thi chưa kết thúc — hãy nộp bài trước khi xem kết quả",
+    });
   });
 
   it("returns full review payload when session is submitted", async () => {

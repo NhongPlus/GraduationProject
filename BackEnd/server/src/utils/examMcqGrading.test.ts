@@ -5,6 +5,7 @@ import {
   mcqAnswersEqual,
   pickRecomputeMcqInput,
   resolveOriginalKeyFromDisplay,
+  resolveReviewCorrectKey,
 } from "./examMcqGrading";
 
 const OPTIONS = {
@@ -53,6 +54,28 @@ describe("mcqAnswersEqual", () => {
 
   it("b vs B case insensitive", () => {
     expect(mcqAnswersEqual("b", "B")).toBe(true);
+  });
+});
+
+describe("resolveReviewCorrectKey", () => {
+  it("uses graded detail letter when question bank has text answer", () => {
+    expect(
+      resolveReviewCorrectKey(
+        "WebSocket (Socket.IO)",
+        { A: "HTTP", B: "WebSocket (Socket.IO)", C: "FTP", D: "SMTP" },
+        "B"
+      )
+    ).toBe("B");
+  });
+
+  it("falls back to matching option text in question bank", () => {
+    expect(
+      resolveReviewCorrectKey(
+        "WebSocket (Socket.IO)",
+        { A: "HTTP", B: "WebSocket (Socket.IO)", C: "FTP", D: "SMTP" },
+        null
+      )
+    ).toBe("B");
   });
 });
 
