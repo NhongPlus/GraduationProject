@@ -9,7 +9,13 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  type NotificationType,
 } from "~/models/userNotification.model";
+
+function asNotificationType(kind: "info" | "warning" | "exam"): NotificationType {
+  if (kind === "warning") return "warning";
+  return "info";
+}
 
 const notificationRouter = Router();
 
@@ -149,7 +155,7 @@ notificationRouter.post(
 
       await Promise.all(
         targetUserIds.map((uid) =>
-          createNotification(uid, title, message, kind as any)
+          createNotification(uid, title, message, asNotificationType(kind))
         )
       );
 

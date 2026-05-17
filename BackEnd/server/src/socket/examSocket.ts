@@ -10,8 +10,15 @@ import {
   disconnectProctorPresence,
   insertProctorLog,
 } from "~/models/examProctor.model";
-import { createNotification } from "~/models/userNotification.model";
+import { createNotification, type NotificationType } from "~/models/userNotification.model";
 import pool from "~/config/db";
+
+type NotifyKind = "info" | "warning" | "exam";
+
+function asNotificationType(kind: NotifyKind): NotificationType {
+  if (kind === "warning") return "warning";
+  return "info";
+}
 
 interface JwtPayloadShape {
   userId: string;
@@ -82,7 +89,7 @@ async function notifyEnrolledStudents(
   examId: string,
   title: string,
   message: string,
-  kind: "info" | "warning" | "exam" = "info"
+  kind: NotifyKind = "info"
 ): Promise<void> {
   try {
     const r = await pool.query(
@@ -90,9 +97,10 @@ async function notifyEnrolledStudents(
       [examId]
     );
     const studentIds = r.rows.map((row: any) => row.student_id as string);
+    const notifType = asNotificationType(kind);
     await Promise.all(
       studentIds.map((uid) =>
-        createNotification(uid, title, message, kind).catch(console.error)
+        createNotification(uid, title, message, notifType).catch(console.error)
       )
     );
   } catch (e) {
@@ -100,9 +108,9 @@ async function notifyEnrolledStudents(
   }
 }
 
-async function notifyUser(userId: string, title: string, message: string, kind: "info" | "warning" | "exam" = "info"): Promise<void> {
+async function notifyUser(userId: string, title: string, message: string, kind: NotifyKind = "info"): Promise<void> {
   try {
-    await createNotification(userId, title, message, kind);
+    await createNotification(userId, title, message, asNotificationType(kind));
   } catch (e) {
     console.error("[socket] notifyUser failed:", e);
   }
