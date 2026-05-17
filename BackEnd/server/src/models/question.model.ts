@@ -25,7 +25,11 @@ function parseJson<T>(v: unknown, fallback: T): T {
     try {
       return JSON.parse(v) as T;
     } catch {
-      return fallback;
+      // JSONB columns are auto-parsed by the PG driver. A simple string
+      // value like "B" is already the final JS value — JSON.parse("B")
+      // fails because bare letters are not valid JSON. Return the string
+      // itself instead of the fallback so correct_answer = "B" works.
+      return v as unknown as T;
     }
   }
   return v as T;
