@@ -40,8 +40,11 @@ export default function NotificationBell() {
       ]);
       setNotifications(listRes.data);
       setUnreadCount(countRes);
-    } catch {
-      // silent fail — notification is non-critical
+    } catch (err) {
+      // Non-critical — but log so deploy/DB issues are visible in DevTools
+      if (import.meta.env.DEV) {
+        console.warn('[NotificationBell] load failed', err);
+      }
     }
   }
 

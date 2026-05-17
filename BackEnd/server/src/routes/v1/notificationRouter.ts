@@ -46,6 +46,13 @@ notificationRouter.get("/unread-count", async (req, res) => {
     res.json({ success: true, data: count });
   } catch (err: any) {
     console.error("notificationRouter /unread-count error:", err?.message ?? err);
+    const missingTable = err?.code === "42P01" || /user_notifications/i.test(String(err?.message ?? ""));
+    if (missingTable) {
+      return res.status(503).json({
+        success: false,
+        error: "user_notifications table missing — run npm run migrate on production DB",
+      });
+    }
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });

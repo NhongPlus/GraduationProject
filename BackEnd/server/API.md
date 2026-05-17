@@ -151,6 +151,33 @@ nhắc nhở => gửi về mail
 
 ---
 
+## Production DB (Neon) — chạy migration
+
+Sau mỗi lần deploy code mới có file trong `src/db/migrations/`, chạy trên DB production:
+
+```bash
+cd BackEnd/server
+# .env phải trỏ DATABASE_URL Neon (giống Render)
+npm run migrate
+```
+
+Kiểm tra bảng thông báo (cần cho `GET /v1/notifications/unread-count`):
+
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM information_schema.tables
+  WHERE table_schema = 'public' AND table_name = 'user_notifications'
+) AS has_user_notifications;
+
+SELECT filename, applied_at FROM schema_migrations
+WHERE filename LIKE '%notification%' OR filename >= '012_%'
+ORDER BY filename;
+```
+
+Nếu thiếu bảng, chạy thủ công trong Neon SQL Editor nội dung file `src/db/migrations/012_user_notifications.sql`.
+
+---
+
 ## Ghi chú
 
 - **Cập nhật danh sách:** Khi thêm/sửa file trong `src/routes/v1/`, nhớ chỉnh lại `API.md` cho khớp.
