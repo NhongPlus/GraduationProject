@@ -306,6 +306,34 @@ export default function ExamAuthoring() {
     });
   };
 
+  const copyQuestionsFromVersion = (fromVersion: number) => {
+    const source = questions.filter((q) => (q.version_index ?? 0) === fromVersion);
+    if (!source.length) return;
+    const copied = source.map((q) => {
+      const { id: _id, ...rest } = q;
+      return { ...rest, version_index: activeVersion };
+    });
+    setQuestions((prev) => {
+      const kept = prev.filter((q) => (q.version_index ?? 0) !== activeVersion);
+      return normalizeQuestions([...kept, ...copied]);
+    });
+    setNotice(
+      t('exam_authoring.notice_copied_version', {
+        count: copied.length,
+        from: versionCodeForIndex(fromVersion),
+        to: versionCodeForIndex(activeVersion),
+      })
+    );
+    setError('');
+  };
+
+  const otherVersionWithQuestions = useMemo(() => {
+    for (let i = 0; i < numVersions; i += 1) {
+      if (i !== activeVersion && versionCounts[i] > 0) return i;
+    }
+    return -1;
+  }, [activeVersion, numVersions, versionCounts]);
+
   const normalizeQuestions = (items: AuthoringQuestion[]) => {
     const next = items.map((item) => ({ ...item }));
     for (let v = 0; v < numVersions; v += 1) {
@@ -464,7 +492,12 @@ export default function ExamAuthoring() {
     for (let v = 0; v < numVersions; v += 1) {
       if (versionCounts[v] === 0) {
         setActiveVersion(v);
-        setError(t('exam_authoring.error_need_version_questions', { version: versionCodeForIndex(v) }));
+        const summary = versionCodes.map((code, i) => `${code}: ${versionCounts[i]} câu`).join(', ');
+        setError(
+          t('exam_authoring.error_need_version_questions', { version: versionCodeForIndex(v) }) +
+            ' ' +
+            t('exam_authoring.error_need_version_questions_hint', { summary })
+        );
         return;
       }
     }
@@ -741,6 +774,13 @@ export default function ExamAuthoring() {
                   ))}
                 </Group>
               )}
+              {file && versionCounts[activeVersion] === 0 && !preview && (
+                <Text size="xs" c="orange">
+                  {t('exam_authoring.file_selected_not_imported', {
+                    code: versionCodeForIndex(activeVersion),
+                  })}
+                </Text>
+              )}
               <Text size="xs" c={versionCounts.every((c) => c > 0) ? 'teal' : 'dimmed'}>
                 {versionSummaryText}
               </Text>
@@ -776,9 +816,22 @@ export default function ExamAuthoring() {
                 <Text fw={500} c="dimmed">
                   {isEditMode ? t('exam_authoring.empty_edit') : t('exam_authoring.empty_create')}
                 </Text>
-                <Text size="sm" c="dimmed" ta="center" maw={300}>
+                <Text size="sm" c="dimmed" ta="center" maw={360}>
                   {t('exam_authoring.empty_version_desc', { code: versionCodeForIndex(activeVersion) })}
                 </Text>
+                {otherVersionWithQuestions >= 0 && (
+                  <Button
+                    size="sm"
+                    variant="light"
+                    color="teal"
+                    onClick={() => copyQuestionsFromVersion(otherVersionWithQuestions)}
+                  >
+                    {t('exam_authoring.btn_copy_from_version', {
+                      code: versionCodeForIndex(otherVersionWithQuestions),
+                      count: versionCounts[otherVersionWithQuestions],
+                    })}
+                  </Button>
+                )}
               </Stack>
             </Paper>
           )}
