@@ -7,7 +7,7 @@ import { connectDB, closeDB } from "./config/db";
 import { env } from "./config/enviroment";
 import RouterV1 from "./routes/v1/index";
 import { errorHandler } from "~/middlewares/error.middleware";
-import { registerExamSocket } from "~/socket/examSocket";
+import { registerExamSocket, restoreExamRuntimesOnStartup } from "~/socket/examSocket";
 import { setupSwaggerDocs } from "./docs/swagger";
 import { startExamDeadlineReminderScheduler } from "~/jobs/examDeadlineReminders.job";
 
@@ -42,6 +42,9 @@ const START_SERVER = () => {
     path: "/socket.io",
   });
   registerExamSocket(io);
+
+  // Restore active exam runtimes from DB (survive server restart)
+  void restoreExamRuntimesOnStartup(io);
 
   startExamDeadlineReminderScheduler();
 

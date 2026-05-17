@@ -4,12 +4,16 @@ export interface Subject {
   id: string;
   name: string;
   code: string;
+  credits: number;
+  semester: number;
+  category: string;
+  is_active: boolean;
   created_at: string;
 }
 
 export const getAllSubjects = async (): Promise<Subject[]> => {
   const result = await pool.query(
-    "SELECT * FROM subjects ORDER BY name ASC"
+    "SELECT * FROM subjects ORDER BY semester ASC, name ASC"
   );
   return result.rows;
 };
@@ -22,28 +26,61 @@ export const getSubjectById = async (id: string): Promise<Subject | null> => {
   return result.rows[0] ?? null;
 };
 
+export interface CreateSubjectInput {
+  name: string;
+  code?: string;
+  credits?: number;
+  semester?: number;
+  category?: string;
+}
+
 export const createSubject = async (
-  name: string,
-  code: string
+  input: CreateSubjectInput
 ): Promise<Subject> => {
   const result = await pool.query(
-    "INSERT INTO subjects (name, code) VALUES ($1, $2) RETURNING *",
-    [name, code]
+    `INSERT INTO subjects (name, code, credits, semester, category)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      input.name,
+      input.code ?? "",
+      input.credits ?? 0,
+      input.semester ?? 0,
+      input.category ?? "general",
+    ]
   );
   return result.rows[0];
 };
 
+export interface UpdateSubjectInput {
+  name?: string;
+  code?: string;
+  credits?: number;
+  semester?: number;
+  category?: string;
+  is_active?: boolean;
+}
+
 export const updateSubject = async (
   id: string,
-  fields: Partial<Pick<Subject, "name" | "code">>
+  input: UpdateSubjectInput
 ): Promise<Subject | null> => {
-  const keys = Object.keys(fields) as Array<keyof typeof fields>;
-  if (keys.length === 0) return null;
-  const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
-  const values = keys.map((k) => fields[k]);
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (input.name !== undefined) { fields.push(`name = $${idx++}`); values.push(input.name); }
+  if (input.code !== undefined) { fields.push(`code = $${idx++}`); values.push(input.code); }
+  if (input.credits !== undefined) { fields.push(`credits = $${idx++}`); values.push(input.credits); }
+  if (input.semester !== undefined) { fields.push(`semester = $${idx++}`); values.push(input.semester); }
+  if (input.category !== undefined) { fields.push(`category = $${idx++}`); values.push(input.category); }
+  if (input.is_active !== undefined) { fields.push(`is_active = $${idx++}`); values.push(input.is_active); }
+
+  if (fields.length === 0) return null;
+
   const result = await pool.query(
-    `UPDATE subjects SET ${setClauses} WHERE id = $1 RETURNING *`,
-    [id, ...values]
+    `UPDATE subjects SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+    [...values, id]
   );
   return result.rows[0] ?? null;
 };

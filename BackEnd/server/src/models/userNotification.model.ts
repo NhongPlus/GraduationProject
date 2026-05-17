@@ -43,6 +43,39 @@ export const getUnreadNotifications = async (
   return result.rows as UserNotification[];
 };
 
+export const getNotificationsByUser = async (
+  userId: string,
+  limit: number,
+  offset: number
+): Promise<{ notifications: UserNotification[]; total: number }> => {
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(
+      `SELECT * FROM user_notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset]
+    ),
+    pool.query(
+      `SELECT COUNT(*) as cnt FROM user_notifications WHERE user_id = $1`,
+      [userId]
+    ),
+  ]);
+  return {
+    notifications: dataResult.rows as UserNotification[],
+    total: Number(countResult.rows[0]?.cnt ?? 0),
+  };
+};
+
+export const getUnreadCount = async (userId: string): Promise<number> => {
+  const result = await pool.query(
+    `SELECT COUNT(*) as cnt FROM user_notifications
+     WHERE user_id = $1 AND is_read = FALSE`,
+    [userId]
+  );
+  return Number(result.rows[0]?.cnt ?? 0);
+};
+
 export const markNotificationRead = async (
   id: string,
   userId: string

@@ -274,6 +274,14 @@ const ExamResult = () => {
                           <Text size="sm">{teacherComment}</Text>
                         </Box>
                       )}
+
+                      {/* Explanation (if available from question) */}
+                      {(q as any).explanation && (
+                        <Box p="sm" style={{ background: 'var(--mantine-color-teal-0)', borderRadius: 8 }}>
+                          <Text size="xs" c="teal" fw={600} mb={4}>Giải thích:</Text>
+                          <Text size="sm">{(q as any).explanation}</Text>
+                        </Box>
+                      )}
                     </Stack>
                   </Accordion.Panel>
                 </Accordion.Item>

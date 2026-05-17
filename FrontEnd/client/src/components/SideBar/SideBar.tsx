@@ -11,6 +11,7 @@ import icon from '@/assets/logo/logo.svg'
 import LanguageSwitcher from '../SwitchLanguage/LanguageSwitcher';
 import ButtonFilled from '../Button/ButtonFilled/ButtonFilled';
 import useAuth from '@/hooks/useAuth';
+import NotificationBell from '../common/NotificationBell';
 
 export default function SideBar() {
   const { authenticated } = useAuth();
@@ -30,6 +31,7 @@ export default function SideBar() {
           </Group>
         </Anchor>
         <Group>
+          <NotificationBell />
           <LanguageSwitcher/>
           {!authenticated && <ButtonFilled label={'Sign up'} disabled={false} />}
         </Group>

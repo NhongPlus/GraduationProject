@@ -12,7 +12,9 @@ export interface Question {
   media_url: string | null;
   points: number;
   display_order: number;
+  version_index: number;
   created_at: string;
+  explanation: string | null;
 }
 
 export type PublicQuestion = Omit<Question, "correct_answer">;
@@ -44,7 +46,9 @@ function mapQuestionRow(row: any): Question {
     media_url: row.media_url ?? null,
     points: Number(row.points),
     display_order: Number(row.display_order ?? 0),
+    version_index: Number(row.version_index ?? 0),
     created_at: row.created_at,
+    explanation: row.explanation ?? null,
   };
 }
 
@@ -83,7 +87,8 @@ export const createQuestion = async (
   options?: Record<string, string> | null,
   correctAnswer?: string | string[] | null,
   mediaUrl?: string | null,
-  displayOrder?: number
+  displayOrder?: number,
+  versionIndex?: number
 ): Promise<Question> => {
   const opts =
     questionType === "essay" ? null : options != null ? JSON.stringify(options) : JSON.stringify({});
@@ -95,7 +100,7 @@ export const createQuestion = async (
         : null;
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order)
+    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index)
      VALUES (
        $1,
        $2,
@@ -104,10 +109,11 @@ export const createQuestion = async (
        $5,
        $6,
        $7,
-       COALESCE($8, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1))
+       COALESCE($8, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1 AND version_index = COALESCE($9, 0))),
+       COALESCE($9, 0)
      )
      RETURNING *`,
-    [examId, content, questionType, opts, correct, mediaUrl ?? null, points, displayOrder ?? null]
+    [examId, content, questionType, opts, correct, mediaUrl ?? null, points, displayOrder ?? null, versionIndex ?? 0]
   );
   return mapQuestionRow(result.rows[0]);
 };

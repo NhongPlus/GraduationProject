@@ -115,6 +115,20 @@ export const requestSelfPasswordReset = async (email: string): Promise<{ request
   return res.data.data;
 };
 
+// Manual admin-approval password reset (Task 6): student submits request → admin approves → email sent
+export const forgotPassword = async (email: string): Promise<{ requestId: string; message: string }> => {
+  const res = await apiClient.post<{ success: boolean; data: { requestId: string }; message: string }>(
+    "/password-reset/self",
+    { email }
+  );
+  return { requestId: res.data.data.requestId, message: res.data.message || "Yêu cầu đã được gửi. Vui lòng chờ quản trị viên xử lý." };
+};
+
+// Self-service email-based reset password (Task 6)
+export const resetPassword = async (token: string, password: string): Promise<void> => {
+  await apiClient.post("/auth/reset-password", { token, password });
+};
+
 export const getPendingPasswordResets = async (): Promise<PasswordResetRequestItem[]> => {
   const res = await apiClient.get<{ success: boolean; data: PasswordResetRequestItem[] }>(
     "/password-reset/pending"

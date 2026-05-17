@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from '@mantine/form';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   AspectRatio,
@@ -13,6 +14,7 @@ import {
   Image,
   NumberInput,
   Paper,
+  SegmentedControl,
   Select,
   Stack,
   Text,
@@ -35,12 +37,21 @@ import {
   IconTrash,
   IconEdit,
 } from '@tabler/icons-react';
-import classApi, { type ClassDetail } from '@/services/classApi';
+import adminClassApi, { type AdminClassDto } from '@/services/adminClassApi';
+import subjectApi, { type SubjectDto } from '@/services/subjectApi';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
+import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
+
+const MAX_EXAM_VERSIONS = 4;
+
+function versionCodeForIndex(index: number): string {
+  return `D${String(index + 1).padStart(2, '0')}`;
+}
 
 type AuthoringQuestion = ImportedQuestionDraft & {
   id?: string;
+  version_index: number;
   media?: { type: 'image' | 'audio' | 'video'; filename: string; url?: string };
   media_url?: string | null;
 };
@@ -50,7 +61,9 @@ type ExamMetaFormValues = {
   description: string;
   durationMin: number | '';
   closesAt: string;
-  classId: string | null;
+  adminClassId: string | null;
+  subjectId: string | null;
+  numVersions: string;
 };
 
 type QuestionEditFormValues = {
@@ -98,10 +111,12 @@ function AuthoringMediaPreview({ url }: { url: string }) {
 }
 
 export default function ExamAuthoring() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { examId } = useParams<{ examId: string }>();
   const isEditMode = Boolean(examId);
-  const [classes, setClasses] = useState<ClassDetail[]>([]);
+  const [adminClass, setAdminClass] = useState<AdminClassDto | null>(null);
+  const [subjects, setSubjects] = useState<SubjectDto[]>([]);
   const examForm = useForm<ExamMetaFormValues>({
     mode: 'uncontrolled',
     initialValues: {
@@ -109,7 +124,9 @@ export default function ExamAuthoring() {
       description: '',
       durationMin: 60,
       closesAt: '',
-      classId: null,
+      adminClassId: null,
+      subjectId: null,
+      numVersions: '2',
     },
   });
   const questionEditForm = useForm<QuestionEditFormValues>({
@@ -127,8 +144,14 @@ export default function ExamAuthoring() {
     },
   });
   const [questions, setQuestions] = useState<AuthoringQuestion[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<ExamImportPreview | null>(null);
+  const [numVersionsCount, setNumVersionsCount] = useState(2);
+  const [activeVersion, setActiveVersion] = useState(0);
+  const [versionFiles, setVersionFiles] = useState<(File | null)[]>(() =>
+    Array.from({ length: MAX_EXAM_VERSIONS }, () => null)
+  );
+  const [versionPreviews, setVersionPreviews] = useState<(ExamImportPreview | null)[]>(() =>
+    Array.from({ length: MAX_EXAM_VERSIONS }, () => null)
+  );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -143,26 +166,45 @@ export default function ExamAuthoring() {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const [data, existingExam, existingQuestions] = await Promise.all([
-          classApi.getClasses(),
+        const [subjectList, existingExam, existingQuestions] = await Promise.all([
+          subjectApi.getSubjects(),
           examId ? examApi.getExam(examId) : Promise.resolve(null),
           examId ? examApi.getQuestions(examId) : Promise.resolve([]),
         ]);
-        setClasses(data);
+        let mineClass: AdminClassDto | null = null;
+        try {
+          mineClass = await adminClassApi.getMine();
+        } catch {
+          const list = await adminClassApi.getClasses();
+          mineClass =
+            list.find((c) => c.display_name.includes('16-02')) ?? list[0] ?? null;
+        }
+        setAdminClass(mineClass);
+        setSubjects(subjectList);
         examForm.setValues((prev) => {
-          const classIdNext = prev.classId ?? existingExam?.class_id ?? data[0]?.id ?? null;
+          const adminClassIdNext =
+            prev.adminClassId ?? existingExam?.admin_class_id ?? mineClass?.id ?? null;
+          const subjectIdNext =
+            prev.subjectId ?? existingExam?.subject_id ?? subjectList[0]?.id ?? null;
           if (!existingExam) {
-            return { ...prev, classId: classIdNext };
+            return { ...prev, adminClassId: adminClassIdNext, subjectId: subjectIdNext };
           }
           return {
             ...prev,
-            classId: classIdNext,
+            adminClassId: adminClassIdNext,
+            subjectId: subjectIdNext,
             title: existingExam.title,
             description: existingExam.description ?? '',
             durationMin: existingExam.duration_min,
             closesAt: existingExam.closes_at ? existingExam.closes_at.slice(0, 16) : '',
+            numVersions: String(Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))),
           };
         });
+        if (existingExam) {
+          setNumVersionsCount(
+            Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))
+          );
+        }
         if (existingQuestions.length) {
           setQuestions(
             existingQuestions.map((question, index) => {
@@ -175,6 +217,7 @@ export default function ExamAuthoring() {
                 options: question.options,
                 correct_answer: question.correct_answer ?? null,
                 display_order: question.display_order ?? index + 1,
+                version_index: question.version_index ?? 0,
                 media_url: url,
                 media: url
                   ? {
@@ -189,7 +232,7 @@ export default function ExamAuthoring() {
           );
         }
       } catch {
-        setError('Không tải được dữ liệu tạo bài thi.');
+        setError(t('exam_authoring.error_load_failed'));
       } finally {
         setLoading(false);
       }
@@ -199,21 +242,87 @@ export default function ExamAuthoring() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync exam meta once per examId; examForm is stable
   }, [examId]);
 
-  const classOptions = useMemo(
-    () =>
-      classes.map((item) => ({
-        value: item.id,
-        label: `${item.subject_code} - ${item.subject_name} (${item.semester} ${item.year})`,
-      })),
-    [classes]
+  const numVersions = numVersionsCount;
+
+  const versionCodes = useMemo(
+    () => Array.from({ length: numVersions }, (_, i) => versionCodeForIndex(i)),
+    [numVersions]
   );
 
-  const normalizeQuestions = (items: AuthoringQuestion[]) =>
-    items.map((item, index) => ({ ...item, display_order: index + 1 }));
+  const file = versionFiles[activeVersion];
+  const preview = versionPreviews[activeVersion];
+
+  const handleNumVersionsChange = (nextRaw: string | null) => {
+    const next = Math.min(MAX_EXAM_VERSIONS, Math.max(1, Number(nextRaw) || 1));
+    setNumVersionsCount(next);
+    examForm.setFieldValue('numVersions', String(next));
+    setActiveVersion((prev) => Math.min(prev, next - 1));
+    setQuestions((prev) => prev.filter((q) => (q.version_index ?? 0) < next));
+    setEditingQuestionId(null);
+  };
+
+  const currentQuestions = useMemo(
+    () => questions.filter((q) => (q.version_index ?? 0) === activeVersion),
+    [questions, activeVersion]
+  );
+
+  const versionCounts = useMemo(() => {
+    const counts = Array.from({ length: numVersions }, () => 0);
+    for (const q of questions) {
+      const v = q.version_index ?? 0;
+      if (v >= 0 && v < numVersions) counts[v] += 1;
+    }
+    return counts;
+  }, [questions, numVersions]);
+
+  const versionSummaryText = useMemo(() => {
+    const parts = versionCodes.map((code, i) => `${code}: ${versionCounts[i]} câu`);
+    const allOk = versionCounts.every((c) => c > 0);
+    return allOk ? `${parts.join(' · ')} — ${t('exam_authoring.version_summary_ok')}` : parts.join(' · ');
+  }, [versionCodes, versionCounts, t]);
+
+  const versionSegmentData = useMemo(
+    () =>
+      versionCodes.map((code, i) => ({
+        label: `${code} (${versionCounts[i]})`,
+        value: String(i),
+      })),
+    [versionCodes, versionCounts]
+  );
+
+  const setVersionFile = (versionIdx: number, next: File | null) => {
+    setVersionFiles((prev) => {
+      const copy = [...prev];
+      copy[versionIdx] = next;
+      return copy;
+    });
+  };
+
+  const setVersionPreview = (versionIdx: number, next: ExamImportPreview | null) => {
+    setVersionPreviews((prev) => {
+      const copy = [...prev];
+      copy[versionIdx] = next;
+      return copy;
+    });
+  };
+
+  const normalizeQuestions = (items: AuthoringQuestion[]) => {
+    const next = items.map((item) => ({ ...item }));
+    for (let v = 0; v < numVersions; v += 1) {
+      let order = 1;
+      for (const item of next) {
+        if ((item.version_index ?? 0) === v) {
+          item.display_order = order;
+          order += 1;
+        }
+      }
+    }
+    return next;
+  };
 
   const previewWord = async () => {
     if (!file) {
-      setError('Vui lòng chọn file .docx.');
+      setError(t('exam_authoring.error_select_file'));
       return;
     }
     setLoading(true);
@@ -221,13 +330,13 @@ export default function ExamAuthoring() {
     setNotice('');
     try {
       const data = await examApi.previewWordImport(file);
-      setPreview(data);
+      setVersionPreview(activeVersion, data);
       const meta = examForm.getValues();
       if (data.exam.title && !meta.title) examForm.setFieldValue('title', data.exam.title);
       if (data.exam.description && !meta.description) examForm.setFieldValue('description', data.exam.description);
       if (data.exam.duration_min) examForm.setFieldValue('durationMin', data.exam.duration_min);
     } catch {
-      setError('Không đọc được file Word. Vui lòng kiểm tra đúng template .docx.');
+      setError(t('exam_authoring.error_read_file'));
     } finally {
       setLoading(false);
     }
@@ -241,15 +350,24 @@ export default function ExamAuthoring() {
   const handleVerifyConfirm = (verifiedQuestions: ImportedQuestionDraft[]) => {
     const mapped = (verifiedQuestions as AuthoringQuestion[]).map((q) => ({
       ...q,
+      version_index: activeVersion,
       media_url: q.media?.url ?? q.media_url ?? null,
     }));
-    setQuestions(normalizeQuestions(mapped));
-    setNotice(`Đã xác nhận ${verifiedQuestions.length} câu từ file Word.`);
+    setQuestions((prev) => {
+      const kept = prev.filter((q) => (q.version_index ?? 0) !== activeVersion);
+      return normalizeQuestions([...kept, ...mapped]);
+    });
+    setNotice(
+      t('exam_authoring.notice_confirmed', { count: verifiedQuestions.length }) +
+        ` (${versionCodeForIndex(activeVersion)})`
+    );
     setVerifyOpened(false);
   };
 
-  const deleteQuestion = (idx: number) => {
-    setQuestions((prev) => prev.filter((_, i) => i !== idx));
+  const deleteQuestion = (localIdx: number) => {
+    const target = currentQuestions[localIdx];
+    if (!target) return;
+    setQuestions((prev) => prev.filter((q) => q !== target));
   };
 
   const startEditQuestion = (q: AuthoringQuestion, idx: number) => {
@@ -286,7 +404,7 @@ export default function ExamAuthoring() {
       const url = uploaded.url;
       questionEditForm.setFieldValue('media_url', url);
     } catch (e: unknown) {
-      setMediaUploadError(e instanceof Error ? e.message : 'Không tải được media.');
+      setMediaUploadError(e instanceof Error ? e.message : t('exam_authoring.error_media_upload'));
     } finally {
       setMediaUploadLoading(false);
     }
@@ -297,16 +415,18 @@ export default function ExamAuthoring() {
     setMediaUploadError('');
   };
 
-  const saveEditQuestion = (idx: number) => {
+  const saveEditQuestion = (localIdx: number) => {
     const v = questionEditForm.getValues();
     const optionsMcq =
       v.question_type === 'mcq'
         ? { A: v.optionA, B: v.optionB, C: v.optionC, D: v.optionD }
         : undefined;
+    const globalIdx = questions.findIndex((q) => q === currentQuestions[localIdx]);
+    if (globalIdx < 0) return;
     setQuestions((prev) => {
       const next = [...prev];
-      const base = prev[idx];
-      next[idx] = {
+      const base = prev[globalIdx];
+      next[globalIdx] = {
         ...base,
         content: v.content,
         question_type: v.question_type,
@@ -329,15 +449,24 @@ export default function ExamAuthoring() {
   };
 
   const saveExam = async () => {
-    const { title, description, durationMin, closesAt, classId } = examForm.getValues();
+    const { title, description, durationMin, closesAt, adminClassId, subjectId } = examForm.getValues();
     const duration = Number(durationMin);
-    if (!title.trim() || !classId || !Number.isFinite(duration) || duration <= 0) {
-      setError('Vui lòng nhập tiêu đề, lớp và thời gian làm bài hợp lệ.');
+    if (
+      !title.trim() ||
+      !adminClassId ||
+      !subjectId ||
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ) {
+      setError(t('exam_authoring.error_fill_required'));
       return;
     }
-    if (questions.length === 0) {
-      setError('Bài thi cần ít nhất 1 câu hỏi.');
-      return;
+    for (let v = 0; v < numVersions; v += 1) {
+      if (versionCounts[v] === 0) {
+        setActiveVersion(v);
+        setError(t('exam_authoring.error_need_version_questions', { version: versionCodeForIndex(v) }));
+        return;
+      }
     }
 
     setSaving(true);
@@ -350,6 +479,7 @@ export default function ExamAuthoring() {
           duration_min: Math.floor(duration),
           description: description.trim() || null,
           closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+          num_versions: numVersions,
         });
         const ordered = normalizeQuestions(questions);
         const existing = ordered.filter((q): q is AuthoringQuestion & { id: string } => Boolean(q.id));
@@ -374,10 +504,11 @@ export default function ExamAuthoring() {
             options: question.options ?? undefined,
             correct_answer: question.correct_answer ?? undefined,
             media_url: question.media_url ?? question.media?.url ?? null,
+            version_index: question.version_index ?? 0,
           });
         }
         setNotice(
-          `Đã cập nhật bài thi (${existing.length} câu đã lưu${newQuestions.length ? `, +${newQuestions.length} câu mới` : ''}).`
+          t('exam_authoring.notice_updated', { existing: existing.length, new: newQuestions.length })
         );
         window.setTimeout(() => navigate('/exams'), 800);
         return;
@@ -385,19 +516,22 @@ export default function ExamAuthoring() {
 
       const created = await examApi.commitWordImport({
         title: title.trim(),
-        class_id: classId,
+        admin_class_id: adminClassId,
+        subject_id: subjectId,
         duration_min: Math.floor(duration),
         description: description.trim() || null,
         closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+        num_versions: numVersions,
         questions: normalizeQuestions(questions).map((q) => ({
           ...q,
+          version_index: q.version_index ?? 0,
           media_url: q.media_url ?? q.media?.url ?? null,
         })),
       });
-      setNotice(`Đã tạo bài thi "${created.exam.title}" với ${created.questions.length} câu.`);
+      setNotice(t('exam_authoring.notice_created', { title: created.exam.title, count: created.questions.length }));
       window.setTimeout(() => navigate('/exams'), 800);
     } catch {
-      setError('Không tạo được bài thi. Vui lòng kiểm tra dữ liệu và thử lại.');
+      setError(t('exam_authoring.error_save_failed'));
     } finally {
       setSaving(false);
     }
@@ -408,15 +542,15 @@ export default function ExamAuthoring() {
       {/* Page header */}
       <Group justify="space-between" mb="md" wrap="wrap">
         <Group gap="sm">
-          <Title order={2}>{isEditMode ? 'Sửa bài thi' : 'Tạo bài thi mới'}</Title>
+          <Title order={2}>{isEditMode ? t('exam_authoring.edit_title') : t('exam_authoring.create_title')}</Title>
           {isEditMode && (
-            <Badge size="lg" color="teal" variant="light">{questions.length} câu</Badge>
+            <Badge size="lg" color="teal" variant="light">{questions.length} {t('exam_authoring.questions')}</Badge>
           )}
         </Group>
         <Group gap="sm">
-          <Button variant="default" onClick={() => navigate('/exams')}>Quay lại</Button>
+          <Button variant="default" onClick={() => navigate('/exams')}>{t('common.back')}</Button>
           <Button color="green" loading={saving} onClick={saveExam}>
-            {isEditMode ? 'Cập nhật' : 'Lưu bài thi'}
+            {isEditMode ? t('exam_authoring.btn_update') : t('exam_authoring.btn_save')}
           </Button>
         </Group>
       </Group>
@@ -424,10 +558,14 @@ export default function ExamAuthoring() {
       {!!error && <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} mb="sm">{error}</Alert>}
       {!!notice && <Alert color="green" variant="light" icon={<IconCheck size={16} />} mb="sm">{notice}</Alert>}
 
+      <Alert color="blue" variant="light" mb="sm">
+        {t('exam_authoring.multi_version_hint')}
+      </Alert>
+
       {/* Two-column layout */}
       <Group align="flex-start" gap="md" wrap="wrap" style={{ rowGap: '12px' }}>
         {/* LEFT COLUMN — Exam info + Import (compact sidebar) */}
-        <Stack gap="sm" style={{ minWidth: 320, flex: '0 0 320px' }}>
+        <Stack gap="sm" style={{ minWidth: 370, flex: '0 0 370px' }}>
           {/* Thông tin bài thi — collapsible */}
           <Paper radius="md" withBorder style={{ overflow: 'hidden' }}>
             <Box
@@ -436,7 +574,7 @@ export default function ExamAuthoring() {
             >
               <Group justify="space-between">
                 <Group gap="xs">
-                  <Text size="sm" fw={600} c="white">Thông tin bài thi</Text>
+                  <Text size="sm" fw={600} c="white">{t('exam_authoring.exam_info')}</Text>
                 </Group>
                 {infoCollapsed ? <IconChevronDown size={14} color="white" /> : <IconChevronUp size={14} color="white" />}
               </Group>
@@ -444,25 +582,38 @@ export default function ExamAuthoring() {
             <Collapse in={!infoCollapsed}>
               <Stack gap="xs" p="sm">
                 <TextInput
-                  label="Tiêu đề bài thi"
+                  label={t('exam_authoring.exam_title_label')}
                   size="sm"
-                  placeholder="VD: Giữa kỳ - Python cơ bản"
+                  placeholder={t('exam_authoring.exam_title_placeholder')}
                   key={examForm.key('title')}
                   {...examForm.getInputProps('title')}
                 />
-                <Select
-                  label="Lớp học"
+                <TextInput
+                  label={t('exam_authoring.admin_class_label')}
                   size="sm"
-                  placeholder={loading ? 'Đang tải...' : 'Chọn lớp'}
-                  data={classOptions}
-                  searchable
-                  disabled={isEditMode}
-                  key={examForm.key('classId')}
-                  {...examForm.getInputProps('classId')}
+                  readOnly
+                  value={adminClass?.display_name ?? ''}
+                  placeholder={
+                    loading
+                      ? t('exam_authoring.loading')
+                      : t('exam_authoring.no_admin_class')
+                  }
+                />
+                <SubjectCategoryPicker
+                  label={t('exam_authoring.subject_label')}
+                  size="sm"
+                  subjects={subjects}
+                  placeholder={
+                    loading ? t('exam_authoring.loading') : t('exam_authoring.select_subject')
+                  }
+                  disabled={isEditMode || !adminClass || loading}
+                  value={examForm.getValues().subjectId}
+                  onChange={(id) => examForm.setFieldValue('subjectId', id)}
+                  error={examForm.errors.subjectId as string | undefined}
                 />
                 <Group grow>
                   <NumberInput
-                    label="Thời gian (phút)"
+                    label={t('exam_authoring.duration_label')}
                     size="sm"
                     min={1}
                     max={300}
@@ -470,18 +621,31 @@ export default function ExamAuthoring() {
                     {...examForm.getInputProps('durationMin')}
                   />
                   <TextInput
-                    label="Hạn nộp"
+                    label={t('exam_authoring.deadline_label')}
                     size="sm"
                     type="datetime-local"
                     key={examForm.key('closesAt')}
                     {...examForm.getInputProps('closesAt')}
                   />
                 </Group>
+                <Select
+                  label={t('exam_authoring.num_versions_label')}
+                  description={t('exam_authoring.num_versions_desc')}
+                  size="sm"
+                  allowDeselect={false}
+                  disabled={isEditMode}
+                  data={[1, 2, 3, 4].map((n) => ({
+                    value: String(n),
+                    label: t('exam_authoring.num_versions_option', { count: n }),
+                  }))}
+                  value={String(numVersionsCount)}
+                  onChange={(value) => handleNumVersionsChange(value)}
+                />
                 <Textarea
-                  label="Mô tả"
+                  label={t('exam_authoring.description_label')}
                   size="sm"
                   minRows={2}
-                  placeholder="Nội dung, yêu cầu..."
+                  placeholder={t('exam_authoring.description_placeholder')}
                   key={examForm.key('description')}
                   {...examForm.getInputProps('description')}
                 />
@@ -494,15 +658,43 @@ export default function ExamAuthoring() {
             <Box style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', padding: '10px 16px' }}>
               <Group gap="xs">
                 <IconFileWord size={14} color="white" />
-                <Text size="sm" fw={600} c="white">Import từ Word (.docx)</Text>
+                <Text size="sm" fw={600} c="white">
+                  {t('exam_authoring.import_for_version', { code: versionCodeForIndex(activeVersion) })}
+                </Text>
               </Group>
             </Box>
             <Stack gap="xs" p="sm">
-              <Text size="xs" c="dimmed">
-                Tags: <code>[LOAI:TN]</code> <code>[DIEM:1]</code> <code>[KHO:DE]</code> <code>[DAPAN:A]</code>
-              </Text>
+              {numVersions > 1 && (
+                <SegmentedControl
+                  fullWidth
+                  size="xs"
+                  value={String(activeVersion)}
+                  onChange={(v) => {
+                    setActiveVersion(Number(v));
+                    setEditingQuestionId(null);
+                  }}
+                  data={versionSegmentData}
+                />
+              )}
+              <Stack gap={4}>
+                <Text size="xs" c="dimmed">
+                  {t('exam_authoring.word_import_tags_label')}{' '}
+                  <code>[LOAI:TN]</code> <code>[DIEM:0.5]</code> <code>[KHO:DE]</code>
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {t('exam_authoring.word_import_tags_example')}
+                </Text>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  leftSection={<IconFileWord size={12} />}
+                  onClick={() => examApi.downloadWordImportTemplate().catch(() => {})}
+                >
+                  {t('exam_authoring.word_import_download_template')}
+                </Button>
+              </Stack>
               <Dropzone
-                onDrop={(files) => setFile(files[0] ?? null)}
+                onDrop={(files) => setVersionFile(activeVersion, files[0] ?? null)}
                 accept={[MIME_TYPES.docx, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
                 maxFiles={1}
                 radius="md"
@@ -520,7 +712,7 @@ export default function ExamAuthoring() {
                   </Dropzone.Idle>
                   <div>
                     <Text size="xs" c="dimmed" ta="center">
-                      {file ? file.name : 'Kéo thả .docx hoặc click'}
+                      {file ? file.name : t('exam_authoring.dropzone_hint')}
                     </Text>
                     {file && (
                       <Text size="xs" c="teal" ta="center">
@@ -532,55 +724,69 @@ export default function ExamAuthoring() {
               </Dropzone>
               <Group gap="xs">
                 <Button size="xs" variant="light" leftSection={<IconFileWord size={12} />} loading={loading} onClick={previewWord} disabled={!file}>
-                  Xem trước
+                  {t('exam_authoring.btn_preview')}
                 </Button>
                 <Button size="xs" variant="light" color="violet" disabled={!preview || !file} onClick={applyPreviewQuestions}>
-                  Kiểm tra &amp; Import
+                  {t('exam_authoring.btn_import')}
                 </Button>
               </Group>
               {preview && (
                 <Group gap="xs">
-                  <Badge color="blue" size="sm">{preview.questions.length} câu</Badge>
+                  <Badge color="blue" size="sm">{preview.questions.length} {t('exam_authoring.questions')}</Badge>
                   {preview.parse_summary && preview.parse_summary.needs_review > 0 && (
-                    <Badge color="orange" size="sm">{preview.parse_summary.needs_review} cần xem lại</Badge>
+                    <Badge color="orange" size="sm">{t('exam_authoring.needs_review', { count: preview.parse_summary.needs_review })}</Badge>
                   )}
                   {preview.errors.map((item, i) => (
                     <Text key={i} size="xs" c="red">{item}</Text>
                   ))}
                 </Group>
               )}
+              <Text size="xs" c={versionCounts.every((c) => c > 0) ? 'teal' : 'dimmed'}>
+                {versionSummaryText}
+              </Text>
             </Stack>
           </Paper>
         </Stack>
 
         {/* RIGHT COLUMN — Questions list (main content) */}
         <Box style={{ flex: 1, minWidth: 0 }}>
+          {numVersions > 1 && (
+            <SegmentedControl
+              mb="sm"
+              value={String(activeVersion)}
+              onChange={(v) => {
+                setActiveVersion(Number(v));
+                setEditingQuestionId(null);
+              }}
+              data={versionSegmentData}
+            />
+          )}
           {/* Empty state */}
-          {questions.length === 0 && (
+          {currentQuestions.length === 0 && (
             <Paper radius="md" withBorder style={{ overflow: 'hidden' }}>
               <Box style={{ background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)', padding: '14px 20px' }}>
-                <Text size="sm" fw={600} c="white">Danh sách câu hỏi</Text>
+                <Text size="sm" fw={600} c="white">
+                  {t('exam_authoring.question_list_for_version', { code: versionCodeForIndex(activeVersion) })}
+                </Text>
               </Box>
               <Stack align="center" gap="sm" py="xl">
                 <ThemeIcon size={48} radius="xl" variant="light" color="gray">
                   <IconFileWord size={24} />
                 </ThemeIcon>
                 <Text fw={500} c="dimmed">
-                  {isEditMode ? 'Bài thi chưa có câu hỏi nào' : 'Chưa có câu hỏi nào'}
+                  {isEditMode ? t('exam_authoring.empty_edit') : t('exam_authoring.empty_create')}
                 </Text>
                 <Text size="sm" c="dimmed" ta="center" maw={300}>
-                  {isEditMode
-                    ? 'Import file Word để thêm câu hỏi vào bài thi này.'
-                    : 'Import từ file Word để bắt đầu tạo đề thi.'}
+                  {t('exam_authoring.empty_version_desc', { code: versionCodeForIndex(activeVersion) })}
                 </Text>
               </Stack>
             </Paper>
           )}
 
           {/* Questions cards */}
-          {questions.length > 0 && (
+          {currentQuestions.length > 0 && (
             <Stack gap="sm">
-              {questions.map((q, idx) => {
+              {currentQuestions.map((q, idx) => {
                 const isEditing = editingQuestionId === (q.id ?? String(idx));
 
                 return (
@@ -601,13 +807,13 @@ export default function ExamAuthoring() {
                             size="sm"
                             variant="light"
                           >
-                            {q.question_type === 'mcq' ? 'Trắc nghiệm' : 'Tự luận'}
+                            {q.question_type === 'mcq' ? t('exam_authoring.mcq') : t('exam_authoring.essay')}
                           </Badge>
-                          <Badge size="xs" variant="outline" color="gray">{q.points} điểm</Badge>
+                          <Badge size="xs" variant="outline" color="gray">{q.points} {t('exam_authoring.points')}</Badge>
                         </Group>
                         <Group gap={4}>
                           {q.correct_answer && typeof q.correct_answer === 'string' && (
-                            <Badge size="xs" color="green" variant="light">Đáp án: {q.correct_answer}</Badge>
+                            <Badge size="xs" color="green" variant="light">{t('exam_authoring.correct_answer')}: {q.correct_answer}</Badge>
                           )}
                           <ActionIcon
                             size="sm"
@@ -634,7 +840,7 @@ export default function ExamAuthoring() {
                       {isEditing ? (
                         <Stack gap="xs" key={editingQuestionId ?? idx}>
                           <Textarea
-                            label="Nội dung câu hỏi"
+                            label={t('exam_authoring.form_content_label')}
                             size="sm"
                             minRows={2}
                             key={questionEditForm.key('content')}
@@ -642,7 +848,7 @@ export default function ExamAuthoring() {
                           />
                           <Group grow>
                             <NumberInput
-                              label="Điểm"
+                              label={t('exam_authoring.form_points')}
                               size="sm"
                               min={0.5}
                               step={0.5}
@@ -650,18 +856,18 @@ export default function ExamAuthoring() {
                               {...questionEditForm.getInputProps('points')}
                             />
                             <Select
-                              label="Loại"
+                              label={t('exam_authoring.form_type')}
                               size="sm"
                               data={[
-                                { value: 'mcq', label: 'Trắc nghiệm' },
-                                { value: 'essay', label: 'Tự luận' },
+                                { value: 'mcq', label: t('exam_authoring.mcq') },
+                                { value: 'essay', label: t('exam_authoring.essay') },
                               ]}
                               key={questionEditForm.key('question_type')}
                               {...questionEditForm.getInputProps('question_type')}
                             />
                             {questionEditForm.getValues().question_type === 'mcq' && (
                               <Select
-                                label="Đáp án"
+                                label={t('exam_authoring.form_correct_answer')}
                                 size="sm"
                                 data={[
                                   { value: 'A', label: 'A' },
@@ -676,14 +882,14 @@ export default function ExamAuthoring() {
                           </Group>
                           {questionEditForm.getValues().question_type === 'mcq' && (
                             <>
-                              <Text size="xs" fw={600} c="dimmed">Các lựa chọn</Text>
+                              <Text size="xs" fw={600} c="dimmed">{t('exam_authoring.form_options')}</Text>
                               {(['A', 'B', 'C', 'D'] as const).map((opt) => (
                                 <Group key={opt} gap="xs" align="flex-start">
                                   <Text size="xs" fw={700} c="dimmed" style={{ minWidth: 16, paddingTop: 6 }}>{opt}.</Text>
                                   <TextInput
                                     size="xs"
                                     style={{ flex: 1 }}
-                                    placeholder={`Nội dung đáp án ${opt}`}
+                                    placeholder={t('exam_authoring.form_option_placeholder', { key: opt })}
                                     key={questionEditForm.key(`option${opt}` as keyof QuestionEditFormValues)}
                                     {...questionEditForm.getInputProps(`option${opt}` as keyof QuestionEditFormValues)}
                                   />
@@ -691,10 +897,10 @@ export default function ExamAuthoring() {
                               ))}
                             </>
                           )}
-                          <Divider label="Media (ảnh / âm thanh / video)" labelPosition="left" my="xs" />
+                          <Divider label={t('exam_authoring.media_label')} labelPosition="left" my="xs" />
                           <FileInput
-                            label="Tải media (Cloudinary)"
-                            description="JPG, PNG, MP3, MP4… — cần CLOUDINARY_URL trên server"
+                            label={t('exam_authoring.media_upload_label')}
+                            description={t('exam_authoring.media_upload_desc')}
                             size="sm"
                             accept="image/*,audio/*,video/*"
                             clearable
@@ -702,7 +908,7 @@ export default function ExamAuthoring() {
                             onChange={(f) => void handleEditMediaFile(f)}
                           />
                           {mediaUploadLoading && (
-                            <Text size="xs" c="dimmed">Đang tải lên…</Text>
+                            <Text size="xs" c="dimmed">{t('exam_authoring.uploading')}</Text>
                           )}
                           {mediaUploadError && (
                             <Text size="xs" c="red">{mediaUploadError}</Text>
@@ -710,7 +916,7 @@ export default function ExamAuthoring() {
                           {questionEditForm.getValues().media_url && (
                             <Group gap="xs" align="flex-end">
                               <Button size="xs" variant="light" color="red" onClick={clearEditMedia}>
-                                Xóa media
+                                {t('exam_authoring.remove_media')}
                               </Button>
                             </Group>
                           )}
@@ -718,8 +924,8 @@ export default function ExamAuthoring() {
                             <AuthoringMediaPreview url={questionEditForm.getValues().media_url!} />
                           )}
                           <Group gap="xs" justify="flex-end">
-                            <Button size="xs" variant="default" onClick={cancelEditQuestion}>Hủy</Button>
-                            <Button size="xs" color="teal" onClick={() => saveEditQuestion(idx)}>Lưu</Button>
+                            <Button size="xs" variant="default" onClick={cancelEditQuestion}>{t('common.cancel')}</Button>
+                            <Button size="xs" color="teal" onClick={() => saveEditQuestion(idx)}>{t('common.save')}</Button>
                           </Group>
                         </Stack>
                       ) : (
@@ -727,7 +933,7 @@ export default function ExamAuthoring() {
                           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }} mb="xs">{q.content}</Text>
                           {mediaUrlFromQuestion(q) && (
                             <Box mb="sm" p="xs" style={{ background: '#f8fafc', borderRadius: 8 }}>
-                              <Text size="xs" fw={600} c="dimmed" mb={6}>Media</Text>
+                              <Text size="xs" fw={600} c="dimmed" mb={6}>{t('exam_authoring.media')}</Text>
                               <AuthoringMediaPreview url={mediaUrlFromQuestion(q)!} />
                             </Box>
                           )}
@@ -739,7 +945,7 @@ export default function ExamAuthoring() {
                                     <Text size="xs" fw={700} c="dimmed">{opt}.</Text>
                                     <Text size="xs">{q.options[opt]}</Text>
                                     {typeof q.correct_answer === 'string' && q.correct_answer.toUpperCase() === opt && (
-                                      <Badge color="green" size="xs" variant="filled">Đáp án</Badge>
+                                      <Badge color="green" size="xs" variant="filled">{t('exam_authoring.correct_answer')}</Badge>
                                     )}
                                   </Group>
                                 ) : null

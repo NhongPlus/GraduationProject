@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useForm, type UseFormReturnType } from '@mantine/form';
 import {
   Modal,
   Box,
@@ -20,6 +21,7 @@ import {
   Alert,
   Loader,
   FileInput,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconCheck,
@@ -28,9 +30,17 @@ import {
   IconPhoto,
   IconMicrophone,
   IconVideo,
+  IconPlus,
+  IconTrash,
 } from '@tabler/icons-react';
 import type { ExamImportPreview, ImportedQuestionDraft } from '@/services/examApi';
 import examApi from '@/services/examApi';
+import {
+  draftToFormRow,
+  draftsToFormValues,
+  formRowToDraft,
+  type ImportPreviewFormValues,
+} from './importPreviewForm';
 
 interface ExamImportPreviewModalProps {
   preview: ExamImportPreview;
@@ -38,12 +48,12 @@ interface ExamImportPreviewModalProps {
   onClose: () => void;
 }
 
-const TYPE_META: Record<string, { color: string; label: string; accent: string }> = {
-  mcq: { color: 'blue', label: 'TN', accent: '#3B82F6' },
-  essay: { color: 'grape', label: 'TL', accent: '#10B981' },
-  'TN-ANH': { color: 'orange', label: 'TN-ANH', accent: '#F59E0B' },
-  'TN-AUDIO': { color: 'violet', label: 'TN-AUDIO', accent: '#8B5CF6' },
-  'TN-VIDEO': { color: 'red', label: 'TN-VIDEO', accent: '#EF4444' },
+const TYPE_META: Record<string, { color: string; label: string }> = {
+  mcq: { color: 'blue', label: 'TN' },
+  essay: { color: 'grape', label: 'TL' },
+  'TN-ANH': { color: 'orange', label: 'TN-ANH' },
+  'TN-AUDIO': { color: 'violet', label: 'TN-AUDIO' },
+  'TN-VIDEO': { color: 'red', label: 'TN-VIDEO' },
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -58,32 +68,28 @@ type MediaPreview = {
   name: string;
 };
 
-const ensureMcqOptions = (options?: Record<string, string> | null) => ({
-  A: options?.A ?? '',
-  B: options?.B ?? '',
-  C: options?.C ?? '',
-  D: options?.D ?? '',
-});
-
 function QuestionCard({
-  q,
+  form,
   idx,
-  updateQuestion,
+  q,
+  onDelete,
   mediaPreview,
   mediaFile,
   onMediaChange,
   uploading,
   uploadError,
 }: {
-  q: ImportedQuestionDraft;
+  form: UseFormReturnType<ImportPreviewFormValues>;
   idx: number;
-  updateQuestion: (idx: number, updated: ImportedQuestionDraft) => void;
+  q: ImportPreviewFormValues['questions'][number];
+  onDelete: () => void;
   mediaPreview?: MediaPreview;
   mediaFile?: File | null;
   onMediaChange: (idx: number, file: File | null) => void;
   uploading?: boolean;
   uploadError?: string;
 }) {
+  const base = `questions.${idx}` as const;
   const meta = TYPE_META[q.question_type] || TYPE_META.mcq;
   const confidence = q.ai_confidence ?? 100;
   const isMcq = q.question_type === 'mcq';
@@ -96,30 +102,16 @@ function QuestionCard({
 
   const handleTypeChange = (value: string) => {
     if (value === q.question_type) return;
+    form.setFieldValue(`${base}.question_type`, value as 'mcq' | 'essay');
     if (value === 'mcq') {
-      updateQuestion(idx, {
-        ...q,
-        question_type: 'mcq',
-        options: ensureMcqOptions(q.options),
-        correct_answer: q.correct_answer || 'A',
-      });
-      return;
+      form.setFieldValue(`${base}.correct_answer`, 'A');
+    } else {
+      form.setFieldValue(`${base}.correct_answer`, '');
     }
-
-    updateQuestion(idx, {
-      ...q,
-      question_type: 'essay',
-      options: null,
-      correct_answer: null,
-    });
   };
 
   return (
-    <Paper
-      withBorder
-      radius="lg"
-      p="md"
-    >
+    <Paper withBorder radius="lg" p="md">
       <Stack gap="sm">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Group gap="xs" wrap="wrap">
@@ -151,15 +143,22 @@ function QuestionCard({
             >
               {q.needs_review ? 'Review' : 'OK'}
             </Badge>
+            <ActionIcon size="sm" variant="subtle" color="red" onClick={onDelete} title="Xóa câu hỏi">
+              <IconTrash size={14} />
+            </ActionIcon>
           </Group>
         </Group>
 
         <Textarea
           size="sm"
-          minRows={2}
-          value={q.content}
-          onChange={(e) => updateQuestion(idx, { ...q, content: e.currentTarget.value })}
+          minRows={4}
+          autosize
+          maxRows={12}
           variant="unstyled"
+          w="100%"
+          styles={{ root: { width: '100%' }, wrapper: { width: '100%' }, input: { width: '100%' } }}
+          key={form.key(`${base}.content`)}
+          {...form.getInputProps(`${base}.content`)}
         />
 
         <Group gap="sm" align="flex-end" wrap="wrap">
@@ -205,7 +204,13 @@ function QuestionCard({
             variant="light"
             color="yellow"
             leftSection={
-              q.media.type === 'image' ? <IconPhoto size={12} /> : q.media.type === 'audio' ? <IconMicrophone size={12} /> : <IconVideo size={12} />
+              q.media.type === 'image' ? (
+                <IconPhoto size={12} />
+              ) : q.media.type === 'audio' ? (
+                <IconMicrophone size={12} />
+              ) : (
+                <IconVideo size={12} />
+              )
             }
           >
             {q.media.filename}
@@ -213,14 +218,7 @@ function QuestionCard({
         )}
 
         {mediaUrl && mediaType === 'image' && (
-          <Image
-            src={mediaUrl}
-            alt={mediaName || 'media'}
-            radius="md"
-            fit="contain"
-            maw={520}
-            mah={280}
-          />
+          <Image src={mediaUrl} alt={mediaName || 'media'} radius="md" fit="contain" maw={520} mah={280} />
         )}
         {mediaUrl && mediaType === 'audio' && (
           <Box>
@@ -240,31 +238,29 @@ function QuestionCard({
 
         {isMcq ? (
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
-            {['A', 'B', 'C', 'D'].map((key) => (
-              <Paper
-                key={key}
-                withBorder
-                radius="md"
-                p="xs"
-              >
-                <Group align="flex-start" gap="xs" wrap="nowrap">
-                  <ThemeIcon size={22} radius="sm" variant="light" color="gray">
+            {(['A', 'B', 'C', 'D'] as const).map((key) => (
+              <Paper key={key} withBorder radius="md" p="xs">
+                <Group align="flex-start" gap="xs" wrap="nowrap" w="100%">
+                  <ThemeIcon size={22} radius="sm" variant="light" color="gray" style={{ flexShrink: 0 }}>
                     <Text size="xs" fw={700}>
                       {key}
                     </Text>
                   </ThemeIcon>
-                  <Textarea
-                    size="xs"
-                    minRows={1}
-                    value={q.options && q.options[key] ? q.options[key] : ''}
-                    onChange={(e) => {
-                      const opts = q.options ? { ...q.options } : {};
-                      opts[key] = e.currentTarget.value;
-                      if (!e.currentTarget.value) delete opts[key];
-                      updateQuestion(idx, { ...q, options: opts });
-                    }}
-                    variant="unstyled"
-                  />
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Textarea
+                      size="xs"
+                      minRows={1}
+                      variant="unstyled"
+                      w="100%"
+                      styles={{
+                        root: { width: '100%' },
+                        wrapper: { width: '100%' },
+                        input: { width: '100%' },
+                      }}
+                      key={form.key(`${base}.option${key}`)}
+                      {...form.getInputProps(`${base}.option${key}`)}
+                    />
+                  </Box>
                 </Group>
               </Paper>
             ))}
@@ -277,9 +273,10 @@ function QuestionCard({
             <Textarea
               size="xs"
               minRows={2}
-              value={q.answer_hint || ''}
-              onChange={(e) => updateQuestion(idx, { ...q, answer_hint: e.currentTarget.value })}
+              w="100%"
               placeholder="Nhập gợi ý / đáp án mẫu..."
+              key={form.key(`${base}.answer_hint`)}
+              {...form.getInputProps(`${base}.answer_hint`)}
             />
           </Box>
         )}
@@ -288,8 +285,8 @@ function QuestionCard({
           <Select
             size="xs"
             label="Độ khó"
-            value={q.difficulty || 'DE'}
-            onChange={(v) => updateQuestion(idx, { ...q, difficulty: (v as 'DE' | 'TRUNGBINH' | 'KHO') })}
+            key={form.key(`${base}.difficulty`)}
+            {...form.getInputProps(`${base}.difficulty`)}
             data={[
               { value: 'DE', label: 'Dễ' },
               { value: 'TRUNGBINH', label: 'Trung bình' },
@@ -300,15 +297,15 @@ function QuestionCard({
             size="xs"
             label="Chương"
             min={1}
-            value={q.chapter || 1}
-            onChange={(v) => updateQuestion(idx, { ...q, chapter: typeof v === 'number' ? v : 1 })}
+            key={form.key(`${base}.chapter`)}
+            {...form.getInputProps(`${base}.chapter`)}
           />
           {isMcq && (
             <Select
               size="xs"
               label="Đáp án đúng"
-              value={Array.isArray(q.correct_answer) ? q.correct_answer.join(',') : q.correct_answer || ''}
-              onChange={(v) => updateQuestion(idx, { ...q, correct_answer: v || null })}
+              key={form.key(`${base}.correct_answer`)}
+              {...form.getInputProps(`${base}.correct_answer`)}
               data={['A', 'B', 'C', 'D', 'A,B', 'A,C', 'B,D', 'A,B,C', 'A,B,D', 'B,C,D', 'A,C,D', 'A,B,C,D']}
               allowDeselect={false}
             />
@@ -316,11 +313,7 @@ function QuestionCard({
         </Group>
 
         {q.needs_review && q.review_reason && (
-          <Alert
-            color="red"
-            variant="light"
-            icon={<IconAlertCircle size={14} />}
-          >
+          <Alert color="red" variant="light" icon={<IconAlertCircle size={14} />}>
             {q.review_reason}
           </Alert>
         )}
@@ -334,7 +327,15 @@ export default function ExamImportPreviewModal({
   onConfirm,
   onClose,
 }: ExamImportPreviewModalProps) {
-  const [questions, setQuestions] = useState<ImportedQuestionDraft[]>(preview.questions);
+  const [, setFormTick] = useState(0);
+  const form = useForm<ImportPreviewFormValues>({
+    mode: 'uncontrolled',
+    initialValues: draftsToFormValues(preview.questions),
+    onValuesChange: () => {
+      setFormTick((n) => n + 1);
+    },
+  });
+
   const [recomposing, setRecomposing] = useState(false);
   const [recomposeError, setRecomposeError] = useState('');
   const [recomposeFile, setRecomposeFile] = useState<File | null>(null);
@@ -346,6 +347,7 @@ export default function ExamImportPreviewModal({
   const mediaPreviewRef = useRef<Record<number, MediaPreview>>({});
   const mediaUploadTokenRef = useRef<Record<number, string>>({});
 
+  const questions = form.getValues().questions;
   const needsReviewCount = questions.filter((q) => q.needs_review).length;
   const mcqCount = questions.filter((q) => q.question_type === 'mcq').length;
   const essayCount = questions.filter((q) => q.question_type === 'essay').length;
@@ -354,17 +356,25 @@ export default function ExamImportPreviewModal({
     mediaPreviewRef.current = mediaPreviews;
   }, [mediaPreviews]);
 
-  useEffect(() => () => {
-    Object.values(mediaPreviewRef.current).forEach((item) => {
-      if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
-    });
-  }, []);
+  useEffect(
+    () => () => {
+      Object.values(mediaPreviewRef.current).forEach((item) => {
+        if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+      });
+    },
+    []
+  );
 
   const detectMediaType = (file: File): MediaPreview['type'] | null => {
     if (file.type.startsWith('image/')) return 'image';
     if (file.type.startsWith('audio/')) return 'audio';
     if (file.type.startsWith('video/')) return 'video';
     return null;
+  };
+
+  const patchQuestionMedia = (idx: number, media: ImportedQuestionDraft['media']) => {
+    form.setFieldValue(`questions.${idx}.media`, media);
+    form.setFieldValue(`questions.${idx}.media_url`, media?.url ?? null);
   };
 
   const handleMediaChange = async (idx: number, file: File | null) => {
@@ -392,31 +402,17 @@ export default function ExamImportPreviewModal({
       return next;
     });
 
-    setQuestions((prev) =>
-      prev.map((item, index) => {
-        if (index !== idx) return item;
-        if (!file || !type) {
-          return { ...item, media: null };
-        }
-        return {
-          ...item,
-          media: {
-            type,
-            filename: file.name,
-            status: 'embedded',
-          },
-        };
-      })
-    );
-
-    if (!file) {
+    if (!file || !type) {
       delete mediaUploadTokenRef.current[idx];
+      patchQuestionMedia(idx, null);
       return;
     }
-    if (!type) {
-      setMediaErrors((prev) => ({ ...prev, [idx]: 'Định dạng media không hỗ trợ.' }));
-      return;
-    }
+
+    patchQuestionMedia(idx, {
+      type,
+      filename: file.name,
+      status: 'embedded',
+    });
 
     const token = `${file.name}-${file.size}-${file.lastModified}`;
     mediaUploadTokenRef.current[idx] = token;
@@ -426,20 +422,12 @@ export default function ExamImportPreviewModal({
       const uploaded = await examApi.uploadExamMedia(file);
       if (mediaUploadTokenRef.current[idx] !== token) return;
 
-      setQuestions((prev) =>
-        prev.map((item, index) => {
-          if (index !== idx) return item;
-          return {
-            ...item,
-            media: {
-              type,
-              filename: file.name,
-              status: 'found',
-              url: uploaded.url,
-            },
-          };
-        })
-      );
+      patchQuestionMedia(idx, {
+        type,
+        filename: file.name,
+        status: 'found',
+        url: uploaded.url,
+      });
 
       setMediaPreviews((prev) => {
         const next = { ...prev };
@@ -468,8 +456,12 @@ export default function ExamImportPreviewModal({
     setRecomposeError('');
     try {
       const result = await examApi.aiRecomposeExam({ file: recomposeFile, examInfo: preview.exam });
-      setQuestions(result.questions);
+      const nextValues = draftsToFormValues(result.questions);
+      form.setInitialValues(nextValues);
+      form.setValues(nextValues);
+      form.reset();
       setShowFileUpload(false);
+      setRecomposeFile(null);
       setMediaFiles({});
       setMediaPreviews({});
     } catch (err: unknown) {
@@ -481,13 +473,68 @@ export default function ExamImportPreviewModal({
   };
 
   const handleConfirm = () => {
-    onConfirm(questions);
+    const rows = form.getValues().questions;
+    onConfirm(rows.map((row) => formRowToDraft(row)));
   };
 
-  const updateQuestion = (idx: number, updated: ImportedQuestionDraft) => {
-    const newQuestions = [...questions];
-    newQuestions[idx] = updated;
-    setQuestions(newQuestions);
+  const handleDeleteQuestion = (idx: number) => {
+    const current = form.getValues().questions;
+    const updated = current.filter((_, i) => i !== idx).map((q, i) => ({
+      ...q,
+      display_order: i + 1,
+    }));
+    form.setValues({ questions: updated });
+    setMediaFiles((prev: Record<number, File | null>) => {
+      const next: Record<number, File | null> = {};
+      Object.keys(prev)
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach((key) => {
+          const k = Number(key);
+          if (k < idx) next[k] = prev[k];
+          else if (k > idx) next[k - 1] = prev[k];
+        });
+      return next;
+    });
+    setMediaPreviews((prev: Record<number, MediaPreview>) => {
+      const next: Record<number, MediaPreview> = {};
+      Object.keys(prev)
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach((key) => {
+          const k = Number(key);
+          if (k < idx) next[k] = prev[k];
+          else if (k > idx) next[k - 1] = prev[k];
+        });
+      return next;
+    });
+  };
+
+  const handleAddQuestion = () => {
+    const current = form.getValues().questions;
+    const newOrder = current.length + 1;
+    form.setValues({
+      questions: [
+        ...current,
+        {
+          content: '',
+          question_type: 'mcq',
+          points: 1,
+          optionA: '',
+          optionB: '',
+          optionC: '',
+          optionD: '',
+          correct_answer: 'A',
+          difficulty: 'DE',
+          chapter: 1,
+          answer_hint: '',
+          display_order: newOrder,
+          ai_confidence: 100,
+          needs_review: false,
+          review_reason: null,
+          media: null,
+          media_url: null,
+        },
+      ],
+    });
   };
 
   return (
@@ -509,17 +556,10 @@ export default function ExamImportPreviewModal({
         header: { display: 'none' },
       }}
     >
-      {/* Header */}
-      <Paper
-        radius={0}
-        p="sm"
-        withBorder
-      >
+      <Paper radius={0} p="sm" withBorder>
         <Group justify="space-between" align="center" wrap="nowrap">
           <Stack gap={4} style={{ flex: 1 }}>
-            <Title order={4}>
-              {preview.exam.title || 'Xem trước đề thi'}
-            </Title>
+            <Title order={4}>{preview.exam.title || 'Xem trước đề thi'}</Title>
             <Group gap="xs" wrap="wrap">
               {preview.exam.duration_min && (
                 <Badge variant="light" color="gray">
@@ -569,49 +609,49 @@ export default function ExamImportPreviewModal({
             >
               AI Sửa Lại
             </Button>
-            <Button
-              size="xs"
-              color="cyan"
-              onClick={handleConfirm}
-            >
+            <Button size="xs" color="cyan" onClick={handleConfirm}>
               Xác nhận ({questions.length})
             </Button>
-            <Button
-              size="xs"
-              variant="default"
-              onClick={onClose}
-            >
+            <Button size="xs" variant="default" onClick={onClose}>
               Hủy
             </Button>
           </Group>
         </Group>
 
         {recomposeError && (
-          <Alert
-            mt="xs"
-            color="red"
-            variant="light"
-          >
+          <Alert mt="xs" color="red" variant="light">
             {recomposeError}
           </Alert>
         )}
       </Paper>
 
-      {/* Questions list */}
       <Box style={{ overflow: 'auto', flex: 1, minHeight: 0, padding: '16px 32px' }}>
-        <Stack gap="md">
+        <Button
+          size="sm"
+          variant="light"
+          color="teal"
+          leftSection={<IconPlus size={14} />}
+          onClick={handleAddQuestion}
+          mb="md"
+        >
+          Thêm câu hỏi
+        </Button>
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
           {questions.map((q, idx) => (
             <QuestionCard
               key={`${q.display_order}-${idx}`}
-              q={q}
+              form={form}
               idx={idx}
-              updateQuestion={updateQuestion}
+              q={q}
+              onDelete={() => handleDeleteQuestion(idx)}
               mediaPreview={mediaPreviews[idx]}
               mediaFile={mediaFiles[idx] ?? null}
               onMediaChange={handleMediaChange}
+              uploading={mediaUploading[idx]}
+              uploadError={mediaErrors[idx]}
             />
           ))}
-        </Stack>
+        </SimpleGrid>
       </Box>
     </Modal>
   );

@@ -12,7 +12,15 @@ import {
 import authRoute from './authRoute';
 import type { NavGroup, Routes } from '@/@types/routes';
 
-export const publicRoutes: Routes = [...authRoute];
+export const publicRoutes: Routes = [
+  ...authRoute,
+  {
+    key: 'reset-password',
+    path: '/reset-password',
+    component: lazy(() => import('@/pages/auth/ResetPassword/ResetPassword')),
+    authority: ['user', 'admin', 'teacher'],
+  },
+];
 
 export const navGroups: NavGroup[] = [
   {
@@ -175,12 +183,6 @@ export const protectedRoutes: Routes = [
     path: '/exam-sessions',
     component: lazy(() => import('@/pages/main/Exam/ExamSessions')),
     authority: ['admin', 'teacher'],
-    nav: {
-      labelKey: 'nav.exam_sessions',
-      position: 'main',
-      icon: IconClipboardList,
-      order: 3,
-    },
   },
   {
     key: 'question-bank',
@@ -222,7 +224,7 @@ export const protectedRoutes: Routes = [
     key: 'proctoring-detail',
     path: '/proctoring/:examId',
     component: lazy(() => import('@/pages/main/Proctoring/ProctoringDashboard')),
-    authority: ['admin'],
+    authority: ['admin', 'teacher'],
   },
   {
     key: 'password-reset-management',

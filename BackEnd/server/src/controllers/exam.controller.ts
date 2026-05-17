@@ -1,7 +1,10 @@
+import fs from "fs";
+import path from "path";
 import { Request, Response, NextFunction } from "express";
 import {
   listExams,
   listExamsByClass,
+  listExamsByAdminClass,
   getExam,
   createExamService,
   updateExamService,
@@ -24,8 +27,12 @@ import {
   persistIntegrityEventsService,
   persistAutosaveSnapshotService,
   createExamWithQuestionsService,
+  getSessionReview,
 } from "~/services/exam.service";
 import { parseExamImportDocx, aiRecomposeExam } from "~/services/examImport.service";
+import { getIntegrityEventsByExam } from "~/models/examIntegrity.model";
+import { getActivePresenceByExam, getProctorLogsByExam } from "~/models/examProctor.model";
+import { getSessionsByExamWithStudent } from "~/models/examsession.model";
 import { uploadMediaBuffer } from "~/services/cloudinary.service";
 import { emitForceSubmitNotification, startExamRuntimeFromServer } from "~/socket/examSocket";
 import { auditGradeSession, auditForceSubmit } from "~/services/auditHelpers";
@@ -33,10 +40,12 @@ import type { QuestionType } from "~/models/question.model";
 
 export const getExamListController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { class_id } = req.query;
-    const data = class_id
-      ? await listExamsByClass(String(class_id))
-      : await listExams();
+    const { class_id, admin_class_id } = req.query;
+    const data = admin_class_id
+      ? await listExamsByAdminClass(String(admin_class_id))
+      : class_id
+        ? await listExamsByClass(String(class_id))
+        : await listExams();
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -55,20 +64,47 @@ export const getExamController = async (req: Request, res: Response, next: NextF
 
 export const createExamController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, class_id, duration_min, description, closes_at } = req.body;
-    if (!title || !class_id || !duration_min) {
-      return res.status(400).json({ success: false, message: "title/class_id/duration_min là bắt buộc" });
+    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, num_versions } =
+      req.body;
+    if (!title || !admin_class_id || !subject_id || !duration_min) {
+      return res.status(400).json({
+        success: false,
+        message: "title/admin_class_id/subject_id/duration_min là bắt buộc",
+      });
     }
     const user = (req as any).user;
     const exam = await createExamService(
       title,
-      class_id,
       user.userId,
       Number(duration_min),
+      { admin_class_id, subject_id, class_id },
+      user.role,
       description,
-      closes_at
+      closes_at,
+      num_versions ? Number(num_versions) : 2
     );
     res.status(201).json({ success: true, data: exam });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const WORD_IMPORT_TEMPLATE_PATH = path.join(
+  process.cwd(),
+  "..",
+  "exam_template_GiaoVien.docx"
+);
+
+export const downloadWordImportTemplateController = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!fs.existsSync(WORD_IMPORT_TEMPLATE_PATH)) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy file mẫu đề Word" });
+    }
+    res.download(WORD_IMPORT_TEMPLATE_PATH, "exam_template_GiaoVien.docx");
   } catch (err) {
     next(err);
   }
@@ -98,15 +134,20 @@ export const commitWordImportController = async (
 ) => {
   try {
     const user = (req as any).user;
-    const { title, class_id, duration_min, description, closes_at, questions } = req.body;
+    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, num_versions, questions } =
+      req.body;
     const data = await createExamWithQuestionsService({
       title,
+      admin_class_id,
+      subject_id,
       class_id,
       duration_min: Number(duration_min),
       description,
       closes_at,
+      num_versions: num_versions ? Number(num_versions) : 2,
       questions,
       created_by: user.userId,
+      role: user.role,
     });
     res.status(201).json({ success: true, data });
   } catch (err) {
@@ -201,7 +242,7 @@ export const getQuestionsController = async (req: Request, res: Response, next: 
 
 export const addQuestionController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { content, options, correct_answer, points, question_type, media_url } = req.body;
+    const { content, options, correct_answer, points, question_type, media_url, version_index } = req.body;
     if (!content || points === undefined || points === null) {
       return res.status(400).json({ success: false, message: "content và points là bắt buộc" });
     }
@@ -216,7 +257,9 @@ export const addQuestionController = async (req: Request, res: Response, next: N
       qt,
       options ?? null,
       correct_answer ?? null,
-      media_url ?? null
+      media_url ?? null,
+      undefined,
+      version_index != null ? Number(version_index) : 0
     );
     res.status(201).json({ success: true, data: q });
   } catch (err) {
@@ -297,7 +340,7 @@ export const getMySessionsController = async (req: Request, res: Response, next:
 
 export const getExamSessionsController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await getExamSessions(req.params.examId);
+    const data = await getSessionsByExamWithStudent(req.params.examId);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -349,6 +392,16 @@ export const getSessionGradingController = async (req: Request, res: Response, n
   try {
     const user = (req as any).user;
     const data = await getSessionGradingView(req.params.sessionId, user.userId, user.role);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getSessionReviewController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    const data = await getSessionReview(req.params.sessionId, user.userId);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -427,6 +480,49 @@ export const postAutosaveController = async (
     });
 
     res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---- Task 2: Proctoring endpoints for teacher/admin ----
+
+export const getIntegrityEventsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const events = await getIntegrityEventsByExam(req.params.examId);
+    res.json({ success: true, data: events });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getProctorPresenceController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const presence = await getActivePresenceByExam(req.params.examId);
+    res.json({ success: true, data: presence });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getProctorLogsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 500;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    const logs = await getProctorLogsByExam(req.params.examId, { limit, offset });
+    res.json({ success: true, data: logs });
   } catch (err) {
     next(err);
   }

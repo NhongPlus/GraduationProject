@@ -1,6 +1,7 @@
 import {
   getAllExams,
   getExamsByClass,
+  getExamsByAdminClass,
   getExamById,
   createExam,
   updateExam,
@@ -8,6 +9,8 @@ import {
   Exam,
   ExamDetail,
 } from "~/models/exam.model";
+import { getAdminClassById } from "~/models/adminClass.model";
+import { getSubjectById } from "~/models/subject.model";
 import {
   getPublicQuestionsByExam,
   getQuestionsByExam,
@@ -50,11 +53,15 @@ import {
   IntegrityEventType,
 } from "~/models/examIntegrity.model";
 import {
+  getRuntimeStateByExam,
+} from "~/models/examRuntimeState.model";
+import {
   AutosaveAnswers,
   getLatestAutosaveSnapshotBySession,
   upsertAutosaveSnapshot,
 } from "~/models/examAutosave.model";
 import pool from "~/config/db";
+import { createNotification } from "~/models/userNotification.model";
 import {
   isMalformedClosesAt,
   isPastClosesAt,
@@ -71,19 +78,52 @@ export function httpError(status: number, message: string): Error & { status: nu
 export const listExams = async (): Promise<ExamDetail[]> => getAllExams();
 export const listExamsByClass = async (classId: string): Promise<Exam[]> =>
   getExamsByClass(classId);
+export const listExamsByAdminClass = async (adminClassId: string): Promise<Exam[]> =>
+  getExamsByAdminClass(adminClassId);
 export const getExam = async (id: string): Promise<ExamDetail | null> => getExamById(id);
+
+export interface CreateExamScope {
+  admin_class_id: string;
+  subject_id: string;
+  class_id?: string | null;
+}
+
+async function assertExamScope(
+  scope: CreateExamScope,
+  userId: string,
+  role: string
+): Promise<CreateExamScope> {
+  const adminClass = await getAdminClassById(scope.admin_class_id);
+  if (!adminClass) throw httpError(404, "Không tìm thấy lớp hành chính");
+  if (role === "teacher" && adminClass.manager_teacher_id !== userId) {
+    throw httpError(403, "Bạn không quản lý lớp này");
+  }
+  const subject = await getSubjectById(scope.subject_id);
+  if (!subject) throw httpError(404, "Không tìm thấy môn học");
+  return scope;
+}
 
 export const createExamService = async (
   title: string,
-  classId: string,
   createdBy: string,
   durationMin: number,
+  scope: CreateExamScope,
+  role: string,
   description?: string,
-  closesAt?: string | null
+  closesAt?: string | null,
+  numVersions?: number
 ): Promise<Exam> => {
   if (isMalformedClosesAt(closesAt)) throw httpError(400, "closes_at không hợp lệ");
   const normalized = normalizeClosesAtInput(closesAt);
-  return createExam(title, classId, createdBy, durationMin, description, normalized);
+  const validated = await assertExamScope(scope, createdBy, role);
+  return createExam(title, createdBy, durationMin, {
+    description,
+    closesAt: normalized,
+    adminClassId: validated.admin_class_id,
+    subjectId: validated.subject_id,
+    classId: validated.class_id ?? null,
+    numVersions,
+  });
 };
 
 export const updateExamService = async (
@@ -93,9 +133,10 @@ export const updateExamService = async (
     description?: string | null;
     duration_min?: number;
     closes_at?: string | null;
+    num_versions?: number;
   }
 ): Promise<Exam | null> => {
-  const fields: Partial<Pick<Exam, "title" | "description" | "duration_min" | "closes_at">> = {};
+  const fields: Partial<Pick<Exam, "title" | "description" | "duration_min" | "closes_at" | "num_versions">> = {};
 
   if (payload.title !== undefined) {
     const title = payload.title.trim();
@@ -115,6 +156,13 @@ export const updateExamService = async (
   if (payload.closes_at !== undefined) {
     if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
     fields.closes_at = normalizeClosesAtInput(payload.closes_at);
+  }
+  if (payload.num_versions !== undefined) {
+    const n = Number(payload.num_versions);
+    if (!Number.isFinite(n) || n < 1 || n > 4) {
+      throw httpError(400, "num_versions phải từ 1 đến 4");
+    }
+    fields.num_versions = Math.floor(n);
   }
 
   return updateExam(id, fields);
@@ -136,7 +184,8 @@ export const addQuestion = async (
   options?: Record<string, string> | null,
   correctAnswer?: string | string[] | null,
   mediaUrl?: string | null,
-  displayOrder?: number
+  displayOrder?: number,
+  versionIndex?: number
 ): Promise<Question> => {
   if (questionType === "mcq") {
     if (!options || Object.keys(options).length === 0) {
@@ -154,7 +203,8 @@ export const addQuestion = async (
     options ?? null,
     correctAnswer ?? null,
     mediaUrl ?? null,
-    displayOrder
+    displayOrder,
+    versionIndex ?? 0
   );
 };
 
@@ -197,9 +247,13 @@ export const updateQuestionInExam = async (
 
 export interface CreateExamWithQuestionsPayload {
   title: string;
-  class_id: string;
+  admin_class_id: string;
+  subject_id: string;
+  class_id?: string | null;
   created_by: string;
+  role: string;
   duration_min: number;
+  num_versions?: number;
   description?: string | null;
   closes_at?: string | null;
   questions: ImportedQuestionDraft[];
@@ -228,7 +282,18 @@ export const createExamWithQuestionsService = async (
   payload: CreateExamWithQuestionsPayload
 ): Promise<{ exam: Exam; questions: Question[] }> => {
   if (!payload.title?.trim()) throw httpError(400, "title không hợp lệ");
-  if (!payload.class_id) throw httpError(400, "class_id là bắt buộc");
+  if (!payload.admin_class_id || !payload.subject_id) {
+    throw httpError(400, "admin_class_id và subject_id là bắt buộc");
+  }
+  const scope = await assertExamScope(
+    {
+      admin_class_id: payload.admin_class_id,
+      subject_id: payload.subject_id,
+      class_id: payload.class_id,
+    },
+    payload.created_by,
+    payload.role
+  );
   if (!Number.isFinite(payload.duration_min) || payload.duration_min <= 0 || payload.duration_min > 300) {
     throw httpError(400, "duration_min phải từ 1 đến 300 phút");
   }
@@ -237,19 +302,29 @@ export const createExamWithQuestionsService = async (
     throw httpError(400, "questions là mảng bắt buộc");
   }
   payload.questions.forEach(validateQuestionDraft);
+  const numVersions = payload.num_versions ?? 2;
+  for (let v = 0; v < numVersions; v += 1) {
+    const count = payload.questions.filter((q) => (q.version_index ?? 0) === v).length;
+    if (count === 0) {
+      throw httpError(400, `Mã đề D${String(v + 1).padStart(2, "0")} chưa có câu hỏi — cần import file Word riêng cho từng đề`);
+    }
+  }
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const examResult = await client.query(
-      `INSERT INTO exams (title, description, class_id, created_by, duration_min, closes_at)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO exams (title, description, class_id, admin_class_id, subject_id, created_by, duration_min, num_versions, closes_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
         payload.title.trim(),
         payload.description ?? null,
-        payload.class_id,
+        scope.class_id ?? null,
+        scope.admin_class_id,
+        scope.subject_id,
         payload.created_by,
         Math.floor(payload.duration_min),
+        numVersions,
         normalizeClosesAtInput(payload.closes_at),
       ]
     );
@@ -269,9 +344,10 @@ export const createExamWithQuestionsService = async (
           ? (q as { media_url: string }).media_url
           : null) ??
         null;
+      const versionIndex = Math.max(0, Math.min(3, Number(q.version_index ?? 0)));
       const questionResult = await client.query(
-        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           exam.id,
           q.content.trim(),
@@ -281,6 +357,7 @@ export const createExamWithQuestionsService = async (
           mediaUrl,
           q.points,
           q.display_order || i + 1,
+          versionIndex,
         ]
       );
       const row = questionResult.rows[0];
@@ -294,6 +371,8 @@ export const createExamWithQuestionsService = async (
         media_url: row.media_url ?? null,
         points: Number(row.points),
         display_order: Number(row.display_order ?? i + 1),
+        version_index: Number(row.version_index ?? 0),
+        explanation: null,
         created_at: row.created_at,
       });
     }
@@ -335,6 +414,12 @@ export interface StartSessionPayload {
     points: number;
     media_url: string | null;
   }>;
+  /** null if exam has not been started by teacher yet */
+  runtime_state: {
+    started_at: string;
+    ends_at: string;
+    is_active: boolean;
+  } | null;
 }
 
 export const startSessionWithMeta = async (
@@ -354,8 +439,13 @@ export const startSessionWithMeta = async (
   const versions = await getVersionsByExam(examId);
   if (versions.length === 0) throw httpError(500, "Không có mã đề cho kỳ thi này");
 
-  // Deterministic assignment based on studentId
-  const versionIdx = assignVersionIndex(studentId, versions.length);
+  // Round-robin assignment based on existing session count for this exam
+  const sessionCountResult = await pool.query(
+    `SELECT COUNT(*)::int AS cnt FROM exam_sessions WHERE exam_id = $1`,
+    [examId]
+  );
+  const sessionCount = Number(sessionCountResult.rows[0]?.cnt ?? 0);
+  const versionIdx = sessionCount % versions.length;
   const version = versions[versionIdx];
 
   // Create or reuse session (update version if already exists)
@@ -400,6 +490,9 @@ export const startSessionWithMeta = async (
     media_url: q.media_url ?? null,
   }));
 
+  // Check if exam has been started (runtime state exists)
+  const runtimeState = await getRuntimeStateByExam(examId);
+
   return {
     session,
     deadline_at: new Date(deadline).toISOString(),
@@ -407,6 +500,13 @@ export const startSessionWithMeta = async (
     version_code: version.version_code,
     version_id: version.id,
     questions: shuffledPayload,
+    runtime_state: runtimeState && runtimeState.is_active
+      ? {
+          started_at: runtimeState.started_at,
+          ends_at: runtimeState.ends_at,
+          is_active: true,
+        }
+      : null,
   };
 };
 
@@ -418,24 +518,33 @@ async function ensureVersionPool(examId: string): Promise<void> {
   const existing = await getVersionsByExam(examId);
   if (existing.length > 0) return; // already generated
 
+  const exam = await getExamById(examId);
+  if (!exam) return;
+
   const questions = await getQuestionsByExam(examId);
   if (questions.length === 0) return;
 
-  const questionIds = questions.map((q) => q.id);
-  const questionOptions: Record<string, Record<string, string>> = {};
-  for (const q of questions) {
-    if (q.options) {
-      questionOptions[q.id] = { ...q.options };
-    } else {
-      questionOptions[q.id] = { A: "A", B: "B", C: "C", D: "D" };
+  const numVersions = exam.num_versions ?? 2;
+
+  for (let v = 0; v < numVersions; v += 1) {
+    const versionQuestions = questions.filter((q) => (q.version_index ?? 0) === v);
+    if (versionQuestions.length === 0) continue;
+
+    const questionIds = versionQuestions.map((q) => q.id);
+    const questionOptions: Record<string, Record<string, string>> = {};
+    for (const q of versionQuestions) {
+      if (q.options) {
+        questionOptions[q.id] = { ...q.options };
+      } else {
+        questionOptions[q.id] = { A: "A", B: "B", C: "C", D: "D" };
+      }
     }
-  }
 
-  const DEFAULT_NUM_VERSIONS = 4;
-  const pool = generateVersionPool(questionIds, questionOptions, DEFAULT_NUM_VERSIONS);
-
-  for (const v of pool) {
-    await createVersion(examId, v.versionCode, v.versionIndex, v.questionOrder, v.optionMaps);
+    // Một lần xáo câu + đáp án cho toàn bộ SV cùng mã đề (D01, D02, …)
+    const pool = generateVersionPool(questionIds, questionOptions, 1);
+    const shuffled = pool[0];
+    const versionCode = `D${String(v + 1).padStart(2, "0")}`;
+    await createVersion(examId, versionCode, v, shuffled.questionOrder, shuffled.optionMaps);
   }
 }
 
@@ -769,6 +878,35 @@ export const submitSessionService = async (
 
   if (!updated) throw httpError(409, "Không thể nộp bài (phiên không còn active)");
 
+  // Notify student of result (auto-grade: no essay)
+  if (gradingStatus === "complete" && updated.student_id) {
+    const examRow = await pool.query(
+      `SELECT e.title FROM exams e WHERE e.id = (SELECT exam_id FROM exam_sessions WHERE id = $1)`,
+      [sessionId]
+    );
+    const examTitle = examRow.rows[0]?.title ?? "Bài thi";
+    const submittedAt = new Date().toLocaleString("vi-VN");
+    void createNotification(
+      updated.student_id,
+      "[Kết quả] Điểm đã có",
+      `Bài thi "${examTitle}" — Điểm: ${score}/${totalPoints} — Đã nộp lúc ${submittedAt}`,
+      "success"
+    ).catch(() => { /* non-critical */ });
+  } else if (gradingStatus === "pending_manual" && updated.student_id) {
+    // Has essay — notify pending grading
+    const examRow = await pool.query(
+      `SELECT e.title FROM exams e WHERE e.id = (SELECT exam_id FROM exam_sessions WHERE id = $1)`,
+      [sessionId]
+    );
+    const examTitle = examRow.rows[0]?.title ?? "Bài thi";
+    void createNotification(
+      updated.student_id,
+      "[Thông báo] Bài đã được nộp",
+      `Bài thi "${examTitle}" đã được nộp. Đang chờ giáo viên chấm điểm tự luận.`,
+      "info"
+    ).catch(() => { /* non-critical */ });
+  }
+
   const studentDetails = gradedRows.map((d) => ({
     question_id: d.question_id,
     question_type: d.question_type,
@@ -784,7 +922,7 @@ export const submitSessionService = async (
     score,
     total_points: totalPoints,
     correct_count: correctCount,
-    total_questions: allQuestions.length,
+    total_questions: questionOrder.length,
     grading_status: gradingStatus,
     details: studentDetails,
   };
@@ -822,6 +960,74 @@ export const getMySubmissionForExam = async (
   };
 };
 
+export interface ReviewDetailRow {
+  question_id: string;
+  question_type: QuestionType;
+  content: string;
+  options: Record<string, string> | null;
+  explanation: string | null;
+  submitted: string | string[] | null;
+  correct: string | string[] | null;
+  is_correct: boolean;
+  points_earned: number | null;
+  max_points: number;
+  pending_grading?: boolean;
+  teacher_comment?: string | null;
+}
+
+export interface SessionReviewPayload {
+  session: ExamSession;
+  exam: ExamDetail;
+  score: number | null;
+  max_points: number | null;
+  grading_status: GradingStatus | null;
+  questions: ReviewDetailRow[];
+}
+
+export const getSessionReview = async (
+  sessionId: string,
+  studentId: string
+): Promise<SessionReviewPayload> => {
+  const session = await getSessionById(sessionId);
+  if (!session) throw httpError(404, "Không tìm thấy phiên thi");
+  if (session.student_id !== studentId) throw httpError(403, "Không có quyền xem bài này");
+  if (session.status === "active") throw httpError(400, "Phiên thi chưa kết thúc");
+
+  const exam = await getExamById(session.exam_id);
+  if (!exam) throw httpError(404, "Không tìm thấy bài thi");
+
+  const allQuestions = await getQuestionsByExam(session.exam_id);
+  const gradedDetails = parseGradedDetails(session.graded_details);
+
+  // Build review with explanations
+  const reviewQuestions: ReviewDetailRow[] = allQuestions.map((q) => {
+    const detail = gradedDetails.find((d) => d.question_id === q.id);
+    return {
+      question_id: q.id,
+      question_type: q.question_type,
+      content: q.content,
+      options: q.options,
+      explanation: q.explanation ?? null,
+      submitted: detail?.submitted ?? null,
+      correct: q.question_type === "mcq" ? q.correct_answer : null,
+      is_correct: detail?.is_correct ?? false,
+      points_earned: detail?.points_earned ?? null,
+      max_points: Number(q.points),
+      pending_grading: detail?.pending_grading,
+      teacher_comment: detail?.teacher_comment ?? null,
+    };
+  });
+
+  return {
+    session,
+    exam,
+    score: session.score != null ? Number(session.score) : null,
+    max_points: session.max_points != null ? Number(session.max_points) : null,
+    grading_status: session.grading_status,
+    questions: reviewQuestions,
+  };
+};
+
 export interface GradingViewPayload {
   session: ExamSession;
   exam: ExamDetail;
@@ -849,7 +1055,10 @@ export const getSessionGradingView = async (
   const exam = await getExamById(meta.exam_id);
   if (!exam) throw httpError(404, "Không tìm thấy đề");
 
-  const questions = await getQuestionsByExam(meta.exam_id);
+  const allQuestions = await getQuestionsByExam(meta.exam_id);
+  const gradedDetails = parseGradedDetails(meta.graded_details);
+  const gradedIds = new Set(gradedDetails.map((d) => d.question_id));
+  const questions = allQuestions.filter((q) => gradedIds.has(q.id));
   const acc = await pool.query("SELECT full_name, email FROM accounts WHERE id = $1", [
     meta.student_id,
   ]);
@@ -860,7 +1069,7 @@ export const getSessionGradingView = async (
     exam,
     student: { full_name: studentRow.full_name ?? null, email: studentRow.email ?? null },
     questions,
-    graded_details: parseGradedDetails(meta.graded_details),
+    graded_details: gradedDetails,
     version_code: (meta as any).version_code ?? null,
     version_id: (meta as any).version_id ?? null,
   };
@@ -1075,7 +1284,7 @@ export const getExamProctoringData = async (examId: string): Promise<ExamProctor
       violation_count: sessEvents.length,
       violations: sessEvents.map((ev) => ({
         event_type: ev.event_type,
-        event_at: ev.event_at,
+        event_at: ev.client_at,
         details: ev.details,
       })),
     };

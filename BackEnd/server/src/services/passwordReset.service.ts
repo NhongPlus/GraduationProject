@@ -11,7 +11,8 @@ import { getUserById } from "~/models/user.model";
 import { createNotification } from "~/models/userNotification.model";
 import pool from "~/config/db";
 import bcrypt from "bcrypt";
-import { sendMail, isMailConfigured } from "./mail.service";
+import { sendEmail, sendPasswordReset } from "./email.service";
+import { isEmailConfigured } from "./email.service";
 
 export const requestPasswordReset = async (
   userId: string,
@@ -67,14 +68,10 @@ export const approveResetRequest = async (
   await updateResetRequestStatus(requestId, "approved", approverId, adminNote, tempPassword);
 
   // Gửi email cho sinh viên nếu SMTP đã cấu hình
-  if (isMailConfigured()) {
+  if (isEmailConfigured()) {
     const user = await getUserById(request.user_id);
     if (user?.email) {
-      await sendMail({
-        to: user.email,
-        subject: "Yêu cầu đặt lại mật khẩu đã được duyệt",
-        text: `Xin chào ${user.full_name || user.username},\n\nMật khẩu tạm thời của bạn là: ${tempPassword}\n\nVui lòng đăng nhập và đổi mật khẩu ngay sau khi đăng nhập thành công.\n\nTrân trọng,\nBan quản trị hệ thống thi trực tuyến.`,
-      }).catch(() => {
+      await sendPasswordReset(user.email, tempPassword, user.full_name ?? undefined).catch(() => {
         // Không throw lỗi email để không ảnh hưởng đến flow chính
       });
     }

@@ -5,279 +5,811 @@
     "total_subjects": 52,
     "academic_year": "2016-2020",
     "scale": 10,
-    "description": "Bảng điểm toàn khóa lớp CNTT 16-02, dùng để huấn luyện mô hình dự đoán điểm học phần"
+    "description": "Bảng điểm toàn khóa lớp CNTT 16-02, dùng để huấn luyện mô hình dự đoán điểm học phần",
+    "subject_taxonomy_version": "2026-05-15",
+    "subject_clusters": {
+      "skills_support": {
+        "label": "Khối kỹ năng / thể chất / hỗ trợ",
+        "subjects": [
+          {
+            "id": "S01",
+            "name": "Lý luận và phương pháp Giáo dục thể chất 1",
+            "sub_category": "pe",
+            "code": "PE001",
+            "credits": 1.0
+          },
+          {
+            "id": "S02",
+            "name": "Võ (Cơ bản)",
+            "sub_category": "pe",
+            "code": "PE002",
+            "credits": 1.0
+          },
+          {
+            "id": "S03",
+            "name": "Yoga (Cơ bản)",
+            "sub_category": "pe",
+            "code": "PE003",
+            "credits": 1.0
+          },
+          {
+            "id": "S04",
+            "name": "Zumba(Cơ bản)",
+            "sub_category": "pe",
+            "code": "PE004",
+            "credits": 1.0
+          },
+          {
+            "id": "S05",
+            "name": "Zumba(Nâng cao)",
+            "sub_category": "pe",
+            "code": "PE005",
+            "credits": 1.0
+          },
+          {
+            "id": "S08",
+            "name": "Kỹ năng mềm cơ bản",
+            "sub_category": "soft_skills",
+            "code": "SKL001",
+            "credits": 2.0
+          },
+          {
+            "id": "S18",
+            "name": "Hệ thống thông tin địa lý",
+            "sub_category": "geo",
+            "code": "GIS001",
+            "credits": 2.0
+          },
+          {
+            "id": "S30",
+            "name": "Kỹ năng mềm nâng cao",
+            "sub_category": "soft_skills",
+            "code": "SKL002",
+            "credits": 3.0
+          },
+          {
+            "id": "S48",
+            "name": "An toàn, bảo mật thông tin",
+            "sub_category": "security",
+            "code": "SEC001",
+            "credits": 2.0
+          },
+          {
+            "id": "S49",
+            "name": "Chuyển đổi số",
+            "sub_category": "digital",
+            "code": "DS801",
+            "credits": 2.0
+          },
+          {
+            "id": "S51",
+            "name": "Ứng dụng Công nghệ thông tin trong doanh nghiệp",
+            "sub_category": "it_business",
+            "code": "IT001",
+            "credits": 3.0
+          }
+        ]
+      },
+      "internship": {
+        "label": "Khối thực tập / đồ án",
+        "subjects": [
+          {
+            "id": "S06",
+            "name": "Thực tập tốt nghiệp",
+            "sub_category": "capstone",
+            "code": "INT001",
+            "credits": 4.0
+          },
+          {
+            "id": "S12",
+            "name": "Thực tập CNTT1: Hệ thống máy tính",
+            "sub_category": "cntt1",
+            "code": "CS101",
+            "credits": 4.0
+          },
+          {
+            "id": "S19",
+            "name": "Thực tập CNTT2: Thiết kế web và triển khai hệ thống phần mềm",
+            "sub_category": "cntt2",
+            "code": "CS102",
+            "credits": 4.0
+          },
+          {
+            "id": "S25",
+            "name": "Thực tập CNTT3: Thiết kế, lập trình Front-End",
+            "sub_category": "cntt3",
+            "code": "CS103",
+            "credits": 4.0
+          },
+          {
+            "id": "S44",
+            "name": "Thực tập CNTT5: Triển khai ứng dụng AI, IoT",
+            "sub_category": "cntt5",
+            "code": "CS105",
+            "credits": 4.0
+          },
+          {
+            "id": "S47",
+            "name": "Thực tập CNTT6: Cài đặt, cấu hình máy chủ, mạng, triển khai ứng dụng",
+            "sub_category": "cntt6",
+            "code": "CS106",
+            "credits": 4.0
+          }
+        ]
+      },
+      "general_ed": {
+        "label": "Khối đại cương bắt buộc",
+        "subjects": [
+          {
+            "id": "S07",
+            "name": "Pháp luật đại cương",
+            "sub_category": "law",
+            "code": "LAW001",
+            "credits": 3.0
+          },
+          {
+            "id": "S13",
+            "name": "Triết học Mác - Lênin",
+            "sub_category": "philosophy",
+            "code": "PHI001",
+            "credits": 3.0
+          },
+          {
+            "id": "S14",
+            "name": "Kinh tế chính trị Mác - Lênin",
+            "sub_category": "politics",
+            "code": "PHI002",
+            "credits": 2.0
+          },
+          {
+            "id": "S26",
+            "name": "Giáo dục quốc phòng P1",
+            "sub_category": "national_defense",
+            "code": "ND001",
+            "credits": 3.0
+          },
+          {
+            "id": "S27",
+            "name": "Giáo dục quốc phòng P2",
+            "sub_category": "national_defense",
+            "code": "ND002",
+            "credits": 2.0
+          },
+          {
+            "id": "S28",
+            "name": "Giáo dục quốc phòng P3",
+            "sub_category": "national_defense",
+            "code": "ND003",
+            "credits": 2.0
+          },
+          {
+            "id": "S29",
+            "name": "Giáo dục quốc phòng P4",
+            "sub_category": "national_defense",
+            "code": "ND004",
+            "credits": 4.0
+          },
+          {
+            "id": "S35",
+            "name": "Chủ nghĩa xã hội khoa học",
+            "sub_category": "politics",
+            "code": "PHI003",
+            "credits": 2.0
+          },
+          {
+            "id": "S40",
+            "name": "Tư tưởng Hồ Chí Minh",
+            "sub_category": "philosophy",
+            "code": "PHI004",
+            "credits": 2.0
+          },
+          {
+            "id": "S45",
+            "name": "Lịch sử Đảng Cộng sản Việt Nam",
+            "sub_category": "history",
+            "code": "HIS001",
+            "credits": 2.0
+          }
+        ]
+      },
+      "foundation": {
+        "label": "Khối nền tảng",
+        "subjects": [
+          {
+            "id": "S09",
+            "name": "Đại số tuyến tính, tối ưu",
+            "sub_category": "math",
+            "code": "MATH001",
+            "credits": 2.0
+          },
+          {
+            "id": "S10",
+            "name": "Nhập môn công nghệ thông tin",
+            "sub_category": "intro",
+            "code": "CS001",
+            "credits": 3.0
+          },
+          {
+            "id": "S11",
+            "name": "Lập trình cơ bản",
+            "sub_category": "programming",
+            "code": "CS111",
+            "credits": 3.0
+          },
+          {
+            "id": "S15",
+            "name": "Tiếng Anh P1",
+            "sub_category": "english",
+            "code": "ENG101",
+            "credits": 4.0
+          },
+          {
+            "id": "S16",
+            "name": "Toán giải tích",
+            "sub_category": "math",
+            "code": "MATH101",
+            "credits": 3.0
+          },
+          {
+            "id": "S17",
+            "name": "Xác suất thống kê và phân tích dữ liệu",
+            "sub_category": "math",
+            "code": "STAT001",
+            "credits": 4.0
+          },
+          {
+            "id": "S20",
+            "name": "Tiếng Anh P2",
+            "sub_category": "english",
+            "code": "ENG102",
+            "credits": 4.0
+          },
+          {
+            "id": "S21",
+            "name": "Toán rời rạc",
+            "sub_category": "math",
+            "code": "MATH201",
+            "credits": 3.0
+          },
+          {
+            "id": "S22",
+            "name": "Cấu trúc dữ liệu và giải thuật",
+            "sub_category": "programming",
+            "code": "CS201",
+            "credits": 3.0
+          },
+          {
+            "id": "S23",
+            "name": "Mạng máy tính",
+            "sub_category": "network",
+            "code": "NET301",
+            "credits": 2.0
+          },
+          {
+            "id": "S24",
+            "name": "Lập trình hướng đối tượng",
+            "sub_category": "programming",
+            "code": "CS202",
+            "credits": 3.0
+          },
+          {
+            "id": "S31",
+            "name": "Tiếng Anh P3",
+            "sub_category": "english",
+            "code": "ENG103",
+            "credits": 4.0
+          },
+          {
+            "id": "S32",
+            "name": "Lý thuyết, thiết kế cơ sở dữ liệu",
+            "sub_category": "database",
+            "code": "DB001",
+            "credits": 3.0
+          },
+          {
+            "id": "S33",
+            "name": "Lập trình IoT",
+            "sub_category": "iot",
+            "code": "CS331",
+            "credits": 2.0
+          },
+          {
+            "id": "S36",
+            "name": "Tiếng Anh P4",
+            "sub_category": "english",
+            "code": "ENG104",
+            "credits": 3.0
+          },
+          {
+            "id": "S37",
+            "name": "Phân tích, thiết kế hệ thống thông tin",
+            "sub_category": "systems",
+            "code": "SA001",
+            "credits": 3.0
+          },
+          {
+            "id": "S46",
+            "name": "Tiếng Anh P5",
+            "sub_category": "english",
+            "code": "ENG105",
+            "credits": 2.0
+          },
+          {
+            "id": "S50",
+            "name": "Lập trình mạng",
+            "sub_category": "network",
+            "code": "NET801",
+            "credits": 3.0
+          }
+        ]
+      },
+      "ai_ml": {
+        "label": "Khối AI/ML",
+        "subjects": [
+          {
+            "id": "S34",
+            "name": "Trí tuệ nhân tạo",
+            "sub_category": "ai",
+            "code": "AI401",
+            "credits": 2.0
+          },
+          {
+            "id": "S38",
+            "name": "Học máy",
+            "sub_category": "ml",
+            "code": "ML501",
+            "credits": 2.0
+          },
+          {
+            "id": "S39",
+            "name": "Công nghệ dữ liệu",
+            "sub_category": "data_eng",
+            "code": "DT501",
+            "credits": 2.0
+          },
+          {
+            "id": "S43",
+            "name": "Dữ liệu lớn",
+            "sub_category": "big_data",
+            "code": "BD601",
+            "credits": 2.0
+          }
+        ]
+      },
+      "software_eng": {
+        "label": "Khối Software Engineering",
+        "subjects": [
+          {
+            "id": "S41",
+            "name": "Công nghệ phần mềm",
+            "sub_category": "se",
+            "code": "SE601",
+            "credits": 3.0
+          },
+          {
+            "id": "S42",
+            "name": "Lập trình mobile",
+            "sub_category": "mobile",
+            "code": "CS621",
+            "credits": 3.0
+          },
+          {
+            "id": "S52",
+            "name": "Kiểm thử phần mềm",
+            "sub_category": "testing",
+            "code": "SE802",
+            "credits": 2.0
+          }
+        ]
+      }
+    },
+    "total_credits": 138.0,
+    "graduation_credit_target": 120,
+    "notes": "category = 6 khối lớn; sub_category = nhóm con. Sơ đồ & luồng: docs/DOMAIN_MODEL.md"
   },
   "subjects": [
     {
       "name": "Lý luận và phương pháp Giáo dục thể chất 1",
       "credits": 1.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S01"
+      "id": "S01",
+      "category_legacy": "general",
+      "sub_category": "pe",
+      "code": "PE001",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Võ (Cơ bản)",
       "credits": 1.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S02"
+      "id": "S02",
+      "category_legacy": "general",
+      "sub_category": "pe",
+      "code": "PE002",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Yoga (Cơ bản)",
       "credits": 1.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S03"
+      "id": "S03",
+      "category_legacy": "general",
+      "sub_category": "pe",
+      "code": "PE003",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Zumba(Cơ bản)",
       "credits": 1.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S04"
+      "id": "S04",
+      "category_legacy": "general",
+      "sub_category": "pe",
+      "code": "PE004",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Zumba(Nâng cao)",
       "credits": 1.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S05"
+      "id": "S05",
+      "category_legacy": "general",
+      "sub_category": "pe",
+      "code": "PE005",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Thực tập tốt nghiệp",
       "credits": 4.0,
       "semester": 0,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S06"
+      "id": "S06",
+      "category_legacy": "general",
+      "sub_category": "capstone",
+      "code": "INT001",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "Pháp luật đại cương",
       "credits": 3.0,
       "semester": 1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S07"
+      "id": "S07",
+      "category_legacy": "general",
+      "sub_category": "law",
+      "code": "LAW001",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Kỹ năng mềm cơ bản",
       "credits": 2.0,
       "semester": 1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S08"
+      "id": "S08",
+      "category_legacy": "general",
+      "sub_category": "soft_skills",
+      "code": "SKL001",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Đại số tuyến tính, tối ưu",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S09"
+      "id": "S09",
+      "category_legacy": "general",
+      "sub_category": "math",
+      "code": "MATH001",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Nhập môn công nghệ thông tin",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S10"
+      "id": "S10",
+      "category_legacy": "general",
+      "sub_category": "intro",
+      "code": "CS001",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Lập trình cơ bản",
       "credits": 3.0,
       "semester": 1,
-      "category": "programming",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S11"
+      "id": "S11",
+      "category_legacy": "programming",
+      "sub_category": "programming",
+      "code": "CS111",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Thực tập CNTT1: Hệ thống máy tính",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S12"
+      "id": "S12",
+      "category_legacy": "general",
+      "sub_category": "cntt1",
+      "code": "CS101",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "Triết học Mác - Lênin",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S13"
+      "id": "S13",
+      "category_legacy": "general",
+      "sub_category": "philosophy",
+      "code": "PHI001",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Kinh tế chính trị Mác - Lênin",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S14"
+      "id": "S14",
+      "category_legacy": "general",
+      "sub_category": "politics",
+      "code": "PHI002",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Tiếng Anh P1",
       "credits": 4.0,
       "semester": 1,
-      "category": "english",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S15"
+      "id": "S15",
+      "category_legacy": "english",
+      "sub_category": "english",
+      "code": "ENG101",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Toán giải tích",
       "credits": 3.0,
       "semester": 1,
-      "category": "math",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S16"
+      "id": "S16",
+      "category_legacy": "math",
+      "sub_category": "math",
+      "code": "MATH101",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Xác suất thống kê và phân tích dữ liệu",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S17"
+      "id": "S17",
+      "category_legacy": "general",
+      "sub_category": "math",
+      "code": "STAT001",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Hệ thống thông tin địa lý",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S18"
+      "id": "S18",
+      "category_legacy": "general",
+      "sub_category": "geo",
+      "code": "GIS001",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Thực tập CNTT2: Thiết kế web và triển khai hệ thống phần mềm",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S19"
+      "id": "S19",
+      "category_legacy": "general",
+      "sub_category": "cntt2",
+      "code": "CS102",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "Tiếng Anh P2",
       "credits": 4.0,
       "semester": 2,
-      "category": "english",
+      "category": "foundation",
       "prerequisites": [
         "Tiếng Anh P1"
       ],
-      "id": "S20"
+      "id": "S20",
+      "category_legacy": "english",
+      "sub_category": "english",
+      "code": "ENG102",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Toán rời rạc",
       "credits": 3.0,
       "semester": 2,
-      "category": "math",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S21"
+      "id": "S21",
+      "category_legacy": "math",
+      "sub_category": "math",
+      "code": "MATH201",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Cấu trúc dữ liệu và giải thuật",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S22"
+      "id": "S22",
+      "category_legacy": "general",
+      "sub_category": "programming",
+      "code": "CS201",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Mạng máy tính",
       "credits": 2.0,
       "semester": 3,
-      "category": "network",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S23"
+      "id": "S23",
+      "category_legacy": "network",
+      "sub_category": "network",
+      "code": "NET301",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Lập trình hướng đối tượng",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S24"
+      "id": "S24",
+      "category_legacy": "general",
+      "sub_category": "programming",
+      "code": "CS202",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Thực tập CNTT3: Thiết kế, lập trình Front-End",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S25"
+      "id": "S25",
+      "category_legacy": "general",
+      "sub_category": "cntt3",
+      "code": "CS103",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "Giáo dục quốc phòng P1",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S26"
+      "id": "S26",
+      "category_legacy": "general",
+      "sub_category": "national_defense",
+      "code": "ND001",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Giáo dục quốc phòng P2",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S27"
+      "id": "S27",
+      "category_legacy": "general",
+      "sub_category": "national_defense",
+      "code": "ND002",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Giáo dục quốc phòng P3",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S28"
+      "id": "S28",
+      "category_legacy": "general",
+      "sub_category": "national_defense",
+      "code": "ND003",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Giáo dục quốc phòng P4",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S29"
+      "id": "S29",
+      "category_legacy": "general",
+      "sub_category": "national_defense",
+      "code": "ND004",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Kỹ năng mềm nâng cao",
       "credits": 3.0,
       "semester": 4,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S30"
+      "id": "S30",
+      "category_legacy": "general",
+      "sub_category": "soft_skills",
+      "code": "SKL002",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Tiếng Anh P3",
       "credits": 4.0,
       "semester": 4,
-      "category": "english",
+      "category": "foundation",
       "prerequisites": [
         "Tiếng Anh P2"
       ],
-      "id": "S31"
+      "id": "S31",
+      "category_legacy": "english",
+      "sub_category": "english",
+      "code": "ENG103",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Lý thuyết, thiết kế cơ sở dữ liệu",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S32"
+      "id": "S32",
+      "category_legacy": "general",
+      "sub_category": "database",
+      "code": "DB001",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Lập trình IoT",
       "credits": 2.0,
       "semester": 4,
-      "category": "programming",
+      "category": "foundation",
       "prerequisites": [
         "Lập trình HĐT",
         "Mạng máy tính"
       ],
-      "id": "S33"
+      "id": "S33",
+      "category_legacy": "programming",
+      "sub_category": "iot",
+      "code": "CS331",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Trí tuệ nhân tạo",
@@ -288,33 +820,49 @@
         "Xác suất thống kê",
         "CTDL & Giải thuật"
       ],
-      "id": "S34"
+      "id": "S34",
+      "category_legacy": "ai_ml",
+      "sub_category": "ai",
+      "code": "AI401",
+      "category_label": "Khối AI/ML"
     },
     {
       "name": "Chủ nghĩa xã hội khoa học",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S35"
+      "id": "S35",
+      "category_legacy": "general",
+      "sub_category": "politics",
+      "code": "PHI003",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Tiếng Anh P4",
       "credits": 3.0,
       "semester": 5,
-      "category": "english",
+      "category": "foundation",
       "prerequisites": [
         "Tiếng Anh P3"
       ],
-      "id": "S36"
+      "id": "S36",
+      "category_legacy": "english",
+      "sub_category": "english",
+      "code": "ENG104",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Phân tích, thiết kế hệ thống thông tin",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "foundation",
       "prerequisites": [],
-      "id": "S37"
+      "id": "S37",
+      "category_legacy": "general",
+      "sub_category": "systems",
+      "code": "SA001",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Học máy",
@@ -326,7 +874,11 @@
         "Đại số tuyến tính",
         "Lập trình HĐT"
       ],
-      "id": "S38"
+      "id": "S38",
+      "category_legacy": "ai_ml",
+      "sub_category": "ml",
+      "code": "ML501",
+      "category_label": "Khối AI/ML"
     },
     {
       "name": "Công nghệ dữ liệu",
@@ -334,15 +886,23 @@
       "semester": 5,
       "category": "ai_ml",
       "prerequisites": [],
-      "id": "S39"
+      "id": "S39",
+      "category_legacy": "ai_ml",
+      "sub_category": "data_eng",
+      "code": "DT501",
+      "category_label": "Khối AI/ML"
     },
     {
       "name": "Tư tưởng Hồ Chí Minh",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S40"
+      "id": "S40",
+      "category_legacy": "general",
+      "sub_category": "philosophy",
+      "code": "PHI004",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Công nghệ phần mềm",
@@ -353,7 +913,11 @@
         "Lập trình HĐT",
         "PTTKHTT"
       ],
-      "id": "S41"
+      "id": "S41",
+      "category_legacy": "software_eng",
+      "sub_category": "se",
+      "code": "SE601",
+      "category_label": "Khối Software Engineering"
     },
     {
       "name": "Lập trình mobile",
@@ -364,7 +928,11 @@
         "Lập trình HĐT",
         "TT CNTT3 Front-End"
       ],
-      "id": "S42"
+      "id": "S42",
+      "category_legacy": "software_eng",
+      "sub_category": "mobile",
+      "code": "CS621",
+      "category_label": "Khối Software Engineering"
     },
     {
       "name": "Dữ liệu lớn",
@@ -375,76 +943,112 @@
         "Công nghệ dữ liệu",
         "Học máy"
       ],
-      "id": "S43"
+      "id": "S43",
+      "category_legacy": "ai_ml",
+      "sub_category": "big_data",
+      "code": "BD601",
+      "category_label": "Khối AI/ML"
     },
     {
       "name": "Thực tập CNTT5: Triển khai ứng dụng AI, IoT",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S44"
+      "id": "S44",
+      "category_legacy": "general",
+      "sub_category": "cntt5",
+      "code": "CS105",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "Lịch sử Đảng Cộng sản Việt Nam",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "general_ed",
       "prerequisites": [],
-      "id": "S45"
+      "id": "S45",
+      "category_legacy": "general",
+      "sub_category": "history",
+      "code": "HIS001",
+      "category_label": "Khối đại cương bắt buộc"
     },
     {
       "name": "Tiếng Anh P5",
       "credits": 2.0,
       "semester": 7,
-      "category": "english",
+      "category": "foundation",
       "prerequisites": [
         "Tiếng Anh P4"
       ],
-      "id": "S46"
+      "id": "S46",
+      "category_legacy": "english",
+      "sub_category": "english",
+      "code": "ENG105",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Thực tập CNTT6: Cài đặt, cấu hình máy chủ, mạng, triển khai ứng dụng",
       "credits": 4.0,
       "semester": -1,
-      "category": "general",
+      "category": "internship",
       "prerequisites": [],
-      "id": "S47"
+      "id": "S47",
+      "category_legacy": "general",
+      "sub_category": "cntt6",
+      "code": "CS106",
+      "category_label": "Khối thực tập / đồ án"
     },
     {
       "name": "An toàn, bảo mật thông tin",
       "credits": 2.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S48"
+      "id": "S48",
+      "category_legacy": "general",
+      "sub_category": "security",
+      "code": "SEC001",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Chuyển đổi số",
       "credits": 2.0,
       "semester": 8,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S49"
+      "id": "S49",
+      "category_legacy": "general",
+      "sub_category": "digital",
+      "code": "DS801",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Lập trình mạng",
       "credits": 3.0,
       "semester": 8,
-      "category": "network",
+      "category": "foundation",
       "prerequisites": [
         "Mạng máy tính",
         "Lập trình HĐT"
       ],
-      "id": "S50"
+      "id": "S50",
+      "category_legacy": "network",
+      "sub_category": "network",
+      "code": "NET801",
+      "category_label": "Khối nền tảng"
     },
     {
       "name": "Ứng dụng Công nghệ thông tin trong doanh nghiệp",
       "credits": 3.0,
       "semester": -1,
-      "category": "general",
+      "category": "skills_support",
       "prerequisites": [],
-      "id": "S51"
+      "id": "S51",
+      "category_legacy": "general",
+      "sub_category": "it_business",
+      "code": "IT001",
+      "category_label": "Khối kỹ năng / thể chất / hỗ trợ"
     },
     {
       "name": "Kiểm thử phần mềm",
@@ -454,7 +1058,11 @@
       "prerequisites": [
         "Công nghệ phần mềm"
       ],
-      "id": "S52"
+      "id": "S52",
+      "category_legacy": "software_eng",
+      "sub_category": "testing",
+      "code": "SE802",
+      "category_label": "Khối Software Engineering"
     }
   ],
   "students": [

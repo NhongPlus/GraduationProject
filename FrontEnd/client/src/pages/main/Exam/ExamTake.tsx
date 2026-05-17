@@ -11,7 +11,7 @@ import { QuestionNavigator } from '@/components/ExamTake/QuestionNavigator';
 import { isQuestionAnswered } from '@/components/ExamTake/isQuestionAnswered';
 import type { MockExamQuestion } from '@/components/ExamTake/types';
 import appConfig from '@/configs/app.config';
-import examApi, { type Question as ApiQuestion } from '@/services/examApi';
+import examApi, { type Question as ApiQuestion, type StartSessionData } from '@/services/examApi';
 import { useExamTakeState } from '@/hooks/useExamTakeState';
 import useAuth from '@/hooks/useAuth';
 import {
@@ -71,6 +71,33 @@ function toUiQuestion(question: ApiQuestion, number: number): MockExamQuestion {
   };
 }
 
+/** Câu hỏi từ startSession — đúng mã đề (D01/D02), đã xáo thứ tự/đáp án */
+function mapSessionQuestionsToUi(questionData: StartSessionData['questions']): {
+  questions: MockExamQuestion[];
+  idMap: Record<number, string>;
+} {
+  const mappedQuestions = questionData.map((q, idx) =>
+    toUiQuestion(
+      {
+        id: q.id,
+        exam_id: '',
+        content: q.content,
+        question_type: q.question_type,
+        options: q.options,
+        points: q.points,
+        media_url: q.media_url ?? null,
+        created_at: '',
+      },
+      idx + 1
+    )
+  );
+  const idMap: Record<number, string> = {};
+  for (let i = 0; i < questionData.length; i += 1) {
+    idMap[i + 1] = questionData[i].id;
+  }
+  return { questions: mappedQuestions, idMap };
+}
+
 type RealtimeHandlers = NonNullable<Parameters<typeof createExamRealtimeSocket>[0]['handlers']>;
 
 function buildSubmitAnswers(
@@ -111,6 +138,7 @@ const ExamTake = () => {
   const { examId } = useParams<{ examId: string }>();
   const activeExamId = examId ?? 'preview-exam';
   const [fullscreenError, setFullscreenError] = useState('');
+  const [sessionLoading, setSessionLoading] = useState(false);
   const envDisableIntegrity = import.meta.env.VITE_DISABLE_INTEGRITY;
   const integrityDisabled = envDisableIntegrity !== undefined
     ? envDisableIntegrity === 'true'
@@ -268,22 +296,52 @@ const ExamTake = () => {
   const ensureSessionStarted = useCallback(async () => {
     if (!examId || sessionId || sessionStartingRef.current) return;
     sessionStartingRef.current = true;
+    setSessionLoading(true);
     try {
       const startData = await examApi.startSession(activeExamId);
+      if (!startData.questions?.length) {
+        throw new Error('Khong co cau hoi cho ma de nay');
+      }
+
+      const { questions: sessionQuestions, idMap } = mapSessionQuestionsToUi(startData.questions);
+      setQuestions(sessionQuestions);
+      setQuestionIdByNumber(idMap);
+      setCurrentNumber(1);
       setSessionId(startData.session.id);
       setVersionCode(startData.version_code ?? null);
-      setDeadlineAt(startData.deadline_at ?? null);
-      const deadlineMs = Date.parse(startData.deadline_at);
-      if (!Number.isNaN(deadlineMs)) {
-        setRemainingSeconds(Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000)));
+
+      const classEndsAt =
+        startData.runtime_state?.is_active && startData.runtime_state.ends_at
+          ? startData.runtime_state.ends_at
+          : null;
+      setDeadlineAt(classEndsAt ?? startData.deadline_at ?? null);
+      if (classEndsAt) {
+        syncServerTime(Date.now(), classEndsAt);
       }
+
+      setExamStarted(true);
+      setBootError('');
     } catch {
       setBootError('Khong the khoi tao phien thi.');
       setExamStarted(false);
     } finally {
       sessionStartingRef.current = false;
+      setSessionLoading(false);
     }
-  }, [activeExamId, examId, sessionId]);
+  }, [
+    activeExamId,
+    examId,
+    sessionId,
+    setBootError,
+    setCurrentNumber,
+    setDeadlineAt,
+    setExamStarted,
+    setQuestionIdByNumber,
+    setQuestions,
+    setSessionId,
+    setVersionCode,
+    syncServerTime,
+  ]);
 
   const forceAutoSubmit = useCallback(() => {
     if (autoSubmitted || submitting) return;
@@ -301,7 +359,6 @@ const ExamTake = () => {
       setConnectionStatus('connected');
       if (payload.status === 'started' && payload.endsAt) {
         syncServerTime(payload.serverNowMs ?? Date.now(), payload.endsAt);
-        setExamStarted(true);
         setAutoSubmitted(false);
         setSubmitFailed(false);
         setViolationLocked(false);
@@ -320,7 +377,6 @@ const ExamTake = () => {
     onStarted: (payload) => {
       setConnectionStatus('connected');
       syncServerTime(Date.now(), payload.endsAt);
-      setExamStarted(true);
       setAutoSubmitted(false);
       setSubmitFailed(false);
       setViolationLocked(false);
@@ -382,25 +438,18 @@ const ExamTake = () => {
       try {
         setBootLoading(true);
         setBootError('');
-        const [examData, questionData] = await Promise.all([
-          examApi.getExam(activeExamId),
-          examApi.getQuestions(activeExamId),
-        ]);
+        const examData = await examApi.getExam(activeExamId);
         if (canceled) return;
 
         setExamTitle(examData.title || 'Bai thi');
         setExamSection(examData.subject_name || examData.description || '');
-
-        const mappedQuestions = questionData.map((q, idx) => toUiQuestion(q, idx + 1));
-        const idMap: Record<number, string> = {};
-        for (let i = 0; i < questionData.length; i += 1) {
-          idMap[i + 1] = questionData[i].id;
-        }
-        setQuestions(mappedQuestions);
-        setQuestionIdByNumber(idMap);
+        setQuestions([]);
+        setQuestionIdByNumber({});
         setSessionId(null);
+        setVersionCode(null);
         setCurrentNumber(1);
         setRemainingSeconds(0);
+        setExamStarted(false);
       } catch {
         if (canceled) return;
         setBootError('Khong the tai du lieu bai thi hoac khoi tao phien thi.');
@@ -788,7 +837,17 @@ const ExamTake = () => {
           </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && effectiveFullscreen && !examStarted && (
+      {!autoSubmitted && !violationLocked && effectiveFullscreen && sessionLoading && (
+        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+          <Text fw={700} size="lg" mb={8}>
+            Dang tai de thi
+          </Text>
+          <Text c="dimmed" size="sm">
+            He thong dang phan ma de va sap xep cau hoi...
+          </Text>
+        </Paper>
+      )}
+      {!autoSubmitted && !violationLocked && effectiveFullscreen && !examStarted && !sessionLoading && (
         <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
           <Text fw={700} size="lg" mb={8}>
             Dang cho giang vien bat dau
@@ -811,7 +870,7 @@ const ExamTake = () => {
           </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && effectiveFullscreen && examStarted && (
+      {!autoSubmitted && !violationLocked && effectiveFullscreen && examStarted && total > 0 && (
         <div className={classes.shell}>
           <ExamTakeHeader
             title={examTitle}

@@ -1,16 +1,18 @@
 import pool from "~/config/db";
 import { env } from "~/config/enviroment";
 import { getEnrollmentsByClass } from "~/models/enrollment.model";
+import { getStudentEmailsByAdminClass } from "~/models/adminClass.model";
 import {
   markExamReminderSent,
   type ExamDeadlineReminderKind,
 } from "~/models/examDeadlineNotification.model";
-import { isMailConfigured, sendMail } from "~/services/mail.service";
+import { isEmailConfigured, sendBatchEmail } from "~/services/email.service";
 
 interface ExamReminderRow {
   id: string;
   title: string;
-  class_id: string;
+  class_id: string | null;
+  admin_class_id: string | null;
   closes_at: string;
 }
 
@@ -18,7 +20,7 @@ async function loadExamsForReminder(kind: ExamDeadlineReminderKind): Promise<Exa
   const intervalLiteral = kind === "24h" ? "24 hours" : "1 hour";
   const r = await pool.query<ExamReminderRow>(
     `
-    SELECT e.id, e.title, e.class_id, e.closes_at
+    SELECT e.id, e.title, e.class_id, e.admin_class_id, e.closes_at
     FROM exams e
     WHERE e.closes_at IS NOT NULL
       AND e.closes_at > NOW()
@@ -53,14 +55,21 @@ async function processOneKind(kind: ExamDeadlineReminderKind): Promise<void> {
 
   for (const ex of exams) {
     try {
-      const rows = await getEnrollmentsByClass(ex.class_id);
-      const emails = [
-        ...new Set(
-          rows
-            .map((r: { email?: string | null }) => (typeof r.email === "string" ? r.email.trim() : ""))
-            .filter(Boolean)
-        ),
-      ] as string[];
+      let emails: string[] = [];
+      if (ex.admin_class_id) {
+        emails = await getStudentEmailsByAdminClass(ex.admin_class_id);
+      } else if (ex.class_id) {
+        const rows = await getEnrollmentsByClass(ex.class_id);
+        emails = [
+          ...new Set(
+            rows
+              .map((r: { email?: string | null }) =>
+                typeof r.email === "string" ? r.email.trim() : ""
+              )
+              .filter(Boolean)
+          ),
+        ] as string[];
+      }
 
       const subject =
         kind === "24h"
@@ -68,7 +77,7 @@ async function processOneKind(kind: ExamDeadlineReminderKind): Promise<void> {
           : `[Nhắc nhở] Bài thi còn 1 giờ để bắt đầu: ${ex.title}`;
       const text = buildEmailBody(ex.title, ex.closes_at, kind);
 
-      if (!isMailConfigured()) {
+      if (!isEmailConfigured()) {
         console.warn(
           `[exam-reminder] Bỏ qua gửi mail (thiếu SMTP). exam=${ex.id} kind=${kind}. Đặt SMTP_HOST và MAIL_FROM trong .env.`
         );
@@ -80,7 +89,29 @@ async function processOneKind(kind: ExamDeadlineReminderKind): Promise<void> {
         continue;
       }
 
-      await sendMail({ bcc: emails, subject, text });
+      const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { background: #ffffff; border-radius: 8px; padding: 30px; max-width: 600px; margin: auto; }
+    .exam-title { font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 16px; }
+    .message { font-size: 15px; color: #374151; line-height: 1.6; }
+    .footer { margin-top: 24px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="exam-title">📝 ${ex.title}</div>
+    <div class="message">${text}</div>
+    <div class="footer">Email này được gửi tự động từ hệ thống thi trực tuyến.</div>
+  </div>
+</body>
+</html>`;
+
+      await sendBatchEmail(emails, subject, html, text);
       await markExamReminderSent(ex.id, kind);
     } catch (e) {
       console.error(`[exam-reminder] Lỗi exam=${ex.id} kind=${kind}`, e);

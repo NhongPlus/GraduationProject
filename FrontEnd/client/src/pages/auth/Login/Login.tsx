@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import image from '@/assets/img/login.jpg';
 import classes from './Login.module.scss';
 import appConfig from '@/configs/app.config';
-import { login, saveSession, requestSelfPasswordReset } from '@/services/authApi';
+import { login, saveSession, forgotPassword as forgotPasswordApi, resetPassword as resetPasswordApi } from '@/services/authApi';
 import InputText from '@/components/Input/InputText/InputText';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -92,13 +92,17 @@ function Login() {
     setForgotStatus('loading');
     setForgotMsg('');
     try {
-      await requestSelfPasswordReset(forgotEmail);
+      const result = await forgotPasswordApi(forgotEmail);
       setForgotStatus('success');
-      setForgotMsg(t('login.forgot_success'));
+      setForgotMsg(result.message || t('login.forgot_success'));
     } catch (err: unknown) {
       setForgotStatus('error');
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setForgotMsg(axiosErr?.response?.data?.message || t('login.forgot_failed'));
+      const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
+      setForgotMsg(
+        axiosErr?.response?.data?.message ||
+        axiosErr?.response?.data?.error ||
+        t('login.forgot_failed')
+      );
     }
   };
 

@@ -80,6 +80,20 @@ export const getStudentUpcomingExams = async (
   limit = 12
 ): Promise<StudentUpcomingExamRow[]> => {
   const hasDeadline = await examsTableHasClosesAt();
+  const studentExamScope = `
+    FROM exams e
+    JOIN accounts acc ON acc.id = $1
+    LEFT JOIN classes c ON c.id = e.class_id
+    LEFT JOIN subjects s ON s.id = COALESCE(e.subject_id, c.subject_id)
+    WHERE (
+      e.admin_class_id IS NOT NULL AND e.admin_class_id = acc.admin_class_id
+    ) OR (
+      e.class_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM enrollments en
+        WHERE en.class_id = e.class_id AND en.student_id = acc.id
+      )
+    )
+  `;
   const sqlWithDeadline = `
     SELECT
       e.id AS exam_id,
@@ -92,10 +106,7 @@ export const getStudentUpcomingExams = async (
       ) AS question_count,
       e.closes_at,
       e.created_at
-    FROM exams e
-    JOIN classes c ON c.id = e.class_id
-    JOIN enrollments en ON en.class_id = c.id AND en.student_id = $1
-    JOIN subjects s ON s.id = c.subject_id
+    ${studentExamScope}
     ORDER BY e.closes_at ASC NULLS LAST, e.created_at DESC
     LIMIT $2
   `;
@@ -111,10 +122,7 @@ export const getStudentUpcomingExams = async (
       ) AS question_count,
       NULL::timestamptz AS closes_at,
       e.created_at
-    FROM exams e
-    JOIN classes c ON c.id = e.class_id
-    JOIN enrollments en ON en.class_id = c.id AND en.student_id = $1
-    JOIN subjects s ON s.id = c.subject_id
+    ${studentExamScope}
     ORDER BY e.created_at DESC
     LIMIT $2
   `;
@@ -144,8 +152,8 @@ export const getStudentRecentSessions = async (
       es.status
     FROM exam_sessions es
     JOIN exams e ON e.id = es.exam_id
-    JOIN classes c ON c.id = e.class_id
-    JOIN subjects s ON s.id = c.subject_id
+    LEFT JOIN classes c ON c.id = e.class_id
+    LEFT JOIN subjects s ON s.id = COALESCE(e.subject_id, c.subject_id)
     WHERE es.student_id = $1
       AND es.status IN ('submitted', 'expired')
     ORDER BY COALESCE(es.submitted_at, es.created_at) DESC

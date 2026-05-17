@@ -49,6 +49,25 @@ export const getActiveExamRuntimes = async (): Promise<ExamRuntimePersist[]> => 
   }));
 };
 
+/** Get runtime state for a specific exam (used when student joins) */
+export const getRuntimeStateByExam = async (examId: string): Promise<ExamRuntimePersist | null> => {
+  const result = await pool.query(
+    `SELECT exam_id, started_at, ends_at, duration_min, is_active
+     FROM exam_runtime_state
+     WHERE exam_id = $1`,
+    [examId]
+  );
+  const r = result.rows[0];
+  if (!r) return null;
+  return {
+    exam_id: r.exam_id,
+    started_at: r.started_at,
+    ends_at: r.ends_at,
+    duration_min: Number(r.duration_min),
+    is_active: r.is_active,
+  };
+};
+
 /** Restore exam runtime state from DB on server startup */
 type ExamRuntimeMemory = {
   examId: string;

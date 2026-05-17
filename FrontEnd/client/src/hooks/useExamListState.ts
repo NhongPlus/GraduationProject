@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import examApi, { type Exam, type ExamSession, type ForceSubmitSummary } from '@/services/examApi';
 
 type StatusFilter = 'all' | 'not_done' | 'done';
@@ -15,10 +15,24 @@ export function useExamListState(opts: {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [startingExamId, setStartingExamId] = useState<string | null>(null);
   const [updatingExamId, setUpdatingExamId] = useState<string | null>(null);
   const [forceSubmittingExamId, setForceSubmittingExamId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const LIMIT = 20;
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSetSearchText = (value: string) => {
+    setSearchText(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 350);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -27,13 +41,21 @@ export function useExamListState(opts: {
         setError('');
         setNotice('');
 
-        const examData = await examApi.getExams();
-        setExams(examData);
+        const params: Record<string, string> = {
+          limit: String(LIMIT),
+          offset: String((page - 1) * LIMIT),
+        };
+        if (debouncedSearch) params.search = debouncedSearch;
+
+        const examData = await examApi.getExams(undefined, params);
+        const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
+        setExams(fetchedExams);
+        setTotalPages(Math.max(1, Math.ceil(fetchedExams.length / LIMIT)));
 
         if (isStaff) {
           setSessions([]);
           const entries = await Promise.all(
-            examData.map(async (exam) => {
+            fetchedExams.map(async (exam) => {
               try {
                 const examSessions = await examApi.getExamSessions(exam.id);
                 const activeCount = examSessions.filter((s) => s.status === 'active').length;
@@ -57,7 +79,7 @@ export function useExamListState(opts: {
     };
 
     void load();
-  }, [isStaff, t]);
+  }, [isStaff, t, page, debouncedSearch]);
 
   const latestSessionByExam = useMemo(() => {
     const byExam = new Map<string, ExamSession>();
@@ -166,7 +188,7 @@ export function useExamListState(opts: {
     error,
     notice,
     searchText,
-    setSearchText,
+    setSearchText: handleSetSearchText,
     statusFilter,
     setStatusFilter,
     startingExamId,
@@ -179,5 +201,8 @@ export function useExamListState(opts: {
     handleStartExam,
     handleUpdateDuration,
     handleForceSubmit,
+    page,
+    setPage,
+    totalPages,
   };
 }

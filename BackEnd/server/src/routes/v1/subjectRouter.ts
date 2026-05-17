@@ -7,6 +7,8 @@ import {
   getSubjectById,
   updateSubject,
   deleteSubject,
+  type CreateSubjectInput,
+  type UpdateSubjectInput,
 } from "~/models/subject.model";
 
 const router = Router();
@@ -39,15 +41,15 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-// POST /v1/subjects — create
-router.post("/", async (req, res, next) => {
+// POST /v1/subjects — create (admin only)
+router.post("/", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
-    const { name, code } = req.body;
+    const { name } = req.body as CreateSubjectInput;
     if (!name) {
       res.status(400).json({ success: false, error: "Tên môn học là bắt buộc" });
       return;
     }
-    const subject = await createSubject(name, code ?? "");
+    const subject = await createSubject(req.body as CreateSubjectInput);
     res.status(201).json({ success: true, data: subject });
   } catch (err: any) {
     if (err.code === "23505") {
@@ -58,15 +60,13 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// PATCH /v1/subjects/:id
-router.patch("/:id", async (req, res, next) => {
+// PATCH /v1/subjects/:id — update (admin only)
+router.patch("/:id", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
-    const { name, code } = req.body;
-    const fields: Record<string, string> = {};
-    if (name !== undefined) fields.name = name;
-    if (code !== undefined) fields.code = code;
-
-    const subject = await updateSubject(req.params.id, fields);
+    const subject = await updateSubject(
+      req.params.id,
+      req.body as UpdateSubjectInput
+    );
     if (!subject) {
       res.status(404).json({ success: false, error: "Không tìm thấy môn học" });
       return;
@@ -81,8 +81,8 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-// DELETE /v1/subjects/:id
-router.delete("/:id", async (req, res, next) => {
+// DELETE /v1/subjects/:id — delete (admin only)
+router.delete("/:id", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
     const deleted = await deleteSubject(req.params.id);
     if (!deleted) {

@@ -67,6 +67,18 @@ const Grading = () => {
     try {
       setSaving(true);
       await examApi.gradeSession(sessionId, draft);
+      const refreshed = await examApi.getSessionGrading(sessionId);
+      setData(refreshed);
+      const init: GradeDraft = {};
+      refreshed.graded_details.forEach((detail) => {
+        if (detail.question_type === 'essay') {
+          init[detail.question_id] = {
+            points_awarded: detail.points_earned ?? 0,
+            comment: detail.teacher_comment ?? '',
+          };
+        }
+      });
+      setDraft(init);
       setSaveMsg(t('grading.saved'));
       setTimeout(() => setSaveMsg(''), 3000);
     } catch (err: any) {
@@ -88,13 +100,14 @@ const Grading = () => {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Alert color="red" variant="light">{error || t('errors.grading_load_failed')}</Alert>
-        <ButtonFilled style={{ marginTop: 16 }} label={t('common.back')} onClick={() => navigate(-1)} />
+        <ButtonFilled style={{ marginTop: 16 }} label={t('common.back')} onClick={() => navigate('/grading')} />
       </Box>
     );
   }
 
   const essayQuestions = data.graded_details.filter((d) => d.question_type === 'essay');
   const mcqQuestions = data.graded_details.filter((d) => d.question_type === 'mcq');
+  const hasPendingEssay = essayQuestions.some((d) => d.pending_grading);
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
@@ -121,7 +134,16 @@ const Grading = () => {
             <Box>
               <Text size="sm" c="dimmed">{t('grading.score')}</Text>
               <Text fw={700} size="lg">
-                {data.session.score != null ? `${data.session.score}/${data.session.max_points}` : '—'}
+                {data.session.score != null
+                  ? (() => {
+                      const val = (data.session.score / data.session.max_points) * 10;
+                      const formatted = val.toFixed(2);
+                      return `${formatted.padStart(4, '0')} / 10`;
+                    })()
+                  : '—'}
+              </Text>
+              <Text size="xs" c="dimmed">
+                Raw: {data.session.score}/{data.session.max_points}
               </Text>
             </Box>
             <Box>
@@ -203,22 +225,35 @@ const Grading = () => {
                     </Box>
 
                     {/* Grading inputs */}
-                    <Group grow align="flex-start">
-                      <InputNumber
-                        label={t('grading.points_awarded')}
-                        value={draft[detail.question_id]?.points_awarded ?? detail.points_earned ?? 0}
-                        min={0}
-                        max={detail.max_points}
-                        onChange={(val) => handleGradeChange(detail.question_id, 'points_awarded', typeof val === 'number' ? val : 0)}
-                        suffix={` / ${detail.max_points}`}
-                      />
-                      <InputTextarea
-                        label={t('grading.teacher_comment')}
-                        value={draft[detail.question_id]?.comment ?? detail.teacher_comment ?? ''}
-                        onChange={(e) => handleGradeChange(detail.question_id, 'comment', e.currentTarget.value)}
-                        minRows={2}
-                      />
-                    </Group>
+                    {detail.pending_grading ? (
+                      <Group grow align="flex-start">
+                        <InputNumber
+                          label={t('grading.points_awarded')}
+                          value={draft[detail.question_id]?.points_awarded ?? detail.points_earned ?? 0}
+                          min={0}
+                          max={detail.max_points}
+                          onChange={(val) => handleGradeChange(detail.question_id, 'points_awarded', typeof val === 'number' ? val : 0)}
+                          suffix={` / ${detail.max_points}`}
+                        />
+                        <InputTextarea
+                          label={t('grading.teacher_comment')}
+                          value={draft[detail.question_id]?.comment ?? detail.teacher_comment ?? ''}
+                          onChange={(e) => handleGradeChange(detail.question_id, 'comment', e.currentTarget.value)}
+                          minRows={2}
+                        />
+                      </Group>
+                    ) : (
+                      <Group gap="md" pt="xs">
+                        <Text size="sm" c="dimmed">
+                          {t('grading.points_awarded')}: <Text span fw={700}>{detail.points_earned ?? 0}</Text> / {detail.max_points}
+                        </Text>
+                        {detail.teacher_comment && (
+                          <Text size="sm" c="dimmed">
+                            {t('grading.teacher_comment')}: {detail.teacher_comment}
+                          </Text>
+                        )}
+                      </Group>
+                    )}
                   </Box>
                 );
               })}
@@ -230,12 +265,14 @@ const Grading = () => {
               </Alert>
             )}
 
-            <ButtonFilled
-              label={t('grading.save_grades')}
-              style={{ marginTop: 16 }}
-              loading={saving}
-              onClick={handleSave}
-            />
+            {hasPendingEssay && (
+              <ButtonFilled
+                label={t('grading.save_grades')}
+                style={{ marginTop: 16 }}
+                loading={saving}
+                onClick={handleSave}
+              />
+            )}
           </Paper>
         )}
 
@@ -247,7 +284,7 @@ const Grading = () => {
           <ButtonFilled
             label={t('common.back')}
             color="gray"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/grading')}
           />
         </Group>
       </Stack>

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Title, Table, Modal, Group, Stack, Text, Loader, Badge,
-  ActionIcon, TextInput, NumberInput, Select, Textarea,
+  ActionIcon, TextInput, NumberInput, Select, Switch, Pagination,
+  Button,
 } from '@mantine/core';
-import { useTranslation } from 'react-i18next';
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '@tabler/icons-react';
 import apiClient from '@/services/apiClient';
 import useAuth from '@/hooks/useAuth';
@@ -20,8 +20,52 @@ interface Subject {
   created_at: string;
 }
 
+interface SubjectFormData {
+  name: string;
+  code: string;
+  credits: number;
+  semester: number;
+  category: string;
+  is_active: boolean;
+}
+
+const CATEGORIES = [
+  { value: 'general', label: 'Tổng quát' },
+  { value: 'programming', label: 'Lập trình' },
+  { value: 'math', label: 'Toán' },
+  { value: 'english', label: 'Tiếng Anh' },
+  { value: 'network', label: 'Mạng' },
+  { value: 'ai_ml', label: 'AI / ML' },
+  { value: 'software_eng', label: 'Công nghệ phần mềm' },
+];
+
+const CategoryBadge = ({ category }: { category: string }) => {
+  const colors: Record<string, string> = {
+    general: 'gray',
+    programming: 'blue',
+    math: 'violet',
+    english: 'green',
+    network: 'orange',
+    ai_ml: 'red',
+    software_eng: 'teal',
+  };
+  const labels: Record<string, string> = {
+    general: 'Tổng quát',
+    programming: 'Lập trình',
+    math: 'Toán',
+    english: 'Tiếng Anh',
+    network: 'Mạng',
+    ai_ml: 'AI/ML',
+    software_eng: 'CNPM',
+  };
+  return (
+    <Badge size="sm" variant="light" color={colors[category] || 'gray'}>
+      {labels[category] || category}
+    </Badge>
+  );
+};
+
 const SubjectManagementPage = () => {
-  const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +73,10 @@ const SubjectManagementPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const LIMIT = 20;
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
@@ -40,7 +88,7 @@ const SubjectManagementPage = () => {
       );
       setSubjects(res.data.data);
     } catch {
-      // handle error
+      setError('Không tải được danh sách môn học.');
     } finally {
       setLoading(false);
     }
@@ -51,33 +99,51 @@ const SubjectManagementPage = () => {
   }, [fetchSubjects]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Xóa môn học này?')) return;
-    await apiClient.delete(`/subjects/${id}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    void fetchSubjects();
+    if (!confirm('Xóa môn học này? Hành động này không thể hoàn tác.')) return;
+    try {
+      await apiClient.delete(`/subjects/${id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setNotice('Đã xóa môn học.');
+      void fetchSubjects();
+    } catch {
+      setError('Không xóa được môn học.');
+    }
   };
 
-  const handleCreate = async (data: { name: string; code: string }) => {
-    await apiClient.post('/subjects', data, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    setCreateModalOpen(false);
-    void fetchSubjects();
+  const handleCreate = async (data: SubjectFormData) => {
+    try {
+      await apiClient.post('/subjects', data, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setCreateModalOpen(false);
+      setNotice('Đã tạo môn học.');
+      void fetchSubjects();
+    } catch {
+      setError('Không tạo được môn học.');
+    }
   };
 
-  const handleUpdate = async (id: string, data: { name: string; code: string }) => {
-    await apiClient.patch(`/subjects/${id}`, data, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    setEditModalOpen(false);
-    void fetchSubjects();
+  const handleUpdate = async (id: string, data: SubjectFormData) => {
+    try {
+      await apiClient.patch(`/subjects/${id}`, data, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setEditModalOpen(false);
+      setNotice('Đã cập nhật môn học.');
+      void fetchSubjects();
+    } catch {
+      setError('Không cập nhật được môn học.');
+    }
   };
 
   const filtered = subjects.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.code.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filtered.length / LIMIT);
+  const paginated = filtered.slice((page - 1) * LIMIT, page * LIMIT);
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -91,82 +157,83 @@ const SubjectManagementPage = () => {
           />
         </Group>
 
+        {error && <Badge color="red" size="lg">{error}</Badge>}
+        {notice && <Badge color="green" size="lg">{notice}</Badge>}
+
         <TextInput
           placeholder="Tìm kiếm tên hoặc mã môn..."
           leftSection={<IconSearch size={14} />}
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
           style={{ maxWidth: 400 }}
         />
 
         {loading ? (
           <Loader />
         ) : (
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Tên môn</Table.Th>
-                <Table.Th>Mã</Table.Th>
-                <Table.Th>Tín chỉ</Table.Th>
-                <Table.Th>Học kỳ</Table.Th>
-                <Table.Th>Loại</Table.Th>
-                <Table.Th>Trạng thái</Table.Th>
-                <Table.Th>Thao tác</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map(subject => (
-                <Table.Tr key={subject.id}>
-                  <Table.Td>
-                    <Text fw={500}>{subject.name}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c="dimmed">{subject.code || '—'}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{subject.credits}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">{subject.semester}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge size="sm" variant="light">{subject.category || 'general'}</Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={subject.is_active ? 'green' : 'gray'} size="sm">
-                      {subject.is_active ? 'Hoạt động' : 'Không hoạt động'}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={4}>
-                      <ActionIcon
-                        variant="subtle"
-                        color="blue"
-                        onClick={() => { setEditingSubject(subject); setEditModalOpen(true); }}
-                      >
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() => void handleDelete(subject.id)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-              {filtered.length === 0 && (
+          <>
+            <Table striped highlightOnHover>
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={7}>
-                    <Text c="dimmed" ta="center">Chưa có môn học nào</Text>
-                  </Table.Td>
+                  <Table.Th>Tên môn</Table.Th>
+                  <Table.Th>Mã</Table.Th>
+                  <Table.Th>Tín chỉ</Table.Th>
+                  <Table.Th>Học kỳ</Table.Th>
+                  <Table.Th>Loại</Table.Th>
+                  <Table.Th>Trạng thái</Table.Th>
+                  <Table.Th>Thao tác</Table.Th>
                 </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {paginated.map(subject => (
+                  <Table.Tr key={subject.id}>
+                    <Table.Td><Text fw={500}>{subject.name}</Text></Table.Td>
+                    <Table.Td><Text size="sm" c="dimmed">{subject.code || '—'}</Text></Table.Td>
+                    <Table.Td><Text size="sm">{subject.credits}</Text></Table.Td>
+                    <Table.Td><Text size="sm">{subject.semester}</Text></Table.Td>
+                    <Table.Td><CategoryBadge category={subject.category} /></Table.Td>
+                    <Table.Td>
+                      <Badge color={subject.is_active ? 'green' : 'gray'} size="sm">
+                        {subject.is_active ? 'Hoạt động' : 'Không hoạt động'}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="blue"
+                          onClick={() => { setEditingSubject(subject); setEditModalOpen(true); }}
+                        >
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() => void handleDelete(subject.id)}
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+                {paginated.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={7}>
+                      <Text c="dimmed" ta="center">Chưa có môn học nào</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+            {totalPages > 1 && (
+              <Group justify="center">
+                <Pagination total={totalPages} value={page} onChange={setPage} />
+              </Group>
+            )}
+          </>
         )}
+        <Text size="sm" c="dimmed">Tổng: {filtered.length} môn học</Text>
       </Stack>
 
       {/* Create Modal */}
@@ -193,17 +260,28 @@ const SubjectManagementPage = () => {
 
 type SubjectFormProps = {
   initial?: Subject;
-  onSubmit: (data: { name: string; code: string }) => void;
+  onSubmit: (data: SubjectFormData) => void;
   onCancel: () => void;
 };
 
 function SubjectForm({ initial, onSubmit, onCancel }: SubjectFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [code, setCode] = useState(initial?.code ?? '');
+  const [credits, setCredits] = useState<number>(initial?.credits ?? 0);
+  const [semester, setSemester] = useState<number>(initial?.semester ?? 0);
+  const [category, setCategory] = useState(initial?.category ?? 'general');
+  const [isActive, setIsActive] = useState(initial?.is_active ?? true);
 
   const handleSubmit = () => {
     if (!name.trim()) return;
-    onSubmit({ name: name.trim(), code: code.trim() });
+    onSubmit({
+      name: name.trim(),
+      code: code.trim(),
+      credits,
+      semester,
+      category,
+      is_active: isActive,
+    });
   };
 
   return (
@@ -221,6 +299,31 @@ function SubjectForm({ initial, onSubmit, onCancel }: SubjectFormProps) {
         onChange={e => setCode(e.target.value)}
         placeholder="Ví dụ: CS101"
       />
+      <Group grow>
+        <NumberInput
+          label="Tín chỉ"
+          value={credits}
+          onChange={v => setCredits(Number(v))}
+          min={0}
+          step={0.5}
+        />
+        <NumberInput
+          label="Học kỳ"
+          value={semester}
+          onChange={v => setSemester(Number(v))}
+          min={-1}
+        />
+      </Group>
+      <Select
+        label="Loại / Chuyên ngành"
+        value={category}
+        onChange={v => setCategory(v ?? 'general')}
+        data={CATEGORIES}
+      />
+      <Group justify="space-between">
+        <Text size="sm" fw={500}>Hoạt động</Text>
+        <Switch checked={isActive} onChange={e => setIsActive(e.currentTarget.checked)} />
+      </Group>
       <Group justify="flex-end" mt="sm">
         <Button variant="default" onClick={onCancel}>Hủy</Button>
         <Button color="teal" onClick={handleSubmit}>Lưu</Button>

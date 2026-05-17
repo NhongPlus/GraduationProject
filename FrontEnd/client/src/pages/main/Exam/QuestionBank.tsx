@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box, Title, Text, Loader, Paper, Group, Stack, Button, TextInput, Select,
   Badge, Table, ActionIcon, Modal, Textarea, NumberInput, SegmentedControl,
@@ -53,7 +54,11 @@ const DIFFICULTY_LABELS: Record<QBDifficulty, string> = {
 };
 
 const QuestionBankPage = () => {
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
+  const [examIdInputOpen, setExamIdInputOpen] = useState(false);
+  const [importingQbId, setImportingQbId] = useState<string | null>(null);
+  const [examIdInput, setExamIdInput] = useState('');
 
   const [items, setItems] = useState<QBItem[]>([]);
   const [subjects, setSubjects] = useState<SubjectDto[]>([]);
@@ -96,7 +101,7 @@ const QuestionBankPage = () => {
       setItems(res.data.data.items);
       setTotal(res.data.data.total);
     } catch {
-      setError('Không tải được ngân hàng câu hỏi.');
+      setError(t('question_bank.error_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -127,15 +132,15 @@ const QuestionBankPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Xóa câu hỏi khỏi ngân hàng?')) return;
+    if (!confirm(t('question_bank.confirm_delete'))) return;
     try {
       await apiClient.delete(`/question-bank/${id}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setNotice('Đã xóa câu hỏi.');
+      setNotice(t('question_bank.notice_deleted'));
       void fetchItems(filter, page);
     } catch {
-      setError('Không xóa được câu hỏi.');
+      setError(t('question_bank.error_delete_failed'));
     }
   };
 
@@ -145,10 +150,10 @@ const QuestionBankPage = () => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setCreateModalOpen(false);
-      setNotice('Đã tạo câu hỏi.');
+      setNotice(t('question_bank.notice_created'));
       void fetchItems(filter, page);
     } catch {
-      setError('Không tạo được câu hỏi.');
+      setError(t('question_bank.error_create_failed'));
     }
   };
 
@@ -158,10 +163,10 @@ const QuestionBankPage = () => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setEditModalOpen(false);
-      setNotice('Đã cập nhật câu hỏi.');
+      setNotice(t('question_bank.notice_updated'));
       void fetchItems(filter, page);
     } catch {
-      setError('Không cập nhật được câu hỏi.');
+      setError(t('question_bank.error_update_failed'));
     }
   };
 
@@ -171,15 +176,15 @@ const QuestionBankPage = () => {
       await apiClient.post(`/question-bank/${qbId}/import/${examId}`, {}, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setNotice('Đã thêm vào đề thi!');
+      setNotice(t('question_bank.notice_imported'));
     } catch {
-      setError('Không import được câu hỏi vào đề.');
+      setError(t('question_bank.error_import_failed'));
     }
   };
 
   const handlePreviewImport = async () => {
     if (!importFile) {
-      setError('Vui lòng chọn file Word .docx.');
+      setError(t('question_bank.error_select_file'));
       return;
     }
     try {
@@ -188,13 +193,13 @@ const QuestionBankPage = () => {
       setImportPreview(preview);
       setImportModalOpen(true);
     } catch {
-      setError('Không đọc được file Word.');
+      setError(t('question_bank.error_read_file'));
     }
   };
 
   const handleBulkImportConfirm = async (questions: ImportedQuestionDraft[]) => {
     if (!importSubjectId) {
-      setError('Vui lòng chọn môn học trước khi import.');
+      setError(t('question_bank.error_select_subject'));
       return;
     }
 
@@ -222,10 +227,10 @@ const QuestionBankPage = () => {
       setImportModalOpen(false);
       setImportPreview(null);
       setImportFile(null);
-      setNotice(`Đã import ${questions.length} câu hỏi vào ngân hàng.`);
+      setNotice(t('question_bank.notice_bulk_imported', { count: questions.length }));
       void fetchItems(filter, page);
     } catch {
-      setError('Import hàng loạt thất bại.');
+      setError(t('question_bank.error_bulk_import_failed'));
     } finally {
       setImporting(false);
     }
@@ -237,10 +242,10 @@ const QuestionBankPage = () => {
     <Box className="max-w-[1200px] mx-auto p-4">
       <Stack gap="md">
         <Group justify="space-between">
-          <Title order={2}>Ngân hàng câu hỏi</Title>
+          <Title order={2}>{t('question_bank.title')}</Title>
           <Group>
             <ButtonFilled
-              label="Tạo câu hỏi"
+              label={t('question_bank.create_question')}
               disabled={false}
               onClick={() => setCreateModalOpen(true)}
             />
@@ -255,19 +260,19 @@ const QuestionBankPage = () => {
 
         <Paper withBorder radius="md" p="md">
           <Stack gap="xs">
-            <Text fw={600}>Import hàng loạt từ Word</Text>
+            <Text fw={600}>{t('question_bank.bulk_import_title')}</Text>
             <Group grow>
               <Select
-                label="Môn học"
-                placeholder="Chọn môn học"
+                label={t('question_bank.subject')}
+                placeholder={t('question_bank.select_subject')}
                 data={subjects.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
                 value={importSubjectId}
                 onChange={setImportSubjectId}
                 searchable
               />
               <FileInput
-                label="File .docx"
-                placeholder="Chọn file Word"
+                label={t('question_bank.docx_file')}
+                placeholder={t('question_bank.select_word_file')}
                 accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 value={importFile}
                 onChange={setImportFile}
@@ -282,7 +287,7 @@ const QuestionBankPage = () => {
                 disabled={!importFile || !importSubjectId || importing}
                 loading={importing}
               >
-                Kiểm tra & Import hàng loạt
+                {t('question_bank.preview_import')}
               </Button>
             </Group>
           </Stack>
@@ -292,7 +297,7 @@ const QuestionBankPage = () => {
         <Paper withBorder radius="md" p="md">
           <Group gap="sm" wrap="wrap">
             <TextInput
-              placeholder="Tìm kiếm nội dung..."
+              placeholder={t('question_bank.search_placeholder')}
               leftSection={<IconSearch size={14} />}
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -300,10 +305,10 @@ const QuestionBankPage = () => {
               style={{ flex: 1, minWidth: 200 }}
             />
             <Select
-              placeholder="Loại"
+              placeholder={t('question_bank.type_placeholder')}
               data={[
-                { value: 'mcq', label: 'Trắc nghiệm' },
-                { value: 'essay', label: 'Tự luận' },
+                { value: 'mcq', label: t('question_bank.type_mcq') },
+                { value: 'essay', label: t('question_bank.type_essay') },
               ]}
               clearable
               value={filter.question_type}
@@ -311,11 +316,11 @@ const QuestionBankPage = () => {
               w={140}
             />
             <Select
-              placeholder="Độ khó"
+              placeholder={t('question_bank.difficulty_placeholder')}
               data={[
-                { value: 'DE', label: 'Dễ' },
-                { value: 'TRUNGBINH', label: 'Trung bình' },
-                { value: 'KHO', label: 'Khó' },
+                { value: 'DE', label: t('question_bank.difficulty_easy') },
+                { value: 'TRUNGBINH', label: t('question_bank.difficulty_medium') },
+                { value: 'KHO', label: t('question_bank.difficulty_hard') },
               ]}
               clearable
               value={filter.difficulty}
@@ -323,7 +328,7 @@ const QuestionBankPage = () => {
               w={140}
             />
             <Button onClick={handleSearch} leftSection={<IconFilter size={14} />}>
-              Lọc
+              {t('question_bank.filter')}
             </Button>
           </Group>
         </Paper>
@@ -336,13 +341,13 @@ const QuestionBankPage = () => {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
-                  <Table.Th>Nội dung</Table.Th>
-                  <Table.Th>Loại</Table.Th>
-                  <Table.Th>Độ khó</Table.Th>
-                  <Table.Th>Tags</Table.Th>
-                  <Table.Th>Điểm</Table.Th>
-                  <Table.Th>Đã dùng</Table.Th>
-                  <Table.Th>Thao tác</Table.Th>
+                  <Table.Th>{t('question_bank.col_content')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_type')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_difficulty')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_tags')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_points')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_usage')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_actions')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -354,7 +359,7 @@ const QuestionBankPage = () => {
                     </Table.Td>
                     <Table.Td>
                       <Badge color={item.question_type === 'mcq' ? 'blue' : 'violet'} size="sm">
-                        {item.question_type === 'mcq' ? 'TN' : 'TL'}
+                        {item.question_type === 'mcq' ? t('question_bank.type_mcq') : t('question_bank.type_essay')}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -376,7 +381,7 @@ const QuestionBankPage = () => {
                     <Table.Td><Text size="sm" c="dimmed">{item.usage_count}</Text></Table.Td>
                     <Table.Td>
                       <Group gap={4}>
-                        <Tooltip label="Sửa">
+                        <Tooltip label={t('question_bank.action_edit')}>
                           <ActionIcon
                             variant="subtle"
                             color="blue"
@@ -385,15 +390,16 @@ const QuestionBankPage = () => {
                             <IconEdit size={16} />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label="Xóa">
+                        <Tooltip label={t('question_bank.action_delete')}>
                           <ActionIcon variant="subtle" color="red" onClick={() => void handleDelete(item.id)}>
                             <IconTrash size={16} />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label="Thêm vào đề thi">
+                        <Tooltip label={t('question_bank.add_to_exam')}>
                           <ActionIcon variant="subtle" color="teal" onClick={() => {
-                            const examId = prompt('Nhập exam ID:');
-                            if (examId) void handleImportToExam(item.id, examId);
+                            setImportingQbId(item.id);
+                            setExamIdInput('');
+                            setExamIdInputOpen(true);
                           }}>
                             <IconDownload size={16} />
                           </ActionIcon>
@@ -405,7 +411,7 @@ const QuestionBankPage = () => {
                 {items.length === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={8}>
-                      <Text c="dimmed" ta="center">Chưa có câu hỏi nào</Text>
+                      <Text c="dimmed" ta="center">{t('question_bank.empty')}</Text>
                     </Table.Td>
                   </Table.Tr>
                 )}
@@ -420,11 +426,11 @@ const QuestionBankPage = () => {
           </Group>
         )}
 
-        <Text size="sm" c="dimmed">Tổng: {total} câu hỏi</Text>
+        <Text size="sm" c="dimmed">{t('question_bank.total_questions', { total })}</Text>
       </Stack>
 
       {/* Create Modal */}
-      <Modal opened={createModalOpen} onClose={() => setCreateModalOpen(false)} title="Tạo câu hỏi mới" size="lg">
+      <Modal opened={createModalOpen} onClose={() => setCreateModalOpen(false)} title={t('question_bank.create_modal_title')} size="lg">
         <QBForm
           subjects={subjects}
           onSubmit={data => void handleCreate(data)}
@@ -433,7 +439,7 @@ const QuestionBankPage = () => {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal opened={editModalOpen} onClose={() => setEditModalOpen(false)} title="Sửa câu hỏi" size="lg">
+      <Modal opened={editModalOpen} onClose={() => setEditModalOpen(false)} title={t('question_bank.edit_modal_title')} size="lg">
         {editingItem && (
           <QBForm
             initial={editingItem}
@@ -451,6 +457,48 @@ const QuestionBankPage = () => {
           onClose={() => setImportModalOpen(false)}
         />
       )}
+
+      {/* Import to exam ID input modal */}
+      <Modal
+        opened={examIdInputOpen}
+        onClose={() => setExamIdInputOpen(false)}
+        title={t('question_bank.import_exam_modal_title')}
+        size="sm"
+        centered
+      >
+        <Stack gap="sm">
+          <TextInput
+            label={t('question_bank.exam_id_label')}
+            placeholder={t('question_bank.exam_id_placeholder')}
+            value={examIdInput}
+            onChange={(e) => setExamIdInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && examIdInput.trim()) {
+                void handleImportToExam(importingQbId!, examIdInput.trim());
+                setExamIdInputOpen(false);
+              }
+            }}
+            autoFocus
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setExamIdInputOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              color="teal"
+              disabled={!examIdInput.trim()}
+              onClick={() => {
+                if (importingQbId && examIdInput.trim()) {
+                  void handleImportToExam(importingQbId, examIdInput.trim());
+                  setExamIdInputOpen(false);
+                }
+              }}
+            >
+              {t('question_bank.confirm_import')}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Box>
   );
 };
@@ -496,7 +544,7 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
   return (
     <Stack gap="sm">
       <Textarea
-        label="Nội dung câu hỏi"
+        label={t('question_bank.form_content_label')}
         value={content}
         onChange={e => setContent(e.target.value)}
         rows={3}
@@ -504,7 +552,7 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
       />
       <Group grow>
         <Select
-          label="Môn học"
+          label={t('question_bank.form_subject')}
           value={subjectId}
           onChange={setSubjectId}
           data={subjects.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
@@ -512,28 +560,28 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
           required
         />
         <Stack gap={4}>
-          <Text size="sm" fw={500}>Loại câu hỏi</Text>
+          <Text size="sm" fw={500}>{t('question_bank.form_question_type')}</Text>
           <SegmentedControl
             value={questionType}
             onChange={v => setQuestionType(v as QuestionType)}
-            data={[{ value: 'mcq', label: 'Trắc nghiệm' }, { value: 'essay', label: 'Tự luận' }]}
+            data={[{ value: 'mcq', label: t('question_bank.type_mcq') }, { value: 'essay', label: t('question_bank.type_essay') }]}
           />
         </Stack>
-        <NumberInput label="Điểm" value={points} onChange={v => setPoints(Number(v))} min={0.5} step={0.5} />
+        <NumberInput label={t('question_bank.form_points')} value={points} onChange={v => setPoints(Number(v))} min={0.5} step={0.5} />
         <Select
-          label="Độ khó"
+          label={t('question_bank.form_difficulty')}
           value={difficulty}
           onChange={v => setDifficulty((v ?? 'TRUNGBINH') as QBDifficulty)}
           data={[
-            { value: 'DE', label: 'Dễ' },
-            { value: 'TRUNGBINH', label: 'Trung bình' },
-            { value: 'KHO', label: 'Khó' },
+            { value: 'DE', label: t('question_bank.difficulty_easy') },
+            { value: 'TRUNGBINH', label: t('question_bank.difficulty_medium') },
+            { value: 'KHO', label: t('question_bank.difficulty_hard') },
           ]}
         />
       </Group>
       {questionType === 'mcq' && (
         <>
-          <Text size="sm" fw={600}>Các lựa chọn</Text>
+          <Text size="sm" fw={600}>{t('question_bank.form_options')}</Text>
           {Object.keys(options).map(key => (
             <Group key={key} gap="xs">
               <Badge w={24} ta="center">{key}</Badge>
@@ -541,12 +589,12 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
                 flex={1}
                 value={options[key]}
                 onChange={e => setOptions(prev => ({ ...prev, [key]: e.target.value }))}
-                placeholder={`Đáp án ${key}`}
+                placeholder={t('question_bank.form_option_placeholder', { key })}
               />
             </Group>
           ))}
           <Select
-            label="Đáp án đúng"
+            label={t('question_bank.form_correct_answer')}
             value={correctAnswer}
             onChange={v => setCorrectAnswer(v ?? '')}
             data={Object.keys(options).filter(k => options[k].trim())}
@@ -554,17 +602,17 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
         </>
       )}
       <Group grow>
-        <NumberInput label="Chương" value={chapter} onChange={v => setChapter(v === '' ? '' : Number(v))} min={1} />
+        <NumberInput label={t('question_bank.form_chapter')} value={chapter} onChange={v => setChapter(v === '' ? '' : Number(v))} min={1} />
         <TextInput
-          label="Tags (phân cách bằng dấu phẩy)"
+          label={t('question_bank.form_tags')}
           value={tags}
           onChange={e => setTags(e.target.value)}
           placeholder="python, loop, function"
         />
       </Group>
       <Group justify="flex-end" mt="sm">
-        <Button variant="default" onClick={onCancel}>Hủy</Button>
-        <Button onClick={handleSubmit} color="teal">Lưu</Button>
+        <Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button onClick={handleSubmit} color="teal">{t('common.save')}</Button>
       </Group>
     </Stack>
   );

@@ -11,7 +11,21 @@ import {
   Group,
   Badge,
   Alert,
+  Button,
+  Menu,
+  ActionIcon,
 } from '@mantine/core';
+import { modals } from '@mantine/modals';
+import {
+  IconDotsVertical,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconEdit,
+  IconClock,
+  IconTrash,
+  IconClipboardList,
+} from '@tabler/icons-react';
+import examApi from '@/services/examApi';
 import { useTranslation } from 'react-i18next';
 import useAuth from '@/hooks/useAuth';
 import { useExamListState } from '@/hooks/useExamListState';
@@ -44,6 +58,36 @@ const ExamList = () => {
     handleUpdateDuration,
     handleForceSubmit,
   } = useExamListState({ isStaff, t });
+
+  const handleDeleteExam = (examId: string, examTitle: string) => {
+    modals.open({
+      title: t('exam_list.confirm_delete_title', 'Xóa bài thi'),
+      centered: true,
+      children: (
+        <Stack gap="md">
+          <Text>{t('exam_list.confirm_delete_msg', 'Bạn có chắc muốn xóa bài thi này?')}</Text>
+          <Text fw={700}>{examTitle}</Text>
+          <Text size="sm" c="red">{t('exam_list.confirm_delete_warn', 'Hành động này không thể hoàn tác.')}</Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => modals.closeAll()}>
+              {t('common.cancel', 'Hủy')}
+            </Button>
+            <Button color="red" onClick={async () => {
+              try {
+                await examApi.deleteExam(examId);
+                modals.closeAll();
+                window.location.reload();
+              } catch {
+                modals.closeAll();
+              }
+            }}>
+              {t('common.delete', 'Xóa')}
+            </Button>
+          </Group>
+        </Stack>
+      ),
+    });
+  };
 
   if (loading) {
     return (
@@ -144,9 +188,11 @@ const ExamList = () => {
                       ? new Date(item.closes_at).toLocaleString()
                       : t('exam_list.deadline_none');
                   return (
-                    <Table.Tr key={item.id}>
+                    <Table.Tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/exams/${item.id}`)}>
                       <Table.Td>{idx + 1}</Table.Td>
-                      <Table.Td>{item.title}</Table.Td>
+                      <Table.Td>
+                        <Text fw={500}>{item.title}</Text>
+                      </Table.Td>
                       <Table.Td>{item.subject_name || '—'}</Table.Td>
                       <Table.Td>{item.duration_min}</Table.Td>
                       <Table.Td>
@@ -166,38 +212,53 @@ const ExamList = () => {
                       </Table.Td>
                       <Table.Td>
                         {isStaff ? (
-                          <Group gap={6} wrap="nowrap">
-                            <ButtonFilled
-                              size="xs"
-                              color="green"
-                              loading={startingExamId === item.id}
-                              label="Start"
-                              disabled={startingExamId === item.id}
-                              onClick={() => void handleStartExam(item)}
-                            />
-                            <ButtonFilled
-                              size="xs"
-                              color="gray"
-                              label={t('exam_list.action_edit_questions')}
-                              disabled={false}
-                              onClick={() => navigate(`/exams/${item.id}/edit`)}
-                            />
-                            <ButtonFilled
-                              size="xs"
-                              color="blue"
-                              loading={updatingExamId === item.id}
-                              label="Set time"
-                              disabled={updatingExamId === item.id || startingExamId === item.id}
-                              onClick={() => void handleUpdateDuration(item)}
-                            />
-                            <ButtonFilled
-                              size="xs"
-                              color="red"
-                              loading={forceSubmittingExamId === item.id}
-                              label={t('exam_list.action_force_submit')}
-                              disabled={activeCount === 0 || forceSubmittingExamId === item.id}
-                              onClick={() => void handleForceSubmit(item.id)}
-                            />
+                          <Group gap={4} wrap="nowrap">
+                            {activeCount > 0 ? (
+                              <Button
+                                size="xs"
+                                color="red"
+                                variant="light"
+                                leftSection={<IconPlayerStop size={13} />}
+                                loading={forceSubmittingExamId === item.id}
+                                onClick={(e) => { e.stopPropagation(); void handleForceSubmit(item.id); }}
+                              >
+                                {t('exam_list.action_stop', 'Dừng')}
+                              </Button>
+                            ) : (
+                              <Button
+                                size="xs"
+                                color="green"
+                                variant="light"
+                                leftSection={<IconPlayerPlay size={13} />}
+                                loading={startingExamId === item.id}
+                                disabled={startingExamId === item.id}
+                                onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
+                              >
+                                {t('exam_list.action_start', 'Start')}
+                              </Button>
+                            )}
+                            <Menu shadow="md" width={170} position="bottom-end">
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                  <IconDotsVertical size={15} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<IconEdit size={13} />} onClick={(e) => { e.stopPropagation(); navigate(`/exams/${item.id}/edit`); }}>
+                                  {t('exam_list.action_edit_questions', 'Sửa câu hỏi')}
+                                </Menu.Item>
+                                <Menu.Item leftSection={<IconClock size={13} />} onClick={(e) => { e.stopPropagation(); void handleUpdateDuration(item); }}>
+                                  {t('exam_list.action_set_time', 'Đặt giờ')}
+                                </Menu.Item>
+                                <Menu.Item leftSection={<IconClipboardList size={13} />} onClick={(e) => { e.stopPropagation(); navigate(`/exam-sessions/${item.id}`); }}>
+                                  {t('exam_sessions.action_manage', 'Quản lý phiên thi')}
+                                </Menu.Item>
+                                <Menu.Divider />
+                                <Menu.Item color="red" leftSection={<IconTrash size={13} />} onClick={(e) => { e.stopPropagation(); handleDeleteExam(item.id, item.title); }}>
+                                  {t('common.delete', 'Xóa')}
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
                           </Group>
                         ) : (
                           <>

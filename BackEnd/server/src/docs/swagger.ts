@@ -584,6 +584,72 @@ const swaggerSpec = {
       },
     },
 
+    "/exams/sessions/{sessionId}/review": {
+      parameters: [
+        {
+          name: "sessionId",
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+        },
+      ],
+      get: {
+        tags: ["Sessions"],
+        summary: "Review submitted exam session",
+        description:
+          "Returns full review payload for a student's submitted session: questions, submitted answers, correct answers, explanations, points earned. Requires JWT. Allowed role: student (own session only).",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Review payload with full question details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        session: { type: "object" },
+                        exam: { type: "object" },
+                        score: { type: "number", nullable: true },
+                        max_points: { type: "number", nullable: true },
+                        grading_status: { type: "string", nullable: true },
+                        questions: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              question_id: { type: "string" },
+                              question_type: { type: "string" },
+                              content: { type: "string" },
+                              options: { type: "object", nullable: true },
+                              explanation: { type: "string", nullable: true },
+                              submitted: { type: "string", nullable: true },
+                              correct: { type: "string", nullable: true },
+                              is_correct: { type: "boolean" },
+                              points_earned: { type: "number", nullable: true },
+                              max_points: { type: "number" },
+                              pending_grading: { type: "boolean" },
+                              teacher_comment: { type: "string", nullable: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: "Session is still active (not submitted)" },
+          403: { description: "Not your session" },
+          404: { description: "Session not found" },
+        },
+      },
+    },
+
     "/exams/integrity-events": {
       post: {
         tags: ["Integrity"],

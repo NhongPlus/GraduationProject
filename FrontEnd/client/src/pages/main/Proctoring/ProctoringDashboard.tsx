@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, TextInput, Select, Button, Modal, Tooltip,
@@ -301,8 +302,8 @@ const ProctoringDashboard = () => {
             </Table.Thead>
             <Table.Tbody>
               {data.sessions.map((session, idx) => (
-                <>
-                  <Table.Tr key={session.session_id}>
+                <React.Fragment key={session.session_id}>
+                  <Table.Tr>
                     <Table.Td>{idx + 1}</Table.Td>
                     <Table.Td>
                       <Stack gap={2}>
@@ -347,7 +348,7 @@ const ProctoringDashboard = () => {
                     </Table.Td>
                   </Table.Tr>
                   {expandedRow === session.session_id && (
-                    <Table.Tr key={`${session.session_id}-log`}>
+                    <Table.Tr>
                       <Table.Td colSpan={7}>
                         <Paper withBorder radius="sm" p="sm" bg="gray.0">
                           <Text size="xs" fw={600} mb="xs">Nhật ký vi phạm</Text>
@@ -369,7 +370,7 @@ const ProctoringDashboard = () => {
                       </Table.Td>
                     </Table.Tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
               {data.sessions.length === 0 && (
                 <Table.Tr>

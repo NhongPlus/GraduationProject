@@ -1,0 +1,57 @@
+-- Chuẩn hóa mã môn + category/sub_category từ cntt1602_grades.json
+UPDATE subjects SET code = 'PE001', category = 'skills_support', sub_category = 'pe'
+WHERE name = 'Lý luận và phương pháp Giáo dục thể chất 1';
+UPDATE subjects SET code = 'PE002', category = 'skills_support', sub_category = 'pe' WHERE name = 'Võ (Cơ bản)';
+UPDATE subjects SET code = 'PE003', category = 'skills_support', sub_category = 'pe' WHERE name = 'Yoga (Cơ bản)';
+UPDATE subjects SET code = 'PE004', category = 'skills_support', sub_category = 'pe' WHERE name ILIKE 'Zumba(Cơ bản)%';
+UPDATE subjects SET code = 'PE005', category = 'skills_support', sub_category = 'pe' WHERE name ILIKE 'Zumba(Nâng cao)%';
+UPDATE subjects SET code = 'INT001', category = 'internship', sub_category = 'capstone' WHERE name = 'Thực tập tốt nghiệp';
+UPDATE subjects SET code = 'LAW001', category = 'general_ed', sub_category = 'law' WHERE name = 'Pháp luật đại cương';
+UPDATE subjects SET code = 'SKL001', category = 'skills_support', sub_category = 'soft_skills' WHERE name = 'Kỹ năng mềm cơ bản';
+UPDATE subjects SET code = 'MATH001', category = 'foundation', sub_category = 'math' WHERE name ILIKE 'Đại số tuyến tính%';
+UPDATE subjects SET code = 'CS001', category = 'foundation', sub_category = 'intro' WHERE name = 'Nhập môn công nghệ thông tin';
+UPDATE subjects SET code = 'CS111', category = 'foundation', sub_category = 'programming' WHERE name = 'Lập trình cơ bản';
+UPDATE subjects SET code = 'CS101', category = 'internship', sub_category = 'cntt1' WHERE name ILIKE 'Thực tập CNTT1%';
+UPDATE subjects SET code = 'PHI001', category = 'general_ed', sub_category = 'philosophy' WHERE name = 'Triết học Mác - Lênin';
+UPDATE subjects SET code = 'PHI002', category = 'general_ed', sub_category = 'politics' WHERE name ILIKE 'Kinh tế chính trị%';
+UPDATE subjects SET code = 'ENG101', category = 'foundation', sub_category = 'english' WHERE name = 'Tiếng Anh P1';
+UPDATE subjects SET code = 'MATH101', category = 'foundation', sub_category = 'math' WHERE name = 'Toán giải tích';
+UPDATE subjects SET code = 'STAT001', category = 'foundation', sub_category = 'math' WHERE name ILIKE 'Xác suất thống kê%';
+UPDATE subjects SET code = 'GIS001', category = 'skills_support', sub_category = 'geo' WHERE name = 'Hệ thống thông tin địa lý';
+UPDATE subjects SET code = 'CS102', category = 'internship', sub_category = 'cntt2' WHERE name ILIKE 'Thực tập CNTT2%';
+UPDATE subjects SET code = 'ENG102', category = 'foundation', sub_category = 'english' WHERE name = 'Tiếng Anh P2';
+UPDATE subjects SET code = 'MATH201', category = 'foundation', sub_category = 'math' WHERE name = 'Toán rời rạc';
+UPDATE subjects SET code = 'CS201', category = 'foundation', sub_category = 'programming' WHERE name = 'Cấu trúc dữ liệu và giải thuật';
+UPDATE subjects SET code = 'NET301', category = 'foundation', sub_category = 'network' WHERE name = 'Mạng máy tính';
+UPDATE subjects SET code = 'CS202', category = 'foundation', sub_category = 'programming' WHERE name = 'Lập trình hướng đối tượng';
+UPDATE subjects SET code = 'CS103', category = 'internship', sub_category = 'cntt3' WHERE name ILIKE 'Thực tập CNTT3%';
+UPDATE subjects SET code = 'ND001', category = 'general_ed', sub_category = 'national_defense' WHERE name = 'Giáo dục quốc phòng P1';
+UPDATE subjects SET code = 'ND002', category = 'general_ed', sub_category = 'national_defense' WHERE name = 'Giáo dục quốc phòng P2';
+UPDATE subjects SET code = 'ND003', category = 'general_ed', sub_category = 'national_defense' WHERE name = 'Giáo dục quốc phòng P3';
+UPDATE subjects SET code = 'ND004', category = 'general_ed', sub_category = 'national_defense' WHERE name = 'Giáo dục quốc phòng P4';
+UPDATE subjects SET code = 'SKL002', category = 'skills_support', sub_category = 'soft_skills' WHERE name = 'Kỹ năng mềm nâng cao';
+UPDATE subjects SET code = 'ENG103', category = 'foundation', sub_category = 'english' WHERE name = 'Tiếng Anh P3';
+UPDATE subjects SET code = 'DB001', category = 'foundation', sub_category = 'database' WHERE name ILIKE 'Lý thuyết%cơ sở dữ liệu%';
+UPDATE subjects SET code = 'CS331', category = 'foundation', sub_category = 'iot' WHERE name = 'Lập trình IoT';
+UPDATE subjects SET code = 'AI401', category = 'ai_ml', sub_category = 'ai' WHERE name = 'Trí tuệ nhân tạo';
+UPDATE subjects SET code = 'PHI003', category = 'general_ed', sub_category = 'politics' WHERE name ILIKE 'Chủ nghĩa xã hội%';
+UPDATE subjects SET code = 'ENG104', category = 'foundation', sub_category = 'english' WHERE name = 'Tiếng Anh P4';
+UPDATE subjects SET code = 'SA001', category = 'foundation', sub_category = 'systems' WHERE name ILIKE 'Phân tích%thiết kế hệ thống%';
+UPDATE subjects SET code = 'ML501', category = 'ai_ml', sub_category = 'ml' WHERE name = 'Học máy';
+UPDATE subjects SET code = 'DT501', category = 'ai_ml', sub_category = 'data_eng' WHERE name = 'Công nghệ dữ liệu';
+UPDATE subjects SET code = 'PHI004', category = 'general_ed', sub_category = 'philosophy' WHERE name = 'Tư tưởng Hồ Chí Minh';
+UPDATE subjects SET code = 'SE601', category = 'software_eng', sub_category = 'se' WHERE name = 'Công nghệ phần mềm';
+UPDATE subjects SET code = 'CS621', category = 'software_eng', sub_category = 'mobile' WHERE name = 'Lập trình mobile';
+UPDATE subjects SET code = 'BD601', category = 'ai_ml', sub_category = 'big_data' WHERE name = 'Dữ liệu lớn';
+UPDATE subjects SET code = 'CS105', category = 'internship', sub_category = 'cntt5' WHERE name ILIKE 'Thực tập CNTT5%';
+UPDATE subjects SET code = 'HIS001', category = 'general_ed', sub_category = 'history' WHERE name ILIKE 'Lịch sử Đảng%';
+UPDATE subjects SET code = 'ENG105', category = 'foundation', sub_category = 'english' WHERE name = 'Tiếng Anh P5';
+UPDATE subjects SET code = 'CS106', category = 'internship', sub_category = 'cntt6' WHERE name ILIKE 'Thực tập CNTT6%';
+UPDATE subjects SET code = 'SEC001', category = 'skills_support', sub_category = 'security' WHERE name ILIKE 'An toàn%bảo mật%';
+UPDATE subjects SET code = 'DS801', category = 'skills_support', sub_category = 'digital' WHERE name = 'Chuyển đổi số';
+UPDATE subjects SET code = 'NET801', category = 'foundation', sub_category = 'network' WHERE name = 'Lập trình mạng';
+UPDATE subjects SET code = 'IT001', category = 'skills_support', sub_category = 'it_business' WHERE name ILIKE 'Ứng dụng Công nghệ thông tin%';
+UPDATE subjects SET code = 'SE802', category = 'software_eng', sub_category = 'testing' WHERE name = 'Kiểm thử phần mềm';
+
+UPDATE subjects SET code = COALESCE(NULLIF(TRIM(code), ''), 'SUBJ-' || LEFT(id::text, 8))
+WHERE code IS NULL OR TRIM(code) = '';

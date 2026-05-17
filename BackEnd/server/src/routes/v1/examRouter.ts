@@ -20,14 +20,19 @@ import {
   startExamRuntimeController,
   getMySubmissionController,
   getSessionGradingController,
+  getSessionReviewController,
   gradeSessionController,
   getExamProctoringController,
   postIntegrityEventsController,
   postAutosaveController,
+  downloadWordImportTemplateController,
   previewWordImportController,
   commitWordImportController,
   aiRecomposeExamController,
   uploadExamMediaController,
+  getIntegrityEventsController,
+  getProctorPresenceController,
+  getProctorLogsController,
 } from "~/controllers/exam.controller";
 
 const examRouter = Router();
@@ -54,6 +59,11 @@ examRouter.patch(
   roleMiddleware(["admin", "teacher"]),
   gradeSessionController
 );
+examRouter.get(
+  "/sessions/:sessionId/review",
+  roleMiddleware(["student"]),
+  getSessionReviewController
+);
 
 examRouter.post(
   "/integrity-events",
@@ -69,6 +79,11 @@ examRouter.post(
 
 examRouter.get("/", roleMiddleware(["admin", "teacher", "student"]), getExamListController);
 examRouter.post("/", roleMiddleware(["admin", "teacher"]), createExamController);
+examRouter.get(
+  "/import-word/template",
+  roleMiddleware(["admin", "teacher"]),
+  downloadWordImportTemplateController
+);
 examRouter.post(
   "/import-word/preview",
   roleMiddleware(["admin", "teacher"]),
@@ -123,5 +138,22 @@ examRouter.post(
   forceSubmitExamSessionsController
 );
 examRouter.get("/:examId/my-submission", roleMiddleware(["student"]), getMySubmissionController);
+
+// Task 2: Integrity events + presence endpoints for teacher/admin
+examRouter.get(
+  "/:examId/integrity-events",
+  roleMiddleware(["admin", "teacher"]),
+  getIntegrityEventsController
+);
+examRouter.get(
+  "/:examId/presence",
+  roleMiddleware(["admin", "teacher"]),
+  getProctorPresenceController
+);
+examRouter.get(
+  "/:examId/proctor-logs",
+  roleMiddleware(["admin", "teacher"]),
+  getProctorLogsController
+);
 
 export default examRouter;

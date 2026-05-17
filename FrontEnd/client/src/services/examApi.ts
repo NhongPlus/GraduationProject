@@ -1,16 +1,24 @@
 import apiClient from './apiClient';
+import type { ForceSubmitSummary } from './examRealtimeSocket';
+
+export type { ForceSubmitSummary };
 
 export interface Exam {
   id: string;
   title: string;
   description: string | null;
-  class_id: string;
+  class_id?: string | null;
+  admin_class_id?: string | null;
+  num_versions?: number;
+  subject_id?: string | null;
   created_by: string;
   duration_min: number;
   /** Hạn chót được phép bắt đầu phiên (ISO), null nếu không đặt */
   closes_at?: string | null;
   created_at: string;
   subject_name?: string;
+  subject_code?: string | null;
+  admin_class_name?: string | null;
   class_semester?: string;
   class_year?: number;
   creator_name?: string | null;
@@ -29,6 +37,8 @@ export interface Question {
   created_at: string;
   correct_answer?: string | string[];
   media_url?: string | null;
+  explanation?: string | null;
+  version_index?: number;
 }
 
 export interface ExamSession {
@@ -46,6 +56,10 @@ export interface ExamSession {
   /** Có khi GET /exams/:examId/sessions (JOIN accounts) */
   full_name?: string | null;
   email?: string | null;
+  /** Từ getSessionsByExamWithStudent — tên sinh viên */
+  student_name?: string | null;
+  student_email?: string | null;
+  version_code?: string | null;
 }
 
 export interface StartSessionData {
@@ -63,6 +77,12 @@ export interface StartSessionData {
     points: number;
     media_url?: string | null;
   }>;
+  /** Đồng hồ lớp khi GV đã bật thi — ưu tiên hơn deadline cá nhân */
+  runtime_state?: {
+    started_at: string;
+    ends_at: string;
+    is_active: boolean;
+  } | null;
 }
 
 export interface SubmitResult {
@@ -109,11 +129,26 @@ export interface GradingPayload {
   }>;
 }
 
-export interface ForceSubmitSummary {
-  exam_id: string;
-  active_sessions: number;
-  submitted_sessions: number;
-  failed_sessions: number;
+export interface SessionReview {
+  session: ExamSession;
+  exam: Exam;
+  score: number | null;
+  max_points: number | null;
+  grading_status: 'pending_manual' | 'complete' | null;
+  questions: Array<{
+    question_id: string;
+    question_type: QuestionType;
+    content: string;
+    options: Record<string, string> | null;
+    explanation: string | null;
+    submitted: string | string[] | null;
+    correct: string | string[] | null;
+    is_correct: boolean;
+    points_earned: number | null;
+    max_points: number;
+    pending_grading?: boolean;
+    teacher_comment?: string | null;
+  }>;
 }
 
 export interface StartRuntimeResult {
@@ -139,6 +174,7 @@ export interface ImportedQuestionDraft {
   ai_confidence?: number;
   needs_review?: boolean;
   review_reason?: string | null;
+  version_index?: number;
 }
 
 export interface ExamImportPreview {
@@ -202,8 +238,10 @@ export interface PredictionRecomputeSummary {
 }
 
 const examApi = {
-  getExams: async (classId?: string): Promise<Exam[]> => {
-    const params = classId ? { class_id: classId } : {};
+  getExams: async (classId?: string, extraParams?: Record<string, string>): Promise<Exam[]> => {
+    const params: Record<string, string> = {};
+    if (classId) params.class_id = classId;
+    if (extraParams) Object.assign(params, extraParams);
     const res = await apiClient.get<{ success: boolean; data: Exam[] }>('/exams', { params });
     return res.data.data;
   },
@@ -226,7 +264,7 @@ const examApi = {
 
   updateExam: async (
     id: string,
-    payload: Partial<Pick<Exam, 'title' | 'description' | 'duration_min' | 'closes_at'>>
+    payload: Partial<Pick<Exam, 'title' | 'description' | 'duration_min' | 'closes_at' | 'num_versions'>>
   ): Promise<Exam> => {
     const res = await apiClient.patch<{ success: boolean; data: Exam }>(`/exams/${id}`, payload);
     return res.data.data;
@@ -252,6 +290,7 @@ const examApi = {
       options?: Record<string, string>;
       correct_answer?: string | string[];
       media_url?: string | null;
+      version_index?: number;
     }
   ): Promise<Question> => {
     const res = await apiClient.post<{ success: boolean; data: Question }>(
@@ -281,6 +320,16 @@ const examApi = {
     return res.data.data;
   },
 
+  downloadWordImportTemplate: async (): Promise<void> => {
+    const res = await apiClient.get<Blob>('/exams/import-word/template', { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'exam_template_GiaoVien.docx';
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
   previewWordImport: async (file: File): Promise<ExamImportPreview> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -294,10 +343,13 @@ const examApi = {
 
   commitWordImport: async (payload: {
     title: string;
-    class_id: string;
+    admin_class_id: string;
+    subject_id: string;
+    class_id?: string | null;
     duration_min: number;
     description?: string | null;
     closes_at?: string | null;
+    num_versions?: number;
     questions: ImportedQuestionDraft[];
   }): Promise<{ exam: Exam; questions: Question[] }> => {
     const res = await apiClient.post<{
@@ -362,9 +414,10 @@ const examApi = {
     return res.data.data;
   },
 
-  getExamSessions: async (examId: string): Promise<ExamSession[]> => {
+  getExamSessions: async (examId: string, params?: { page?: number; limit?: number }): Promise<ExamSession[]> => {
+    const query = params ? `?page=${params.page ?? 1}&limit=${params.limit ?? 20}` : '';
     const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
-      `/exams/${examId}/sessions`
+      `/exams/${examId}/sessions${query}`
     );
     return res.data.data;
   },
@@ -404,6 +457,13 @@ const examApi = {
     const res = await apiClient.patch<{ success: boolean; data: ExamSession }>(
       `/exams/sessions/${sessionId}/grade`,
       { grades }
+    );
+    return res.data.data;
+  },
+
+  getSessionReview: async (sessionId: string): Promise<SessionReview> => {
+    const res = await apiClient.get<{ success: boolean; data: SessionReview }>(
+      `/exams/sessions/${sessionId}/review`
     );
     return res.data.data;
   },

@@ -23,6 +23,8 @@ export interface ImportedQuestionDraft {
   ai_confidence?: number;
   needs_review?: boolean;
   review_reason?: string | null;
+  /** Mã đề (0 = D01, 1 = D02) khi import nhiều file Word */
+  version_index?: number;
 }
 
 export interface ImportedExamDraft {
@@ -78,6 +80,19 @@ const DIFFICULTY_MAP: Record<string, "DE" | "TRUNGBINH" | "KHO"> = {
 };
 
 const HEADER_RE = /\[LOAI:(\w+)\]/i;
+/** Dòng bắt đầu câu hỏi: thẻ ở đầu dòng, hoặc dòng metadata mẫu cũ "Loại: [LOAI:...]" */
+const QUESTION_START_RE = /^\[LOAI:\w+\]/i;
+const LEGACY_META_HEADER_RE = /Loại\s*:\s*\[LOAI:\w+\]/i;
+
+function isQuestionStartLine(line: string): boolean {
+  if (LEGACY_HEADER_RE.test(line)) return true;
+  if (LEGACY_META_HEADER_RE.test(line)) return true;
+  if (!QUESTION_START_RE.test(line)) return false;
+  const afterLoai = line.replace(/^\[LOAI:\w+\]\s*/i, "");
+  if (!afterLoai.trim()) return true;
+  if (/^\[[A-Z]+:/i.test(afterLoai)) return true;
+  return false;
+}
 const DIEM_RE = /\[DIEM:([\d.]+)\]/i;
 const KHO_RE = /\[KHO:(\w+)\]/i;
 const CHUONG_RE = /\[CHUONG:(\d+)\]/i;
@@ -88,10 +103,19 @@ const DAPAN_RE = /\[DAPAN:([^\]]+)\]/i;
 
 const LEGACY_HEADER_RE = /^Q(?:uestion)?\s*(\d+)?\s*\[(mcq|essay)\]\s*\[(\d+(?:\.\d+)?)\]\s*$/i;
 const LEGACY_OPTION_RE = /^([A-Z])[\.)]\s+(.+)$/;
-const LEGACY_ANSWER_RE = /^(Answer|Đáp án|Dap an)\s*:\s*(.+)$/i;
+const LEGACY_ANSWER_RE = /^(Answer|Đáp án|Dap an|DAP AN)\s*:\s*(.+)$/i;
 const LEGACY_TITLE_RE = /^(Title|Tiêu đề|Tieu de)\s*:\s*(.+)$/i;
 const LEGACY_DURATION_RE = /^(Duration|Thời gian|Thoi gian)\s*:\s*(\d+)$/i;
 const LEGACY_DESCRIPTION_RE = /^(Description|Mô tả|Mo ta)\s*:\s*(.*)$/i;
+const ESSAY_HINT_RE = /^(Gợi ý chấm|Goi y cham|Gợi ý|Goi y)\s*:\s*(.+)$/i;
+
+/** Dòng chỉ mang tính trang trí trong mẫu Word cũ — bỏ qua khi parse */
+const SKIP_DECORATIVE_LINE_RE =
+  /^(?:C\d+|TN|TL|ANH|AUDIO|VIDEO|Loại\s*:|Điểm\s*:|Độ khó\s*:|Chương\s*:|✔|→|🖼️|🔊|🎬|📝|📌|PHẦN\s|PHAN\s|Chọn\s1\sđáp|Quan\s+sát|Nghe\sđoạn|Xem\svideo|Trình\s+bày|Mỗi\scâu)/i;
+
+/** Hướng dẫn / phân cách trong file mẫu */
+const SKIP_INSTRUCTION_LINE_RE =
+  /^(?:HƯỚNG\s+DẪN|GHI\s+CHÚ|BẢNG\s|PHỤ\s+LỤC|CHECKLIST|PHẦN\s+MẪU|THÔNG\s+TIN|Giải\s+thích|Lưu\s+ý|Ví\s+dụ|Ghi\s+chú|Thẻ\s+[A-Z]+:|•\s|→\s|─{3,}|\d+\.\s|Cách\s+viết|Loại\scâu|GHI\s+NHỚ|Nộp\s+file|Đặt\stên|Tên\s+file|Hệ\s+thống|\(Mẫu\s|TN\s+hoặc|TL\s+hoặc|TN-ANH|TN-AUDIO|TN-VIDEO\s*=)/i;
 
 function normalizeText(text: string): string[] {
   return text
@@ -102,6 +126,15 @@ function normalizeText(text: string): string[] {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function shouldSkipLine(line: string, hasCurrentQuestion: boolean): boolean {
+  if (HEADER_RE.test(line)) return false;
+  if (SKIP_INSTRUCTION_LINE_RE.test(line)) return true;
+  if (!hasCurrentQuestion && SKIP_DECORATIVE_LINE_RE.test(line)) return true;
+  if (hasCurrentQuestion && /^(?:C\d+|TN|TL|ANH|AUDIO|VIDEO)$/i.test(line)) return true;
+  if (/^Tiêu chí chấm điểm$/i.test(line)) return true;
+  return false;
 }
 
 function normalizeAnswer(raw: string): string | string[] {
@@ -174,7 +207,14 @@ function extractQuestionMetadata(line: string): {
   const question_type = QUESTION_TYPE_MAP[typeRaw] ?? "mcq";
 
   const diemMatch = line.match(DIEM_RE);
-  const points = diemMatch ? parseFloat(diemMatch[1]) : 1;
+  let points = 1;
+  if (diemMatch) {
+    const raw = diemMatch[1].trim();
+    if (raw && !/^[_\-.]+$/.test(raw)) {
+      const parsed = parseFloat(raw);
+      if (Number.isFinite(parsed) && parsed > 0) points = parsed;
+    }
+  }
 
   const khoMatch = line.match(KHO_RE);
   const difficulty = khoMatch
@@ -249,9 +289,31 @@ export function parseExamImportText(text: string): ExamImportPreview {
   let isLegacyMode = false;
 
   for (const line of lines) {
-    const headerMatch = line.match(HEADER_RE);
-    if (headerMatch) {
+    if (shouldSkipLine(line, Boolean(current))) continue;
+
+    const legacyHeaderMatch = line.match(LEGACY_HEADER_RE);
+    if (legacyHeaderMatch) {
       if (current) finalizeQuestion(current, questions, errors, warnings);
+      isLegacyMode = true;
+      const parsedPoints = Number(legacyHeaderMatch[3]);
+      current = {
+        index: questions.length + 1,
+        question_type: legacyHeaderMatch[2].toLowerCase() as QuestionType,
+        points: Number.isFinite(parsedPoints) && parsedPoints > 0 ? parsedPoints : 1,
+        contentLines: [],
+        options: {},
+        correct_answer: null,
+        answer_hint: null,
+        difficulty: "DE",
+        chapter: 1,
+        media: null,
+      };
+      continue;
+    }
+
+    if (isQuestionStartLine(line)) {
+      if (current) finalizeQuestion(current, questions, errors, warnings);
+      isLegacyMode = false;
 
       const meta = extractQuestionMetadata(line);
       const { answer, isHint } = extractAnswer(line);
@@ -271,28 +333,6 @@ export function parseExamImportText(text: string): ExamImportPreview {
       continue;
     }
 
-    if (!current && !isLegacyMode) {
-      const legacyHeaderMatch = line.match(LEGACY_HEADER_RE);
-      if (legacyHeaderMatch) {
-        isLegacyMode = true;
-        if (current) finalizeQuestion(current, questions, errors, warnings);
-        const parsedPoints = Number(legacyHeaderMatch[3]);
-        current = {
-          index: questions.length + 1,
-          question_type: legacyHeaderMatch[2].toLowerCase() as QuestionType,
-          points: Number.isFinite(parsedPoints) && parsedPoints > 0 ? parsedPoints : 1,
-          contentLines: [],
-          options: {},
-          correct_answer: null,
-          answer_hint: null,
-          difficulty: "DE",
-          chapter: 1,
-          media: null,
-        };
-        continue;
-      }
-    }
-
     if (!current) {
       const titleMatch = line.match(LEGACY_TITLE_RE);
       const durationMatch = line.match(LEGACY_DURATION_RE);
@@ -305,7 +345,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
         descriptionLines = [descriptionMatch[2].trim()].filter(Boolean);
       } else if (descriptionLines.length) {
         descriptionLines.push(line);
-      } else if (line.length > 3) {
+      } else if (line.length > 3 && !HEADER_RE.test(line)) {
         warnings.push(`Bỏ qua dòng ngoài câu hỏi: ${line.slice(0, 50)}`);
       }
       continue;
@@ -326,13 +366,28 @@ export function parseExamImportText(text: string): ExamImportPreview {
 
       current.contentLines.push(line);
     } else {
+      const plainAnswerMatch = line.match(LEGACY_ANSWER_RE);
+      if (plainAnswerMatch) {
+        current.correct_answer = normalizeAnswer(plainAnswerMatch[2]);
+        continue;
+      }
+
+      const essayHintMatch = line.match(ESSAY_HINT_RE);
+      if (essayHintMatch && current.question_type === "essay") {
+        current.answer_hint = essayHintMatch[2].trim();
+        continue;
+      }
+
       if (line.match(DAPAN_RE)) {
         const { answer, isHint } = extractAnswer(line);
         if (isHint) {
-          current.answer_hint = line
+          const hintText = line
             .replace(DAPAN_RE, "")
             .replace(/\[DAPAN:[^\]]*\]/g, "")
+            .replace(/^✔\s*ĐÁP ÁN\s*:\s*/i, "")
+            .replace(/^[-—]\s*/, "")
             .trim();
+          current.answer_hint = hintText || current.answer_hint;
         } else {
           current.correct_answer = answer as string | string[] | null;
         }
@@ -352,7 +407,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
   if (descriptionLines.length) exam.description = descriptionLines.join("\n");
   if (!questions.length && errors.length === 0) {
     errors.push(
-      "Không tìm thấy câu hỏi nào trong file. Hãy dùng format TAG: [LOAI:TN] [DIEM:1] [KHO:DE]"
+      "Không tìm thấy câu hỏi. Mỗi câu cần dòng bắt đầu có [LOAI:TN] hoặc [LOAI:TL] (hoặc Q1 [mcq] [1]). Xem file mẫu exam_template_GiaoVien.docx."
     );
   }
   if (
