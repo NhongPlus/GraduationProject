@@ -146,16 +146,30 @@ export const finalizeSessionSubmit = async (
 
 export const updateSessionGrading = async (
   id: string,
-  payload: { score: number; graded_details: unknown; grading_status: GradingStatus }
+  payload: {
+    score: number;
+    graded_details: unknown;
+    grading_status: GradingStatus;
+    student_answers?: Record<string, string | string[]>;
+  }
 ): Promise<ExamSession | null> => {
+  const sets = ["score = $2", "graded_details = $3::jsonb", "grading_status = $4"];
+  const params: unknown[] = [
+    id,
+    payload.score,
+    JSON.stringify(payload.graded_details),
+    payload.grading_status,
+  ];
+  if (payload.student_answers !== undefined) {
+    sets.push(`student_answers = $${params.length + 1}::jsonb`);
+    params.push(JSON.stringify(payload.student_answers));
+  }
   const result = await pool.query(
     `UPDATE exam_sessions
-     SET score = $2,
-         graded_details = $3::jsonb,
-         grading_status = $4
+     SET ${sets.join(", ")}
      WHERE id = $1 AND status = 'submitted'
      RETURNING *`,
-    [id, payload.score, JSON.stringify(payload.graded_details), payload.grading_status]
+    params
   );
   return (result.rows[0] as ExamSession) ?? null;
 };

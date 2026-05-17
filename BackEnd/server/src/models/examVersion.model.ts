@@ -24,39 +24,68 @@ export function assignVersionIndex(studentId: string, totalVersions: number): nu
   return Math.abs(hash) % totalVersions;
 }
 
-/** Given shuffled answer (A/B/C/D) and option_map, return original answer */
-export function reverseAnswer(
-  shuffledAnswer: string,
-  optionMap: Record<string, string>
-): string {
-  // optionMap: { "A": "B", "B": "D", "C": "A", "D": "C" }
-  // means student's "A" corresponds to original "B"
-  // To reverse: find which original key maps to the student's choice
-  for (const [shuffled, original] of Object.entries(optionMap)) {
-    if (shuffled === shuffledAnswer) return original;
-  }
-  return shuffledAnswer;
+/** option_maps lưu map chữ cái (A→C) hay bản cũ lưu text hiển thị */
+export function looksLikeOptionKeyMap(optionMap: Record<string, string>): boolean {
+  const vals = Object.values(optionMap);
+  if (vals.length === 0) return false;
+  return vals.every((v) => /^[A-Za-z]$/.test(String(v).trim()));
 }
 
-/** Given a student's submitted answers (keyed by shuffled question display order index),
- *  and the version's question_order + option_maps, return answers keyed by original question_id */
+/** Chuyển đáp án SV chọn trên màn hình (A/B/C/D) về đáp án gốc trong DB */
+export function reverseAnswer(
+  shuffledAnswer: string,
+  optionMap: Record<string, string>,
+  originalOptions?: Record<string, string> | null
+): string {
+  const pick = String(shuffledAnswer).trim();
+  const pickUpper = pick.toUpperCase();
+
+  if (looksLikeOptionKeyMap(optionMap)) {
+    for (const [displayKey, originalKey] of Object.entries(optionMap)) {
+      if (displayKey.toUpperCase() === pickUpper) {
+        return String(originalKey).trim().toUpperCase();
+      }
+    }
+    return pickUpper;
+  }
+
+  const shownText =
+    optionMap[pick] ?? optionMap[pickUpper] ?? optionMap[pick.toLowerCase()];
+  if (shownText && originalOptions) {
+    for (const [origKey, text] of Object.entries(originalOptions)) {
+      if (text === shownText) return origKey.toUpperCase();
+    }
+  }
+  return pickUpper;
+}
+
+/** display index ("0") hoặc question_id → map về question_id + đáp án gốc */
 export function unshuffleAnswers(
-  studentAnswers: Record<string, string | string[]>, // { "0": "A", "1": "B" } (display idx → answer)
-  questionOrder: string[],                            // [q3_id, q1_id, q2_id]
-  optionMaps: Record<string, Record<string, string>>  // { q_id: { A→B, ... } }
+  studentAnswers: Record<string, string | string[]>,
+  questionOrder: string[],
+  optionMaps: Record<string, Record<string, string>>,
+  originalOptionsByQuestion?: Record<string, Record<string, string>>
 ): Record<string, string | string[]> {
   const result: Record<string, string | string[]> = {};
+  const orderSet = new Set(questionOrder);
 
-  for (const [displayIdx, answer] of Object.entries(studentAnswers)) {
-    const questionId = questionOrder[parseInt(displayIdx)];
+  for (const [key, answer] of Object.entries(studentAnswers)) {
+    let questionId: string | undefined;
+    const idx = parseInt(key, 10);
+    if (Number.isFinite(idx) && String(idx) === key.trim()) {
+      questionId = questionOrder[idx];
+    } else if (orderSet.has(key)) {
+      questionId = key;
+    }
     if (!questionId) continue;
 
     const qMap = optionMaps[questionId];
+    const origOpts = originalOptionsByQuestion?.[questionId];
     if (qMap) {
       if (Array.isArray(answer)) {
-        result[questionId] = answer.map((a) => reverseAnswer(a, qMap));
+        result[questionId] = answer.map((a) => reverseAnswer(a, qMap, origOpts));
       } else {
-        result[questionId] = reverseAnswer(answer, qMap);
+        result[questionId] = reverseAnswer(answer, qMap, origOpts);
       }
     } else {
       result[questionId] = answer;

@@ -98,6 +98,7 @@ export interface SubmitResult {
     question_id: string;
     question_type: QuestionType;
     submitted: string | string[] | null;
+    correct?: string | string[] | null;
     is_correct: boolean;
     points_earned: number | null;
     max_points: number;

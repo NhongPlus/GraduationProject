@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, Paper, Text } from '@mantine/core';
+import { Box, Button, Paper, Stack, Text } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconArrowLeft, IconArrowRight, IconArrowsMaximize } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +11,11 @@ import { QuestionNavigator } from '@/components/ExamTake/QuestionNavigator';
 import { isQuestionAnswered } from '@/components/ExamTake/isQuestionAnswered';
 import type { MockExamQuestion } from '@/components/ExamTake/types';
 import appConfig from '@/configs/app.config';
-import examApi, { type Question as ApiQuestion, type StartSessionData } from '@/services/examApi';
+import examApi, {
+  type Question as ApiQuestion,
+  type StartSessionData,
+  type SubmitResult,
+} from '@/services/examApi';
 import { useExamTakeState } from '@/hooks/useExamTakeState';
 import useAuth from '@/hooks/useAuth';
 import {
@@ -137,6 +141,7 @@ const ExamTake = () => {
   const navigate = useNavigate();
   const { examId } = useParams<{ examId: string }>();
   const activeExamId = examId ?? 'preview-exam';
+  const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [fullscreenError, setFullscreenError] = useState('');
   const [sessionLoading, setSessionLoading] = useState(false);
   const [fsRevision, setFsRevision] = useState(0);
@@ -258,7 +263,8 @@ const ExamTake = () => {
         await flushIntegrityQueue(activeExamId);
 
         const payload = buildSubmitAnswers(answers, questionIdByNumber, byNumber);
-        await examApi.submitSession(sessionId, payload);
+        const result = await examApi.submitSession(sessionId, payload);
+        setSubmitResult(result);
 
         setRealtimeMessage(
           source === 'auto'
@@ -660,15 +666,15 @@ const ExamTake = () => {
   }, [examStarted, remainingSeconds, autoSubmitted, forceAutoSubmit, sessionId]);
 
   useEffect(() => {
-    if (!autoSubmitted) return;
+    if (!autoSubmitted || submitFailed || !examId) return;
     const id = window.setTimeout(() => {
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
-      navigate('/main', { replace: true });
+      navigate(`/result/${examId}`, { replace: true });
     }, 3000);
     return () => window.clearTimeout(id);
-  }, [autoSubmitted, navigate]);
+  }, [autoSubmitted, submitFailed, examId, navigate]);
 
   const currentQuestion = resolveQuestion(currentNumber);
 
@@ -803,10 +809,53 @@ const ExamTake = () => {
           <Text c="dimmed" size="sm">
             {submitFailed ? t('exam_take.submit_failed_desc') : t('exam_take.submit_success_desc')}
           </Text>
+          {!submitFailed && submitResult && (
+            <Box mt="md" ta="left">
+              {(() => {
+                const mcq = submitResult.details.filter((d) => d.question_type === 'mcq');
+                const essays = submitResult.details.filter((d) => d.question_type === 'essay');
+                const mcqScore = mcq.reduce((s, d) => s + (d.points_earned ?? 0), 0);
+                const mcqMax = mcq.reduce((s, d) => s + d.max_points, 0);
+                const mcqCorrect = mcq.filter((d) => d.is_correct).length;
+                return (
+                  <Stack gap={6}>
+                    <Text size="sm" fw={600}>{t('exam_take.submit_mcq_graded')}</Text>
+                    <Text size="sm">
+                      {t('exam_take.submit_mcq_summary', {
+                        correct: mcqCorrect,
+                        total: mcq.length,
+                        score: mcqScore,
+                        max: mcqMax,
+                      })}
+                    </Text>
+                    {essays.length > 0 && (
+                      <Text size="sm" c="yellow.8">
+                        {t('exam_take.submit_essay_pending', { count: essays.length })}
+                      </Text>
+                    )}
+                  </Stack>
+                );
+              })()}
+            </Box>
+          )}
           {!submitFailed && (
             <Text size="xs" c="dimmed" mt="sm">
               {t('exam_take.submit_redirect_hint')}
             </Text>
+          )}
+          {!submitFailed && examId && (
+            <Button
+              mt="md"
+              variant="light"
+              onClick={() => {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                navigate(`/result/${examId}`, { replace: true });
+              }}
+            >
+              {t('exam_take.submit_view_result_now')}
+            </Button>
           )}
           {!!serverForceSummaryText && (
             <Text size="sm" mt={8}>

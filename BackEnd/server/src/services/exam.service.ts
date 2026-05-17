@@ -599,6 +599,7 @@ export interface SubmitResult {
     question_id: string;
     question_type: QuestionType;
     submitted: string | string[] | null;
+    correct?: string | string[] | null;
     is_correct: boolean;
     points_earned: number | null;
     max_points: number;
@@ -761,6 +762,212 @@ export const persistAutosaveSnapshotService = async (payload: {
   };
 };
 
+function normalizeMcqAnswer(val: unknown): string | null {
+  if (val == null) return null;
+  const raw = Array.isArray(val) ? val[0] : val;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/^[A-Za-z]$/.test(s)) return s.toUpperCase();
+  return s;
+}
+
+function mcqAnswersEqual(submitted: unknown, correct: unknown): boolean {
+  const sub = normalizeMcqAnswer(submitted);
+  const cor = normalizeMcqAnswer(correct);
+  if (sub == null || cor == null) return false;
+  if (/^[A-Z]$/.test(sub) && /^[A-Z]$/.test(cor)) return sub === cor;
+  return JSON.stringify(submitted) === JSON.stringify(correct);
+}
+
+function buildOriginalOptionsByQuestion(
+  questions: Question[]
+): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const q of questions) {
+    if (q.options && typeof q.options === "object" && !Array.isArray(q.options)) {
+      out[q.id] = q.options as Record<string, string>;
+    }
+  }
+  return out;
+}
+
+export function autosaveToDisplayIndexAnswers(
+  raw: AutosaveAnswers
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const match = /^q(\d+)$/i.exec(key);
+    if (match) {
+      out[String(Number(match[1]) - 1)] = value.trim();
+    }
+  }
+  return out;
+}
+
+async function getVersionMapsForSession(
+  session: ExamSession
+): Promise<{
+  questionOrder: string[];
+  optionMaps: Record<string, Record<string, string>>;
+} | null> {
+  if (!session.version_id) return null;
+  const versionRow = await pool
+    .query(`SELECT question_order, option_maps FROM exam_versions WHERE id = $1`, [
+      session.version_id,
+    ])
+    .then((r) => r.rows[0]);
+  if (!versionRow) return null;
+  return {
+    questionOrder: versionRow.question_order as string[],
+    optionMaps: versionRow.option_maps as Record<string, Record<string, string>>,
+  };
+}
+
+function parseStudentAnswers(raw: unknown): Record<string, string | string[]> {
+  if (raw == null) return {};
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as Record<string, string | string[]>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object") return raw as Record<string, string | string[]>;
+  return {};
+}
+
+/** Sửa chấm TN khi option_maps cũ hoặc graded_details lưu sai */
+async function recomputeMcqGradingForSession(
+  session: ExamSession,
+  allQuestions: Question[],
+  existingDetails: GradedDetailRow[]
+): Promise<{
+  graded_details: GradedDetailRow[];
+  score: number;
+  student_answers: Record<string, string | string[]>;
+  changed: boolean;
+}> {
+  const versionMaps = await getVersionMapsForSession(session);
+  const originalOptionsByQuestion = buildOriginalOptionsByQuestion(allQuestions);
+
+  let rawAnswers: Record<string, string | string[]> = {};
+  const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
+  if (snapshot?.answers) {
+    const fromAutosave = autosaveToDisplayIndexAnswers(snapshot.answers);
+    if (Object.keys(fromAutosave).length > 0) {
+      rawAnswers = fromAutosave;
+    }
+  }
+  if (Object.keys(rawAnswers).length === 0) {
+    rawAnswers = parseStudentAnswers(session.student_answers);
+  }
+
+  let questionOrder: string[];
+  let unshuffled: Record<string, string | string[]>;
+
+  if (versionMaps) {
+    questionOrder = versionMaps.questionOrder;
+    const orderSet = new Set(questionOrder);
+    const keysAreQuestionIds = Object.keys(rawAnswers).some((k) => orderSet.has(k));
+    const allSingleLetter = Object.values(rawAnswers).every(
+      (v) => typeof v === "string" && /^[A-D]$/i.test(v.trim())
+    );
+    if (keysAreQuestionIds && allSingleLetter) {
+      const byDisplayIdx: Record<string, string> = {};
+      for (let i = 0; i < questionOrder.length; i += 1) {
+        const qId = questionOrder[i];
+        const val = rawAnswers[qId];
+        if (typeof val === "string") byDisplayIdx[String(i)] = val;
+      }
+      rawAnswers = byDisplayIdx;
+    }
+    unshuffled = unshuffleAnswers(
+      rawAnswers,
+      questionOrder,
+      versionMaps.optionMaps,
+      originalOptionsByQuestion
+    );
+  } else {
+    questionOrder = allQuestions.map((q) => q.id);
+    unshuffled = normalizeAutosaveToSubmitAnswers(
+      rawAnswers as AutosaveAnswers,
+      questionOrder
+    );
+    if (Object.keys(unshuffled).length === 0) {
+      unshuffled = rawAnswers;
+    }
+  }
+
+  const existingByQ = new Map(existingDetails.map((d) => [d.question_id, d]));
+  let score = 0;
+  let changed = false;
+  const gradedRows: GradedDetailRow[] = [];
+
+  for (const qId of questionOrder) {
+    const q = allQuestions.find((item) => item.id === qId);
+    if (!q) continue;
+    const prev = existingByQ.get(qId);
+    const submitted = unshuffled[qId] ?? null;
+
+    if (q.question_type === "essay") {
+      const pointsEarned = prev?.points_earned ?? null;
+      if (pointsEarned != null) score += Number(pointsEarned);
+      const row: GradedDetailRow = {
+        question_id: q.id,
+        question_type: "essay",
+        submitted:
+          submitted === null || submitted === undefined
+            ? prev?.submitted ?? ""
+            : Array.isArray(submitted)
+              ? submitted.join("\n")
+              : String(submitted),
+        is_correct: false,
+        points_earned: pointsEarned,
+        max_points: Number(q.points),
+        pending_grading: prev?.pending_grading ?? true,
+        teacher_comment: prev?.teacher_comment ?? null,
+      };
+      if (
+        prev &&
+        (prev.points_earned !== row.points_earned ||
+          prev.pending_grading !== row.pending_grading)
+      ) {
+        changed = true;
+      }
+      gradedRows.push(row);
+      continue;
+    }
+
+    const correct = q.correct_answer;
+    const isCorrect = mcqAnswersEqual(submitted, correct);
+    const pointsEarned = isCorrect ? Number(q.points) : 0;
+    score += pointsEarned;
+
+    const row: GradedDetailRow = {
+      question_id: q.id,
+      question_type: "mcq",
+      submitted,
+      correct,
+      is_correct: isCorrect,
+      points_earned: pointsEarned,
+      max_points: Number(q.points),
+      pending_grading: false,
+    };
+    if (
+      !prev ||
+      prev.is_correct !== row.is_correct ||
+      prev.points_earned !== row.points_earned ||
+      JSON.stringify(prev.submitted) !== JSON.stringify(row.submitted)
+    ) {
+      changed = true;
+    }
+    gradedRows.push(row);
+  }
+
+  return { graded_details: gradedRows, score, student_answers: unshuffled, changed };
+}
+
 function parseGradedDetails(raw: unknown): GradedDetailRow[] {
   if (raw == null) return [];
   if (typeof raw === "string") {
@@ -795,35 +1002,22 @@ export const submitSessionService = async (
   }
 
   const allQuestions = await getQuestionsByExam(session.exam_id);
+  const originalOptionsByQuestion = buildOriginalOptionsByQuestion(allQuestions);
 
-  // Determine question order and option maps from version
   let questionOrder: string[];
-  let optionMaps: Record<string, Record<string, string>>;
   let unshuffledAnswers: Record<string, string | string[]>;
 
-  if (session.version_id) {
-    const version = await getVersionByIndex(session.exam_id,
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
-      assignVersionIndex(studentId, 999) // we just need the version; look up by index from session
+  const versionMaps = await getVersionMapsForSession(session);
+  if (versionMaps) {
+    questionOrder = versionMaps.questionOrder;
+    unshuffledAnswers = unshuffleAnswers(
+      answers,
+      questionOrder,
+      versionMaps.optionMaps,
+      originalOptionsByQuestion
     );
-    // Actually get by ID stored in session — query directly
-    const versionRow = await pool.query(
-      `SELECT * FROM exam_versions WHERE id = $1`, [session.version_id]
-    ).then(r => r.rows[0]);
-    if (versionRow) {
-      questionOrder = versionRow.question_order;
-      optionMaps = versionRow.option_maps;
-      // Unshuffle: answers keyed by display index (0,1,2...) → original question_id + original answer
-      unshuffledAnswers = unshuffleAnswers(answers, questionOrder, optionMaps);
-    } else {
-      questionOrder = allQuestions.map(q => q.id);
-      optionMaps = {};
-      unshuffledAnswers = answers;
-    }
   } else {
-    // No versioning — use original order
-    questionOrder = allQuestions.map(q => q.id);
-    optionMaps = {};
+    questionOrder = allQuestions.map((q) => q.id);
     unshuffledAnswers = answers;
   }
 
@@ -862,7 +1056,7 @@ export const submitSessionService = async (
     const isCorrect =
       submitted !== undefined &&
       submitted !== null &&
-      JSON.stringify(submitted) === JSON.stringify(correct);
+      mcqAnswersEqual(submitted, correct);
     const pointsEarned = isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
     if (isCorrect) correctCount++;
@@ -924,6 +1118,7 @@ export const submitSessionService = async (
     question_id: d.question_id,
     question_type: d.question_type,
     submitted: d.submitted,
+    correct: d.question_type === "mcq" ? d.correct ?? null : null,
     is_correct: d.is_correct,
     points_earned: d.points_earned,
     max_points: d.max_points,
@@ -997,6 +1192,63 @@ export interface SessionReviewPayload {
   questions: ReviewDetailRow[];
 }
 
+async function applyRecomputeIfNeeded(
+  session: ExamSession,
+  allQuestions: Question[],
+  gradedDetails: GradedDetailRow[]
+): Promise<{ session: ExamSession; gradedDetails: GradedDetailRow[] }> {
+  const recompute = await recomputeMcqGradingForSession(session, allQuestions, gradedDetails);
+  if (!recompute.changed) {
+    return { session, gradedDetails };
+  }
+  const hasPendingEssay = recompute.graded_details.some(
+    (d) => d.question_type === "essay" && d.pending_grading
+  );
+  const gradingStatus: GradingStatus = hasPendingEssay ? "pending_manual" : "complete";
+  const updated = await updateSessionGrading(session.id, {
+    score: recompute.score,
+    graded_details: recompute.graded_details,
+    grading_status: gradingStatus,
+    student_answers: recompute.student_answers,
+  });
+  if (updated) {
+    return { session: updated, gradedDetails: recompute.graded_details };
+  }
+  return { session, gradedDetails: recompute.graded_details };
+}
+
+async function buildReviewQuestionsForSession(
+  session: ExamSession,
+  allQuestions: Question[],
+  gradedDetails: GradedDetailRow[]
+): Promise<ReviewDetailRow[]> {
+  const versionMaps = await getVersionMapsForSession(session);
+  const questionOrder = versionMaps?.questionOrder ?? allQuestions.map((q) => q.id);
+  const questionsById = new Map(allQuestions.map((q) => [q.id, q]));
+  const reviewQuestions: ReviewDetailRow[] = [];
+
+  for (const qId of questionOrder) {
+    const q = questionsById.get(qId);
+    if (!q) continue;
+    const detail = gradedDetails.find((d) => d.question_id === qId);
+    reviewQuestions.push({
+      question_id: q.id,
+      question_type: q.question_type,
+      content: q.content,
+      options: q.options,
+      explanation: q.explanation ?? null,
+      submitted: detail?.submitted ?? null,
+      correct: q.question_type === "mcq" ? q.correct_answer : null,
+      is_correct: detail?.is_correct ?? false,
+      points_earned: detail?.points_earned ?? null,
+      max_points: Number(q.points),
+      pending_grading: detail?.pending_grading,
+      teacher_comment: detail?.teacher_comment ?? null,
+    });
+  }
+  return reviewQuestions;
+}
+
 export const getSessionReview = async (
   sessionId: string,
   studentId: string
@@ -1010,33 +1262,25 @@ export const getSessionReview = async (
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");
 
   const allQuestions = await getQuestionsByExam(session.exam_id);
-  const gradedDetails = parseGradedDetails(session.graded_details);
-
-  // Build review with explanations
-  const reviewQuestions: ReviewDetailRow[] = allQuestions.map((q) => {
-    const detail = gradedDetails.find((d) => d.question_id === q.id);
-    return {
-      question_id: q.id,
-      question_type: q.question_type,
-      content: q.content,
-      options: q.options,
-      explanation: q.explanation ?? null,
-      submitted: detail?.submitted ?? null,
-      correct: q.question_type === "mcq" ? q.correct_answer : null,
-      is_correct: detail?.is_correct ?? false,
-      points_earned: detail?.points_earned ?? null,
-      max_points: Number(q.points),
-      pending_grading: detail?.pending_grading,
-      teacher_comment: detail?.teacher_comment ?? null,
-    };
-  });
+  let gradedDetails = parseGradedDetails(session.graded_details);
+  const { session: sessionRow, gradedDetails: fixedDetails } = await applyRecomputeIfNeeded(
+    session,
+    allQuestions,
+    gradedDetails
+  );
+  gradedDetails = fixedDetails;
+  const reviewQuestions = await buildReviewQuestionsForSession(
+    sessionRow,
+    allQuestions,
+    gradedDetails
+  );
 
   return {
-    session,
+    session: sessionRow,
     exam,
-    score: session.score != null ? Number(session.score) : null,
-    max_points: session.max_points != null ? Number(session.max_points) : null,
-    grading_status: session.grading_status,
+    score: sessionRow.score != null ? Number(sessionRow.score) : null,
+    max_points: sessionRow.max_points != null ? Number(sessionRow.max_points) : null,
+    grading_status: sessionRow.grading_status,
     questions: reviewQuestions,
   };
 };
@@ -1069,7 +1313,12 @@ export const getSessionGradingView = async (
   if (!exam) throw httpError(404, "Không tìm thấy đề");
 
   const allQuestions = await getQuestionsByExam(meta.exam_id);
-  const gradedDetails = parseGradedDetails(meta.graded_details);
+  let gradedDetails = parseGradedDetails(meta.graded_details);
+  const { session: updatedSession, gradedDetails: fixedDetails } =
+    await applyRecomputeIfNeeded(meta, allQuestions, gradedDetails);
+  const sessionRow = { ...meta, ...updatedSession };
+  gradedDetails = fixedDetails;
+
   const gradedIds = new Set(gradedDetails.map((d) => d.question_id));
   const questions = allQuestions.filter((q) => gradedIds.has(q.id));
   const acc = await pool.query("SELECT full_name, email FROM accounts WHERE id = $1", [
@@ -1078,7 +1327,7 @@ export const getSessionGradingView = async (
   const studentRow = acc.rows[0] ?? {};
 
   return {
-    session: meta,
+    session: sessionRow,
     exam,
     student: { full_name: studentRow.full_name ?? null, email: studentRow.email ?? null },
     questions,
@@ -1216,10 +1465,9 @@ export const forceSubmitActiveSessionsByExamService = async (
   for (const session of activeSessions) {
     try {
       const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
-      const submitAnswers = normalizeAutosaveToSubmitAnswers(
-        snapshot?.answers ?? {},
-        orderedQuestionIds
-      );
+      const submitAnswers = session.version_id
+        ? autosaveToDisplayIndexAnswers(snapshot?.answers ?? {})
+        : normalizeAutosaveToSubmitAnswers(snapshot?.answers ?? {}, orderedQuestionIds);
 
       await submitSessionService(session.id, session.student_id, submitAnswers, {
         allowPastDeadline: true,

@@ -163,6 +163,7 @@ const Grading = () => {
                   <Table.Th>#</Table.Th>
                   <Table.Th>{t('grading.question')}</Table.Th>
                   <Table.Th>{t('grading.answer')}</Table.Th>
+                  <Table.Th>{t('grading.correct_answer')}</Table.Th>
                   <Table.Th>{t('grading.status')}</Table.Th>
                   <Table.Th>{t('grading.points')}</Table.Th>
                 </Table.Tr>
@@ -178,6 +179,11 @@ const Grading = () => {
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">{Array.isArray(detail.submitted) ? detail.submitted.join(', ') : detail.submitted ?? '—'}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm" fw={500}>
+                          {Array.isArray(detail.correct) ? detail.correct.join(', ') : detail.correct ?? '—'}
+                        </Text>
                       </Table.Td>
                       <Table.Td>
                         <Badge color={detail.is_correct ? 'green' : 'red'}>
