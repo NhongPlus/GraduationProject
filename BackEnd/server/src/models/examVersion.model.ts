@@ -59,6 +59,25 @@ export function reverseAnswer(
   return pickUpper;
 }
 
+/** original_key (DB) → display key (ô SV thấy trên màn hình) */
+export function originalKeyToDisplayKey(
+  optionMap: Record<string, string>,
+  originalKey: string | null | undefined
+): string | null {
+  if (originalKey == null || originalKey === "") return null;
+  const target = String(Array.isArray(originalKey) ? originalKey[0] : originalKey)
+    .trim()
+    .toUpperCase();
+  if (!/^[A-D]$/.test(target)) return null;
+  if (!looksLikeOptionKeyMap(optionMap)) return target;
+  for (const [displayKey, origKey] of Object.entries(optionMap)) {
+    if (String(origKey).trim().toUpperCase() === target) {
+      return displayKey.toUpperCase();
+    }
+  }
+  return target;
+}
+
 /** display index ("0") hoặc question_id → map về question_id + đáp án gốc */
 export function unshuffleAnswers(
   studentAnswers: Record<string, string | string[]>,

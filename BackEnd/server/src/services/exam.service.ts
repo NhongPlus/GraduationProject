@@ -43,6 +43,7 @@ import {
   ExamVersion,
   assignVersionIndex,
   unshuffleAnswers,
+  originalKeyToDisplayKey,
   generateVersionPool,
   getVersionsByExam,
   createVersion,
@@ -69,6 +70,7 @@ import {
   pickRecomputeMcqInput,
   resolveCorrectAnswerKey,
   resolveReviewCorrectKey,
+  normalizeLetterKey,
 } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
 import {
@@ -1195,11 +1197,36 @@ export interface SessionReviewPayload {
   questions: ReviewDetailRow[];
 }
 
+/** Đã chấm đúng lúc submit — không ghi đè bằng autosave khi mở review. */
+function gradedMcqLooksConsistent(
+  gradedDetails: GradedDetailRow[],
+  allQuestions: Question[]
+): boolean {
+  const mcqRows = gradedDetails.filter((d) => d.question_type === "mcq");
+  if (mcqRows.length === 0) return true;
+  return mcqRows.every((d) => {
+    const q = allQuestions.find((item) => item.id === d.question_id);
+    if (!q) return true;
+    const storedCorrect = normalizeLetterKey(d.correct);
+    const expectedCorrect = resolveReviewCorrectKey(q.correct_answer, q.options, d.correct);
+    if (expectedCorrect && !storedCorrect) return false;
+    if (d.submitted == null || d.submitted === "") return true;
+    const expectCorrect = mcqAnswersEqual(d.submitted, q.correct_answer);
+    return d.is_correct === expectCorrect;
+  });
+}
+
 async function applyRecomputeIfNeeded(
   session: ExamSession,
   allQuestions: Question[],
   gradedDetails: GradedDetailRow[]
 ): Promise<{ session: ExamSession; gradedDetails: GradedDetailRow[] }> {
+  if (
+    session.status === "submitted" &&
+    gradedMcqLooksConsistent(gradedDetails, allQuestions)
+  ) {
+    return { session, gradedDetails };
+  }
   const recompute = await recomputeMcqGradingForSession(session, allQuestions, gradedDetails);
   if (!recompute.changed) {
     return { session, gradedDetails };
@@ -1234,23 +1261,42 @@ async function buildReviewQuestionsForSession(
     const q = questionsById.get(qId);
     if (!q) continue;
     const detail = gradedDetails.find((d) => d.question_id === qId);
-    const correctKey =
+    const optionMap = versionMaps?.optionMaps[qId];
+    const displayOptions =
+      q.options && optionMap && Object.keys(optionMap).length > 0
+        ? buildShuffledOptionsForStudent(q.options, optionMap)
+        : q.options;
+    const correctOriginal =
       q.question_type === "mcq"
         ? resolveReviewCorrectKey(q.correct_answer, q.options, detail?.correct)
         : null;
     const submittedRaw = detail?.submitted ?? null;
+    const submittedOriginal = normalizeLetterKey(
+      Array.isArray(submittedRaw) ? submittedRaw[0] : submittedRaw
+    );
+    let submittedForUi: string | string[] | null = submittedRaw;
+    let correctForUi: string | string[] | null = correctOriginal;
+    if (optionMap && submittedOriginal) {
+      submittedForUi =
+        originalKeyToDisplayKey(optionMap, submittedOriginal) ?? submittedOriginal;
+    }
+    if (optionMap && correctOriginal) {
+      correctForUi =
+        originalKeyToDisplayKey(optionMap, correctOriginal) ?? correctOriginal;
+    }
     const isCorrect =
       q.question_type === "mcq"
-        ? mcqAnswersEqual(submittedRaw, q.correct_answer)
+        ? (detail?.is_correct ??
+          mcqAnswersEqual(submittedRaw, q.correct_answer))
         : (detail?.is_correct ?? false);
     reviewQuestions.push({
       question_id: q.id,
       question_type: q.question_type,
       content: q.content,
-      options: q.options,
+      options: displayOptions,
       explanation: q.explanation ?? null,
-      submitted: submittedRaw,
-      correct: correctKey,
+      submitted: submittedForUi,
+      correct: correctForUi,
       is_correct: isCorrect,
       points_earned: detail?.points_earned ?? null,
       max_points: Number(q.points),
