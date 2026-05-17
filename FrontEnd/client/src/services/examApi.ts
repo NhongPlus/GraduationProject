@@ -527,6 +527,38 @@ const examApi = {
     return res.data.data;
   },
 
+  // P0 Fix: Report violation immediately to server
+  reportViolation: async (
+    sessionId: string,
+    payload: {
+      violation_type: 'fullscreen_exit' | 'visibility_hidden' | 'window_blur' | 'tab_switch' | 'devtools_open' | 'copy_attempt' | 'paste_attempt' | 'context_menu' | 'other';
+      reason: string;
+      client_at?: string;
+      auto_submit?: boolean;
+    }
+  ): Promise<{
+    acknowledged: boolean;
+    violation_id: string;
+    session_status: 'active' | 'submitted' | 'expired' | 'violation_locked';
+    auto_submit_triggered: boolean;
+    message: string;
+  }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: {
+        acknowledged: boolean;
+        violation_id: string;
+        session_status: 'active' | 'submitted' | 'expired' | 'violation_locked';
+        auto_submit_triggered: boolean;
+        message: string;
+      };
+    }>(`/exams/sessions/${sessionId}/report-violation`, {
+      ...payload,
+      client_at: payload.client_at || new Date().toISOString(),
+    });
+    return res.data.data;
+  },
+
   /** Sinh viên / admin: đọc cache do admin tính batch (không gọi MiniMax từ trình duyệt). */
   getMyPredictionCache: async (): Promise<PredictionResult | null> => {
     const res = await apiClient.get<{ success: boolean; data: PredictionResult | null }>(

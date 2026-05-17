@@ -28,13 +28,14 @@ import {
   persistAutosaveSnapshotService,
   createExamWithQuestionsService,
   getSessionReview,
+  reportViolationService,
 } from "~/services/exam.service";
 import { parseExamImportDocx, aiRecomposeExam } from "~/services/examImport.service";
 import { getIntegrityEventsByExam } from "~/models/examIntegrity.model";
 import { getActivePresenceByExam, getProctorLogsByExam } from "~/models/examProctor.model";
 import { getSessionsByExamWithStudent } from "~/models/examsession.model";
 import { uploadMediaBuffer } from "~/services/cloudinary.service";
-import { emitForceSubmitNotification, startExamRuntimeFromServer } from "~/socket/examSocket";
+import { emitForceSubmitNotification, startExamRuntimeFromServer, emitViolationConfirmed } from "~/socket/examSocket";
 import { auditGradeSession, auditForceSubmit } from "~/services/auditHelpers";
 import type { QuestionType } from "~/models/question.model";
 
@@ -523,6 +524,43 @@ export const getProctorLogsController = async (
     const offset = req.query.offset ? Number(req.query.offset) : 0;
     const logs = await getProctorLogsByExam(req.params.examId, { limit, offset });
     res.json({ success: true, data: logs });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---- P0 Fix: Report violation immediately to server ----
+export const reportViolationController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const { sessionId } = req.params;
+    const { violation_type, reason, client_at, auto_submit } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ success: false, message: "session_id là bắt buộc" });
+    }
+    if (!violation_type) {
+      return res.status(400).json({ success: false, message: "violation_type là bắt buộc" });
+    }
+    if (!reason) {
+      return res.status(400).json({ success: false, message: "reason là bắt buộc" });
+    }
+
+    const data = await reportViolationService(sessionId, user.userId, {
+      violation_type,
+      reason,
+      client_at: client_at || new Date().toISOString(),
+      auto_submit: auto_submit === true,
+    });
+
+    // Emit socket event to notify teacher/proctors about the violation
+    emitViolationConfirmed(sessionId, data);
+
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

@@ -559,6 +559,27 @@ export function emitForceSubmitNotification(examId: string, summary: {
   ).catch(console.error);
 }
 
+// P0 Fix: Emit violation confirmed event to client and proctors
+export function emitViolationConfirmed(sessionId: string, data: {
+  acknowledged: boolean;
+  violation_id: string;
+  session_status: string;
+  auto_submit_triggered: boolean;
+  message: string;
+}): void {
+  if (!ioInstance) return;
+  // Emit to all sockets (client will filter by sessionId)
+  // In production, you'd want to emit to specific user socket
+  ioInstance.emit("exam:violation_confirmed", {
+    sessionId,
+    violationId: data.violation_id,
+    sessionStatus: data.session_status,
+    autoSubmitTriggered: data.auto_submit_triggered,
+    message: data.message,
+    at: new Date().toISOString(),
+  });
+}
+
 export async function startExamRuntimeFromServer(examId: string): Promise<{
   examId: string;
   startedAt: string;

@@ -33,6 +33,7 @@ import {
   getIntegrityEventsController,
   getProctorPresenceController,
   getProctorLogsController,
+  reportViolationController,
 } from "~/controllers/exam.controller";
 
 const examRouter = Router();
@@ -49,6 +50,12 @@ examRouter.use(authMiddleware);
 
 examRouter.get("/sessions/me", roleMiddleware(["admin", "teacher", "student"]), getMySessionsController);
 examRouter.post("/sessions/:sessionId/submit", roleMiddleware(["student"]), submitSessionController);
+// P0 Fix: Report violation immediately to server (lock + auto-submit)
+examRouter.post(
+  "/sessions/:sessionId/report-violation",
+  roleMiddleware(["student"]),
+  reportViolationController
+);
 examRouter.get(
   "/sessions/:sessionId/grading",
   roleMiddleware(["admin", "teacher"]),

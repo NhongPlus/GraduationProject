@@ -24,7 +24,7 @@ import {
   saveDraftAnswers,
 } from '@/services/examAutosaveClient';
 import { flushIntegrityQueue, trackIntegrityEvent } from '@/services/examIntegrityClient';
-import { createExamRealtimeSocket, type ForceSubmitPayload } from '@/services/examRealtimeSocket';
+import { createExamRealtimeSocket, type ForceSubmitPayload, type ViolationConfirmedPayload } from '@/services/examRealtimeSocket';
 import classes from '@/components/ExamTake/ExamTake.module.scss';
 
 function formatHms(totalSeconds: number) {
@@ -135,6 +135,49 @@ function buildSubmitAnswers(
   return payload;
 }
 
+// P0 Fix: SessionStorage keys for violation persistence
+const VIOLATION_STORAGE_KEY = (examId: string) => `exam_violation_${examId}`;
+
+type ViolationStorageData = {
+  reason: string;
+  sessionId: string;
+  at: number;
+  violationType: string;
+  serverConfirmed: boolean;
+};
+
+function saveViolationToStorage(examId: string, data: ViolationStorageData): void {
+  try {
+    sessionStorage.setItem(VIOLATION_STORAGE_KEY(examId), JSON.stringify(data));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+function loadViolationFromStorage(examId: string): ViolationStorageData | null {
+  try {
+    const raw = sessionStorage.getItem(VIOLATION_STORAGE_KEY(examId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ViolationStorageData;
+    // Only restore if violation was recent (within 30 seconds)
+    if (Date.now() - parsed.at > 30000) {
+      sessionStorage.removeItem(VIOLATION_STORAGE_KEY(examId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearViolationStorage(examId: string): void {
+  try {
+    sessionStorage.removeItem(VIOLATION_STORAGE_KEY(examId));
+  } catch {
+    // Ignore
+  }
+}
+
 const ExamTake = () => {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
@@ -149,6 +192,10 @@ const ExamTake = () => {
   const [teacherRuntimeLive, setTeacherRuntimeLive] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const teacherFullscreenModalRef = useRef(false);
+  /** P0 Fix: Grace period timer ref for fullscreen exit */
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** P0 Fix: Flag to indicate violation is being reported to server */
+  const reportingViolationRef = useRef(false);
   /** Chỉ dev: production luôn bắt fullscreen (tránh VITE_DISABLE_INTEGRITY trên Vercel). */
   const integrityDisabled =
     import.meta.env.DEV && import.meta.env.VITE_DISABLE_INTEGRITY === 'true';
@@ -501,18 +548,95 @@ const ExamTake = () => {
     onConnect: () => {
       setConnectionStatus('connected');
     },
+    // P0 Fix: Handle server-confirmed violation
+    onViolationConfirmed: (payload: ViolationConfirmedPayload) => {
+      // Only process if this is for our session
+      if (payload.sessionId !== sessionId) return;
+
+      // Update sessionStorage to mark as server-confirmed
+      const existingViolation = loadViolationFromStorage(activeExamId);
+      if (existingViolation) {
+        saveViolationToStorage(activeExamId, {
+          ...existingViolation,
+          serverConfirmed: true,
+        });
+      }
+
+      setRealtimeMessage(payload.message);
+
+      if (payload.autoSubmitTriggered) {
+        setAutoSubmitted(true);
+        setViolationLocked(false);
+        clearViolationStorage(activeExamId);
+      } else if (payload.sessionStatus === 'violation_locked') {
+        setViolationLocked(true);
+      }
+    },
   };
 
-  const triggerViolationLock = useCallback((reason: string) => {
+  // P0 Fix: Enhanced triggerViolationLock - sends to server immediately
+  const triggerViolationLock = useCallback(async (
+    reason: string,
+    violationType: 'fullscreen_exit' | 'visibility_hidden' | 'window_blur' | 'tab_switch' | 'devtools_open' | 'copy_attempt' | 'paste_attempt' | 'context_menu' | 'other' = 'other'
+  ) => {
     const now = Date.now();
     if (now - lastViolationAtRef.current < 1200) return;
     lastViolationAtRef.current = now;
-    if (violationTriggeredRef.current) return;
+    if (violationTriggeredRef.current || reportingViolationRef.current) return;
     violationTriggeredRef.current = true;
+    reportingViolationRef.current = true;
+
+    // Set local state immediately for UI feedback
     setLockReason(reason);
     setAutoSubmitCountdown(5);
     setViolationLocked(true);
-  }, [lastViolationAtRef, setAutoSubmitCountdown, setLockReason, setViolationLocked, violationTriggeredRef]);
+
+    // P0 Fix: Save to sessionStorage immediately (persist across reload)
+    if (sessionId) {
+      saveViolationToStorage(activeExamId, {
+        reason,
+        sessionId,
+        at: now,
+        violationType,
+        serverConfirmed: false,
+      });
+    }
+
+    // P0 Fix: Report violation to server immediately
+    if (sessionId) {
+      try {
+        const result = await examApi.reportViolation(sessionId, {
+          violation_type: violationType,
+          reason,
+          client_at: new Date().toISOString(),
+          auto_submit: true, // Request server to auto-submit
+        });
+
+        // Update sessionStorage with server confirmation
+        saveViolationToStorage(activeExamId, {
+          reason,
+          sessionId,
+          at: now,
+          violationType,
+          serverConfirmed: true,
+        });
+
+        // If server already auto-submitted, update UI accordingly
+        if (result.auto_submit_triggered) {
+          setRealtimeMessage(result.message);
+          setAutoSubmitted(true);
+          setViolationLocked(false);
+          clearViolationStorage(activeExamId);
+        }
+      } catch (error) {
+        console.error('[violation] Failed to report to server:', error);
+        // Keep local violation state — will retry on countdown
+        setRealtimeMessage('Không thể gửi báo cáo vi phạm. Đang thử lại...');
+      }
+    }
+
+    reportingViolationRef.current = false;
+  }, [activeExamId, lastViolationAtRef, sessionId, setAutoSubmitCountdown, setAutoSubmitted, setLockReason, setRealtimeMessage, setViolationLocked, violationTriggeredRef]);
 
   useEffect(() => {
     let canceled = false;
@@ -562,6 +686,55 @@ const ExamTake = () => {
     }
   }, [currentNumber, maxQuestionIndex]);
 
+  // P0 Fix: Restore violation state from sessionStorage on mount/reload
+  useEffect(() => {
+    if (!sessionId || integrityDisabled) return;
+
+    const savedViolation = loadViolationFromStorage(activeExamId);
+    if (!savedViolation) return;
+
+    // Only restore if it's for the same session
+    if (savedViolation.sessionId !== sessionId) {
+      clearViolationStorage(activeExamId);
+      return;
+    }
+
+    // Restore violation state
+    violationTriggeredRef.current = true;
+    setLockReason(savedViolation.reason);
+    setViolationLocked(true);
+
+    if (savedViolation.serverConfirmed) {
+      // Server already confirmed — just show locked UI and auto-submit
+      setRealtimeMessage('Bài thi đã bị khóa do vi phạm trước đó.');
+      void submitCurrentSession('auto').then(() => {
+        clearViolationStorage(activeExamId);
+      });
+    } else {
+      // Server hasn't confirmed yet — retry reporting
+      setRealtimeMessage('Đang xác nhận vi phạm với server...');
+      void examApi.reportViolation(sessionId, {
+        violation_type: savedViolation.violationType as any,
+        reason: savedViolation.reason,
+        client_at: new Date(savedViolation.at).toISOString(),
+        auto_submit: true,
+      }).then((result) => {
+        saveViolationToStorage(activeExamId, {
+          ...savedViolation,
+          serverConfirmed: true,
+        });
+        if (result.auto_submit_triggered) {
+          setAutoSubmitted(true);
+          setViolationLocked(false);
+          clearViolationStorage(activeExamId);
+        }
+        setRealtimeMessage(result.message);
+      }).catch(() => {
+        setRealtimeMessage('Không thể xác nhận vi phạm. Bài thi sẽ bị khóa.');
+      });
+    }
+  }, [activeExamId, integrityDisabled, sessionId, setAutoSubmitted, setLockReason, setRealtimeMessage, setViolationLocked, submitCurrentSession]);
+
   useEffect(() => {
     const id = window.setInterval(() => {
       if (!examStarted || autoSubmitted) return;
@@ -570,37 +743,76 @@ const ExamTake = () => {
     return () => window.clearInterval(id);
   }, [examStarted, autoSubmitted]);
 
+  // P0 Fix: Fullscreen change with 3-second grace period
   useEffect(() => {
     if (integrityDisabled) return;
+
     const onFullscreenChange = () => {
       const full = Boolean(document.fullscreenElement);
       setIsFullscreen(full);
       setFsRevision((n) => n + 1);
+
       if (full) {
         setFullscreenError('');
         modals.close('exam-teacher-started-fullscreen');
         teacherFullscreenModalRef.current = false;
-      }
-      if (examStarted || full) {
-        void trackIntegrityEvent(activeExamId, full ? 'fullscreen_enter' : 'fullscreen_exit');
-      }
-      // Chi khoa bai khi da vao fullscreen va dang thi, tranh trigger ngay lan dau vao man hinh.
-      if (!full && isFullscreen && examStarted && !autoSubmitted) {
-        triggerViolationLock('Phát hiện thoát toàn màn hình. Bài thi sẽ bị khóa và tự động nộp.');
+
+        // P0 Fix: User returned to fullscreen within grace period — cancel violation
+        if (graceTimerRef.current) {
+          clearTimeout(graceTimerRef.current);
+          graceTimerRef.current = null;
+          void trackIntegrityEvent(activeExamId, 'fullscreen_enter', { recovered: true });
+          setRealtimeMessage('Đã quay lại toàn màn hình kịp thời.');
+          // Reset violation flags if not yet triggered
+          if (!violationTriggeredRef.current) {
+            setViolationLocked(false);
+          }
+        } else {
+          void trackIntegrityEvent(activeExamId, 'fullscreen_enter');
+        }
+      } else {
+        // Exited fullscreen
+        if (examStarted || full) {
+          void trackIntegrityEvent(activeExamId, 'fullscreen_exit');
+        }
+
+        // P0 Fix: Grace period 3s before triggering violation
+        if (isFullscreen && examStarted && !autoSubmitted && !violationTriggeredRef.current) {
+          setRealtimeMessage('Phát hiện thoát toàn màn hình. Quay lại trong 3 giây để tiếp tục...');
+
+          graceTimerRef.current = setTimeout(() => {
+            graceTimerRef.current = null;
+            // Only trigger if still not in fullscreen after grace period
+            if (!document.fullscreenElement && examStarted && !autoSubmitted) {
+              void triggerViolationLock(
+                'Phát hiện thoát toàn màn hình. Bài thi sẽ bị khóa và tự động nộp.',
+                'fullscreen_exit'
+              );
+            }
+          }, 3000);
+        }
       }
     };
+
     const onFullscreenError = () => {
       setFullscreenError(t('exam_take.fullscreen_error'));
       void trackIntegrityEvent(activeExamId, 'fullscreen_error');
     };
+
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('fullscreenerror', onFullscreenError);
     onFullscreenChange();
+
     return () => {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('fullscreenerror', onFullscreenError);
+      // Clean up grace timer on unmount
+      if (graceTimerRef.current) {
+        clearTimeout(graceTimerRef.current);
+        graceTimerRef.current = null;
+      }
     };
-  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, isFullscreen, setIsFullscreen, t, triggerViolationLock]);
+  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, isFullscreen, setIsFullscreen, setRealtimeMessage, setViolationLocked, t, triggerViolationLock]);
 
   useEffect(() => {
     if (integrityDisabled) return;
@@ -609,14 +821,16 @@ const ExamTake = () => {
       if (document.hidden) {
         setFocusLeaveCount((v) => v + 1);
         void trackIntegrityEvent(activeExamId, 'visibility_hidden');
-        triggerViolationLock('Phát hiện rời khỏi tab thi. Bài thi sẽ bị khóa và tự động nộp.');
+        // P0 Fix: Use updated triggerViolationLock with violation type
+        void triggerViolationLock('Phát hiện rời khỏi tab thi. Bài thi sẽ bị khóa và tự động nộp.', 'visibility_hidden');
       }
     };
     const onWindowBlur = () => {
       if (!examStarted || autoSubmitted) return;
       setFocusLeaveCount((v) => v + 1);
       void trackIntegrityEvent(activeExamId, 'window_blur');
-      triggerViolationLock('Phát hiện mất focus cửa sổ thi. Bài thi sẽ bị khóa và tự động nộp.');
+      // P0 Fix: Use updated triggerViolationLock with violation type
+      void triggerViolationLock('Phát hiện mất focus cửa sổ thi. Bài thi sẽ bị khóa và tự động nộp.', 'window_blur');
     };
     const onWindowFocus = () => {
       if (!examStarted || autoSubmitted) return;
@@ -670,7 +884,7 @@ const ExamTake = () => {
       document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled]);
+  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, triggerViolationLock]);
   useEffect(() => {
     if (!examStarted || !sessionId || autoSubmitted) return;
     saveDraftAnswers(activeExamId, answers);
@@ -720,6 +934,8 @@ const ExamTake = () => {
         onDisconnect: () => handlersRef.current.onDisconnect?.(),
         onReconnecting: () => handlersRef.current.onReconnecting?.(),
         onConnect: () => handlersRef.current.onConnect?.(),
+        // P0 Fix: Handle server-confirmed violation
+        onViolationConfirmed: (payload) => handlersRef.current.onViolationConfirmed?.(payload),
       },
     });
 

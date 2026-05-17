@@ -1674,6 +1674,123 @@ export interface ExamProctoringData {
   sessions: ProctoringEntry[];
 }
 
+// ---------------------------------------------------------------------------
+// Violation Reporting (P0 Fix: Gửi violation lên server ngay, không chỉ client-side)
+// ---------------------------------------------------------------------------
+
+export type ViolationType =
+  | "fullscreen_exit"
+  | "visibility_hidden"
+  | "window_blur"
+  | "tab_switch"
+  | "devtools_open"
+  | "copy_attempt"
+  | "paste_attempt"
+  | "context_menu"
+  | "other";
+
+export interface ViolationReport {
+  session_id: string;
+  student_id: string;
+  exam_id: string;
+  violation_type: ViolationType;
+  reason: string;
+  client_at: string;
+  auto_submitted: boolean;
+}
+
+export interface ReportViolationResult {
+  acknowledged: boolean;
+  violation_id: string;
+  session_status: "active" | "submitted" | "expired" | "violation_locked";
+  auto_submit_triggered: boolean;
+  message: string;
+}
+
+const VIOLATION_TYPES: Set<ViolationType> = new Set([
+  "fullscreen_exit",
+  "visibility_hidden",
+  "window_blur",
+  "tab_switch",
+  "devtools_open",
+  "copy_attempt",
+  "paste_attempt",
+  "context_menu",
+  "other",
+]);
+
+export const reportViolationService = async (
+  sessionId: string,
+  studentId: string,
+  payload: {
+    violation_type: string;
+    reason: string;
+    client_at: string;
+    auto_submit?: boolean;
+  }
+): Promise<ReportViolationResult> => {
+  if (!sessionId) throw httpError(400, "session_id là bắt buộc");
+  if (!payload.violation_type || !VIOLATION_TYPES.has(payload.violation_type as ViolationType)) {
+    throw httpError(400, "violation_type không hợp lệ");
+  }
+  if (!payload.reason?.trim()) throw httpError(400, "reason là bắt buộc");
+  if (!payload.client_at) throw httpError(400, "client_at là bắt buộc");
+
+  const session = await getSessionById(sessionId);
+  if (!session) throw httpError(404, "Phiên thi không tồn tại");
+  if (session.student_id !== studentId) throw httpError(403, "Không có quyền báo cáo vi phạm");
+
+  // Nếu session đã submitted hoặc expired, chỉ ghi log và không auto-submit
+  const alreadyFinished = session.status === "submitted" || session.status === "expired";
+
+  // Ghi violation vào bảng exam_integrity_events
+  const violationId = `viol_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  await insertIntegrityEvents(session.exam_id, session.id, studentId, [
+    {
+      type: payload.violation_type as IntegrityEventType,
+      at: payload.client_at,
+      details: {
+        reason: payload.reason,
+        violation_id: violationId,
+        auto_submit_requested: payload.auto_submit ?? false,
+      },
+    },
+  ]);
+
+  let autoSubmitTriggered = false;
+  let sessionStatus: ReportViolationResult["session_status"] = session.status as any;
+
+  // Nếu chưa nộp và client yêu cầu auto-submit, thực hiện force-submit
+  if (!alreadyFinished && payload.auto_submit) {
+    try {
+      const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
+      const submitAnswers = autosaveToDisplayIndexAnswers(snapshot?.answers ?? {});
+      await submitSessionService(session.id, studentId, submitAnswers, {
+        allowPastDeadline: true,
+      });
+      autoSubmitTriggered = true;
+      sessionStatus = "submitted";
+    } catch (submitError) {
+      console.error(`[violation] auto-submit failed session=${sessionId}`, submitError);
+      sessionStatus = "violation_locked";
+    }
+  } else if (!alreadyFinished) {
+    sessionStatus = "violation_locked";
+  }
+
+  return {
+    acknowledged: true,
+    violation_id: violationId,
+    session_status: sessionStatus,
+    auto_submit_triggered: autoSubmitTriggered,
+    message: autoSubmitTriggered
+      ? "Vi phạm đã được ghi nhận. Bài thi đã được tự động nộp."
+      : alreadyFinished
+        ? "Vi phạm đã được ghi nhận. Bài thi đã nộp trước đó."
+        : "Vi phạm đã được ghi nhận. Bài thi đã bị khóa.",
+  };
+};
+
 export const getExamProctoringData = async (examId: string): Promise<ExamProctoringData> => {
   if (!examId) throw httpError(400, "exam_id là bắt buộc");
 

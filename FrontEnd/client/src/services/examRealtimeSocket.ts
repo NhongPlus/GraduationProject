@@ -14,6 +14,16 @@ export type ForceSubmitPayload = {
   summary?: ForceSubmitSummary;
 };
 
+// P0 Fix: Violation confirmed payload from server
+export type ViolationConfirmedPayload = {
+  sessionId: string;
+  violationId: string;
+  sessionStatus: 'active' | 'submitted' | 'expired' | 'violation_locked';
+  autoSubmitTriggered: boolean;
+  message: string;
+  at: string;
+};
+
 type RealtimeHandlers = {
   onState?: (payload: {
     examId: string;
@@ -31,6 +41,8 @@ type RealtimeHandlers = {
   onDisconnect?: () => void;
   onReconnecting?: () => void;
   onConnect?: () => void;
+  // P0 Fix: Handler for server-confirmed violation
+  onViolationConfirmed?: (payload: ViolationConfirmedPayload) => void;
 };
 
 export function createExamRealtimeSocket(opts: {
@@ -69,6 +81,8 @@ export function createExamRealtimeSocket(opts: {
   socket.on('exam:final_15m', (p) => handlers?.onFinal15?.(p));
   socket.on('exam:force_submit', (p) => handlers?.onForceSubmit?.(p));
   socket.on('exam:alert', (p) => handlers?.onAlert?.(p));
+  // P0 Fix: Listen for violation confirmed from server
+  socket.on('exam:violation_confirmed', (p) => handlers?.onViolationConfirmed?.(p));
   socket.on('exam:error', (p: { message?: string }) => {
     handlers?.onError?.(p?.message ?? 'Realtime error');
   });
