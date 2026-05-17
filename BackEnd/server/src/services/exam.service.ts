@@ -61,7 +61,7 @@ import {
   upsertAutosaveSnapshot,
 } from "~/models/examAutosave.model";
 import pool from "~/config/db";
-import { mcqAnswersEqual, resolveMcqAnswerKey } from "~/utils/examMcqGrading";
+import { gradeMcq, mcqAnswersEqual, resolveCorrectAnswerKey } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
 import {
   isMalformedClosesAt,
@@ -847,11 +847,11 @@ async function recomputeMcqGradingForSession(
     rawAnswers = parseStudentAnswers(session.student_answers);
   }
 
-  let questionOrder: string[];
-  let unshuffled: Record<string, string | string[]>;
+  const questionOrder = versionMaps
+    ? versionMaps.questionOrder
+    : allQuestions.map((q) => q.id);
 
   if (versionMaps) {
-    questionOrder = versionMaps.questionOrder;
     const orderSet = new Set(questionOrder);
     const keysAreQuestionIds = Object.keys(rawAnswers).some((k) => orderSet.has(k));
     const allSingleLetter = Object.values(rawAnswers).every(
@@ -866,46 +866,35 @@ async function recomputeMcqGradingForSession(
       }
       rawAnswers = byDisplayIdx;
     }
-    unshuffled = unshuffleAnswers(
-      rawAnswers,
-      questionOrder,
-      versionMaps.optionMaps,
-      originalOptionsByQuestion
-    );
-  } else {
-    questionOrder = allQuestions.map((q) => q.id);
-    unshuffled = normalizeAutosaveToSubmitAnswers(
-      rawAnswers as AutosaveAnswers,
-      questionOrder
-    );
-    if (Object.keys(unshuffled).length === 0) {
-      unshuffled = rawAnswers;
-    }
   }
 
   const existingByQ = new Map(existingDetails.map((d) => [d.question_id, d]));
   let score = 0;
   let changed = false;
   const gradedRows: GradedDetailRow[] = [];
+  const unshuffled: Record<string, string | string[]> = {};
 
-  for (const qId of questionOrder) {
+  for (let i = 0; i < questionOrder.length; i += 1) {
+    const qId = questionOrder[i];
     const q = allQuestions.find((item) => item.id === qId);
     if (!q) continue;
     const prev = existingByQ.get(qId);
-    const submitted = unshuffled[qId] ?? null;
+    const displayRaw =
+      rawAnswers[String(i)] ?? rawAnswers[qId] ?? null;
 
     if (q.question_type === "essay") {
+      const essayText =
+        displayRaw === null || displayRaw === undefined
+          ? prev?.submitted ?? ""
+          : Array.isArray(displayRaw)
+            ? displayRaw.join("\n")
+            : String(displayRaw);
       const pointsEarned = prev?.points_earned ?? null;
       if (pointsEarned != null) score += Number(pointsEarned);
       const row: GradedDetailRow = {
         question_id: q.id,
         question_type: "essay",
-        submitted:
-          submitted === null || submitted === undefined
-            ? prev?.submitted ?? ""
-            : Array.isArray(submitted)
-              ? submitted.join("\n")
-              : String(submitted),
+        submitted: essayText,
         is_correct: false,
         points_earned: pointsEarned,
         max_points: Number(q.points),
@@ -923,19 +912,21 @@ async function recomputeMcqGradingForSession(
       continue;
     }
 
-    const opts = q.options as Record<string, string> | null;
-    const correct = q.correct_answer;
-    const correctKey = resolveMcqAnswerKey(correct, opts);
-    const isCorrect = mcqAnswersEqual(submitted, correct, opts);
-    const pointsEarned = isCorrect ? Number(q.points) : 0;
+    const optionMap = versionMaps?.optionMaps[qId];
+    const opts = originalOptionsByQuestion[qId];
+    const graded = gradeMcq(displayRaw, q.correct_answer, optionMap, opts);
+    const submitted = graded.originalKey;
+    if (submitted) unshuffled[qId] = submitted;
+
+    const pointsEarned = graded.isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
 
     const row: GradedDetailRow = {
       question_id: q.id,
       question_type: "mcq",
       submitted,
-      correct: correctKey ?? correct,
-      is_correct: isCorrect,
+      correct: graded.correctKey,
+      is_correct: graded.isCorrect,
       points_earned: pointsEarned,
       max_points: Number(q.points),
       pending_grading: false,
@@ -1038,13 +1029,12 @@ export const submitSessionService = async (
       };
     }
 
-    const opts = q.options as Record<string, string> | null;
     const correct = q.correct_answer;
-    const correctKey = resolveMcqAnswerKey(correct, opts);
+    const correctKey = resolveCorrectAnswerKey(correct);
     const isCorrect =
       submitted !== undefined &&
       submitted !== null &&
-      mcqAnswersEqual(submitted, correct, opts);
+      mcqAnswersEqual(submitted, correct);
     const pointsEarned = isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
     if (isCorrect) correctCount++;
@@ -1053,7 +1043,7 @@ export const submitSessionService = async (
       question_id: q.id,
       question_type: "mcq",
       submitted,
-      correct: correctKey ?? correct,
+      correct: correctKey,
       is_correct: isCorrect,
       points_earned: pointsEarned,
       max_points: Number(q.points),
@@ -1219,16 +1209,12 @@ async function buildReviewQuestionsForSession(
     const q = questionsById.get(qId);
     if (!q) continue;
     const detail = gradedDetails.find((d) => d.question_id === qId);
-    const opts = q.options as Record<string, string> | null;
     const correctKey =
-      q.question_type === "mcq"
-        ? resolveMcqAnswerKey(detail?.correct ?? q.correct_answer, opts) ??
-          resolveMcqAnswerKey(q.correct_answer, opts)
-        : null;
+      q.question_type === "mcq" ? resolveCorrectAnswerKey(q.correct_answer) : null;
     const submittedRaw = detail?.submitted ?? null;
     const isCorrect =
       q.question_type === "mcq"
-        ? mcqAnswersEqual(submittedRaw, detail?.correct ?? q.correct_answer, opts)
+        ? mcqAnswersEqual(submittedRaw, q.correct_answer)
         : (detail?.is_correct ?? false);
     reviewQuestions.push({
       question_id: q.id,
