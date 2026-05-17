@@ -2,7 +2,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/server.ts",
-    "build": "tsc && tsc-alias",
+    "build": "tsc && tsc-alias && node scripts/copy-migrations.cjs",
     "migrate": "ts-node -r tsconfig-paths/register scripts/run-migrations.ts",
     "assign-teacher-class": "ts-node -r tsconfig-paths/register scripts/assign-teacher-admin-class.ts",
     "start": "node dist/server.js",

@@ -10,6 +10,7 @@ import { errorHandler } from "~/middlewares/error.middleware";
 import { registerExamSocket, restoreExamRuntimesOnStartup } from "~/socket/examSocket";
 import { setupSwaggerDocs } from "./docs/swagger";
 import { startExamDeadlineReminderScheduler } from "~/jobs/examDeadlineReminders.job";
+import { runPendingMigrations } from "~/db/runMigrations";
 
 const START_SERVER = () => {
   const app = express();
@@ -65,8 +66,8 @@ const START_SERVER = () => {
   });
 };
 
-// connect DB trước khi start server
 connectDB()
+  .then(() => runPendingMigrations())
   .then(() => {
     console.log("Connected to PostgreSQL (Neon) successfully!");
     START_SERVER();
