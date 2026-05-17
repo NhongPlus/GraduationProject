@@ -61,6 +61,7 @@ import {
   upsertAutosaveSnapshot,
 } from "~/models/examAutosave.model";
 import pool from "~/config/db";
+import { mcqAnswersEqual, resolveMcqAnswerKey } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
 import {
   isMalformedClosesAt,
@@ -762,23 +763,6 @@ export const persistAutosaveSnapshotService = async (payload: {
   };
 };
 
-function normalizeMcqAnswer(val: unknown): string | null {
-  if (val == null) return null;
-  const raw = Array.isArray(val) ? val[0] : val;
-  const s = String(raw).trim();
-  if (!s) return null;
-  if (/^[A-Za-z]$/.test(s)) return s.toUpperCase();
-  return s;
-}
-
-function mcqAnswersEqual(submitted: unknown, correct: unknown): boolean {
-  const sub = normalizeMcqAnswer(submitted);
-  const cor = normalizeMcqAnswer(correct);
-  if (sub == null || cor == null) return false;
-  if (/^[A-Z]$/.test(sub) && /^[A-Z]$/.test(cor)) return sub === cor;
-  return JSON.stringify(submitted) === JSON.stringify(correct);
-}
-
 function buildOriginalOptionsByQuestion(
   questions: Question[]
 ): Record<string, Record<string, string>> {
@@ -939,8 +923,10 @@ async function recomputeMcqGradingForSession(
       continue;
     }
 
+    const opts = q.options as Record<string, string> | null;
     const correct = q.correct_answer;
-    const isCorrect = mcqAnswersEqual(submitted, correct);
+    const correctKey = resolveMcqAnswerKey(correct, opts);
+    const isCorrect = mcqAnswersEqual(submitted, correct, opts);
     const pointsEarned = isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
 
@@ -948,7 +934,7 @@ async function recomputeMcqGradingForSession(
       question_id: q.id,
       question_type: "mcq",
       submitted,
-      correct,
+      correct: correctKey ?? correct,
       is_correct: isCorrect,
       points_earned: pointsEarned,
       max_points: Number(q.points),
@@ -1052,11 +1038,13 @@ export const submitSessionService = async (
       };
     }
 
+    const opts = q.options as Record<string, string> | null;
     const correct = q.correct_answer;
+    const correctKey = resolveMcqAnswerKey(correct, opts);
     const isCorrect =
       submitted !== undefined &&
       submitted !== null &&
-      mcqAnswersEqual(submitted, correct);
+      mcqAnswersEqual(submitted, correct, opts);
     const pointsEarned = isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
     if (isCorrect) correctCount++;
@@ -1065,7 +1053,7 @@ export const submitSessionService = async (
       question_id: q.id,
       question_type: "mcq",
       submitted,
-      correct,
+      correct: correctKey ?? correct,
       is_correct: isCorrect,
       points_earned: pointsEarned,
       max_points: Number(q.points),
@@ -1231,15 +1219,26 @@ async function buildReviewQuestionsForSession(
     const q = questionsById.get(qId);
     if (!q) continue;
     const detail = gradedDetails.find((d) => d.question_id === qId);
+    const opts = q.options as Record<string, string> | null;
+    const correctKey =
+      q.question_type === "mcq"
+        ? resolveMcqAnswerKey(detail?.correct ?? q.correct_answer, opts) ??
+          resolveMcqAnswerKey(q.correct_answer, opts)
+        : null;
+    const submittedRaw = detail?.submitted ?? null;
+    const isCorrect =
+      q.question_type === "mcq"
+        ? mcqAnswersEqual(submittedRaw, detail?.correct ?? q.correct_answer, opts)
+        : (detail?.is_correct ?? false);
     reviewQuestions.push({
       question_id: q.id,
       question_type: q.question_type,
       content: q.content,
       options: q.options,
       explanation: q.explanation ?? null,
-      submitted: detail?.submitted ?? null,
-      correct: q.question_type === "mcq" ? q.correct_answer : null,
-      is_correct: detail?.is_correct ?? false,
+      submitted: submittedRaw,
+      correct: correctKey,
+      is_correct: isCorrect,
       points_earned: detail?.points_earned ?? null,
       max_points: Number(q.points),
       pending_grading: detail?.pending_grading,
