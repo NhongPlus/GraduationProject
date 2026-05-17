@@ -176,6 +176,28 @@ function findMcqKeyByOptionText(
   return null;
 }
 
+/**
+ * Chuẩn hóa đáp án đã lưu: có thể là original (B) hoặc display (D) tùy phiên cũ.
+ * Thử map display → original; nếu khớp đáp án đúng thì dùng bản original.
+ */
+export function resolveSubmittedOriginalKey(
+  submitted: unknown,
+  correctAnswer: string | string[] | null | undefined,
+  optionMap?: Record<string, string> | null,
+  originalOptions?: Record<string, string> | null
+): string | null {
+  const letter = normalizeLetterKey(
+    Array.isArray(submitted) ? submitted[0] : submitted
+  );
+  if (!letter) return null;
+  if (!optionMap || Object.keys(optionMap).length === 0) return letter;
+
+  const fromDisplay = resolveOriginalKeyFromDisplay(letter, optionMap, originalOptions);
+  if (fromDisplay && mcqAnswersEqual(fromDisplay, correctAnswer)) return fromDisplay;
+  if (mcqAnswersEqual(letter, correctAnswer)) return letter;
+  return fromDisplay ?? letter;
+}
+
 /** Đáp án đúng hiển thị trên trang review (ưu tiên graded_details, rồi question bank). */
 export function resolveReviewCorrectKey(
   correctAnswer: string | string[] | null | undefined,

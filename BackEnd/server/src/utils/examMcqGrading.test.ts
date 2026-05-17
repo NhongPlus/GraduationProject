@@ -6,6 +6,7 @@ import {
   pickRecomputeMcqInput,
   resolveOriginalKeyFromDisplay,
   resolveReviewCorrectKey,
+  resolveSubmittedOriginalKey,
 } from "./examMcqGrading";
 
 const OPTIONS = {
@@ -75,6 +76,22 @@ describe("resolveReviewCorrectKey", () => {
         { A: "HTTP", B: "WebSocket (Socket.IO)", C: "FTP", D: "SMTP" },
         null
       )
+    ).toBe("B");
+  });
+});
+
+describe("resolveSubmittedOriginalKey", () => {
+  const MAP_DISPLAY_D_IS_ORIGINAL_B = { A: "A", B: "B", C: "C", D: "B" };
+
+  it("treats stored display D as original B when correct is B", () => {
+    expect(
+      resolveSubmittedOriginalKey("D", "B", MAP_DISPLAY_D_IS_ORIGINAL_B, OPTIONS)
+    ).toBe("B");
+  });
+
+  it("keeps stored original B when already correct", () => {
+    expect(
+      resolveSubmittedOriginalKey("B", "B", MAP_DISPLAY_D_IS_ORIGINAL_B, OPTIONS)
     ).toBe("B");
   });
 });

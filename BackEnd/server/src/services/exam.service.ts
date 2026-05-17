@@ -70,6 +70,7 @@ import {
   pickRecomputeMcqInput,
   resolveCorrectAnswerKey,
   resolveReviewCorrectKey,
+  resolveSubmittedOriginalKey,
   normalizeLetterKey,
 } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
@@ -389,6 +390,7 @@ export const createExamWithQuestionsService = async (
     }
 
     await client.query("COMMIT");
+    await ensureVersionPool(exam.id);
     return { exam, questions: insertedQuestions };
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1021,8 +1023,19 @@ export const submitSessionService = async (
       originalOptionsByQuestion
     );
   } else {
-    questionOrder = allQuestions.map((q) => q.id);
-    unshuffledAnswers = answers;
+    const orderedIds = allQuestions.map((q) => q.id);
+    questionOrder = orderedIds;
+    const byQuestionId: Record<string, string | string[]> = {};
+    for (const [key, value] of Object.entries(answers)) {
+      const idx = parseInt(key, 10);
+      if (Number.isFinite(idx) && String(idx) === key.trim()) {
+        const qid = orderedIds[idx];
+        if (qid) byQuestionId[qid] = value;
+      } else if (orderedIds.includes(key)) {
+        byQuestionId[key] = value;
+      }
+    }
+    unshuffledAnswers = byQuestionId;
   }
 
   let score = 0;
@@ -1058,10 +1071,18 @@ export const submitSessionService = async (
 
     const correct = q.correct_answer;
     const correctKey = resolveCorrectAnswerKey(correct);
+    const optionMap = versionMaps?.optionMaps[qId];
+    const submittedOriginal =
+      submitted !== undefined && submitted !== null
+        ? resolveSubmittedOriginalKey(
+            submitted,
+            correct,
+            optionMap,
+            originalOptionsByQuestion[qId]
+          )
+        : null;
     const isCorrect =
-      submitted !== undefined &&
-      submitted !== null &&
-      mcqAnswersEqual(submitted, correct);
+      submittedOriginal !== null && mcqAnswersEqual(submittedOriginal, correct);
     const pointsEarned = isCorrect ? Number(q.points) : 0;
     score += pointsEarned;
     if (isCorrect) correctCount++;
@@ -1069,7 +1090,7 @@ export const submitSessionService = async (
     return {
       question_id: q.id,
       question_type: "mcq",
-      submitted,
+      submitted: submittedOriginal ?? submitted,
       correct: correctKey,
       is_correct: isCorrect,
       points_earned: pointsEarned,
@@ -1198,10 +1219,12 @@ export interface SessionReviewPayload {
 }
 
 /** Đã chấm đúng lúc submit — không ghi đè bằng autosave khi mở review. */
-function gradedMcqLooksConsistent(
+async function gradedMcqLooksConsistent(
+  session: ExamSession,
   gradedDetails: GradedDetailRow[],
   allQuestions: Question[]
-): boolean {
+): Promise<boolean> {
+  const versionMaps = await getVersionMapsForSession(session);
   const mcqRows = gradedDetails.filter((d) => d.question_type === "mcq");
   if (mcqRows.length === 0) return true;
   return mcqRows.every((d) => {
@@ -1211,7 +1234,14 @@ function gradedMcqLooksConsistent(
     const expectedCorrect = resolveReviewCorrectKey(q.correct_answer, q.options, d.correct);
     if (expectedCorrect && !storedCorrect) return false;
     if (d.submitted == null || d.submitted === "") return true;
-    const expectCorrect = mcqAnswersEqual(d.submitted, q.correct_answer);
+    const optionMap = versionMaps?.optionMaps[d.question_id];
+    const resolved = resolveSubmittedOriginalKey(
+      d.submitted,
+      q.correct_answer,
+      optionMap,
+      q.options
+    );
+    const expectCorrect = mcqAnswersEqual(resolved, q.correct_answer);
     return d.is_correct === expectCorrect;
   });
 }
@@ -1223,7 +1253,7 @@ async function applyRecomputeIfNeeded(
 ): Promise<{ session: ExamSession; gradedDetails: GradedDetailRow[] }> {
   if (
     session.status === "submitted" &&
-    gradedMcqLooksConsistent(gradedDetails, allQuestions)
+    (await gradedMcqLooksConsistent(session, gradedDetails, allQuestions))
   ) {
     return { session, gradedDetails };
   }
@@ -1271,14 +1301,21 @@ async function buildReviewQuestionsForSession(
         ? resolveReviewCorrectKey(q.correct_answer, q.options, detail?.correct)
         : null;
     const submittedRaw = detail?.submitted ?? null;
-    const submittedOriginal = normalizeLetterKey(
-      Array.isArray(submittedRaw) ? submittedRaw[0] : submittedRaw
-    );
+    const submittedOriginalResolved =
+      q.question_type === "mcq"
+        ? resolveSubmittedOriginalKey(
+            submittedRaw,
+            q.correct_answer,
+            optionMap,
+            q.options
+          )
+        : null;
     let submittedForUi: string | string[] | null = submittedRaw;
     let correctForUi: string | string[] | null = correctOriginal;
-    if (optionMap && submittedOriginal) {
+    if (optionMap && submittedOriginalResolved) {
       submittedForUi =
-        originalKeyToDisplayKey(optionMap, submittedOriginal) ?? submittedOriginal;
+        originalKeyToDisplayKey(optionMap, submittedOriginalResolved) ??
+        submittedOriginalResolved;
     }
     if (optionMap && correctOriginal) {
       correctForUi =
@@ -1286,8 +1323,7 @@ async function buildReviewQuestionsForSession(
     }
     const isCorrect =
       q.question_type === "mcq"
-        ? (detail?.is_correct ??
-          mcqAnswersEqual(submittedRaw, q.correct_answer))
+        ? mcqAnswersEqual(submittedOriginalResolved, q.correct_answer)
         : (detail?.is_correct ?? false);
     reviewQuestions.push({
       question_id: q.id,
@@ -1298,13 +1334,67 @@ async function buildReviewQuestionsForSession(
       submitted: submittedForUi,
       correct: correctForUi,
       is_correct: isCorrect,
-      points_earned: detail?.points_earned ?? null,
+      points_earned:
+        q.question_type === "mcq"
+          ? isCorrect
+            ? Number(q.points)
+            : 0
+          : (detail?.points_earned ?? null),
       max_points: Number(q.points),
       pending_grading: detail?.pending_grading,
       teacher_comment: detail?.teacher_comment ?? null,
     });
   }
   return reviewQuestions;
+}
+
+async function repairGradedDetailsFromReview(
+  session: ExamSession,
+  gradedDetails: GradedDetailRow[],
+  reviewQuestions: ReviewDetailRow[],
+  allQuestions: Question[]
+): Promise<{ session: ExamSession; gradedDetails: GradedDetailRow[] }> {
+  const repaired = gradedDetails.map((d) => ({ ...d }));
+  let changed = false;
+
+  for (const rq of reviewQuestions) {
+    if (rq.question_type !== "mcq") continue;
+    const idx = repaired.findIndex((d) => d.question_id === rq.question_id);
+    if (idx < 0) continue;
+    const q = allQuestions.find((item) => item.id === rq.question_id);
+    const prev = repaired[idx];
+    const pointsEarned = rq.is_correct ? Number(rq.max_points) : 0;
+    const correctKey = q
+      ? resolveReviewCorrectKey(q.correct_answer, q.options, prev.correct)
+      : normalizeLetterKey(prev.correct);
+    if (
+      prev.is_correct === rq.is_correct &&
+      Number(prev.points_earned ?? 0) === pointsEarned &&
+      normalizeLetterKey(prev.correct) === correctKey
+    ) {
+      continue;
+    }
+    changed = true;
+    repaired[idx] = {
+      ...prev,
+      is_correct: rq.is_correct,
+      points_earned: pointsEarned,
+      correct: correctKey,
+    };
+  }
+
+  if (!changed) return { session, gradedDetails: repaired };
+
+  const score = repaired.reduce((sum, d) => sum + Number(d.points_earned ?? 0), 0);
+  const hasPendingEssay = repaired.some(
+    (d) => d.question_type === "essay" && d.pending_grading
+  );
+  const updated = await updateSessionGrading(session.id, {
+    score,
+    graded_details: repaired,
+    grading_status: hasPendingEssay ? "pending_manual" : "complete",
+  });
+  return { session: updated ?? session, gradedDetails: repaired };
 }
 
 export const getSessionReview = async (
@@ -1334,13 +1424,20 @@ export const getSessionReview = async (
     allQuestions,
     gradedDetails
   );
+  const repaired = await repairGradedDetailsFromReview(
+    sessionRow,
+    gradedDetails,
+    reviewQuestions,
+    allQuestions
+  );
 
   return {
-    session: sessionRow,
+    session: repaired.session,
     exam,
-    score: sessionRow.score != null ? Number(sessionRow.score) : null,
-    max_points: sessionRow.max_points != null ? Number(sessionRow.max_points) : null,
-    grading_status: sessionRow.grading_status,
+    score: repaired.session.score != null ? Number(repaired.session.score) : null,
+    max_points:
+      repaired.session.max_points != null ? Number(repaired.session.max_points) : null,
+    grading_status: repaired.session.grading_status,
     questions: reviewQuestions,
   };
 };
