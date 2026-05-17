@@ -187,8 +187,15 @@ const ExamList = () => {
                     item.closes_at != null && item.closes_at !== ''
                       ? new Date(item.closes_at).toLocaleString()
                       : t('exam_list.deadline_none');
+                  const rowNavigate = isStaff
+                    ? () => navigate(`/exam-sessions/${item.id}`)
+                    : () => navigate(`/exam/${item.id}`);
                   return (
-                    <Table.Tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/exams/${item.id}`)}>
+                    <Table.Tr
+                      key={item.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={rowNavigate}
+                    >
                       <Table.Td>{idx + 1}</Table.Td>
                       <Table.Td>
                         <Text fw={500}>{item.title}</Text>
@@ -268,7 +275,10 @@ const ExamList = () => {
                               label={t('exam_list.action_take')}
                               disabled={pastDeadline}
                               title={pastDeadline ? t('exam_list.take_disabled_deadline') : undefined}
-                              onClick={() => navigate(`/exam/${item.id}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/exam/${item.id}`);
+                              }}
                             />
                             <ButtonFilled
                               size="xs"
@@ -276,7 +286,10 @@ const ExamList = () => {
                               color="gray"
                               label={t('exam_list.action_result')}
                               disabled={!done}
-                              onClick={() => navigate(`/result/${item.id}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/result/${item.id}`);
+                              }}
                             />
                           </>
                         )}
