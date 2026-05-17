@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { gradeMcq, mcqAnswersEqual, resolveOriginalKeyFromDisplay } from "./examMcqGrading";
+import {
+  gradeMcq,
+  gradeMcqRecompute,
+  mcqAnswersEqual,
+  pickRecomputeMcqInput,
+  resolveOriginalKeyFromDisplay,
+} from "./examMcqGrading";
 
 const OPTIONS = {
   A: "HTTP polling mỗi 30 giây",
@@ -47,5 +53,59 @@ describe("mcqAnswersEqual", () => {
 
   it("b vs B case insensitive", () => {
     expect(mcqAnswersEqual("b", "B")).toBe(true);
+  });
+});
+
+describe("recompute MCQ sources", () => {
+  it("when submitted, prefers student original over stale autosave display", () => {
+    const input = pickRecomputeMcqInput(
+      0,
+      "q-uuid",
+      { "0": "C" },
+      { "q-uuid": "A" },
+      "A",
+      { preferSubmittedSource: true }
+    );
+    expect(input).toEqual({ kind: "original", key: "A" });
+  });
+
+  it("when not submitted, prefers autosave display for force-submit path", () => {
+    const input = pickRecomputeMcqInput(
+      0,
+      "q-uuid",
+      { "0": "B" },
+      {},
+      undefined,
+      { preferSubmittedSource: false }
+    );
+    expect(input).toEqual({ kind: "display", key: "B" });
+  });
+
+  it("uses student original without double option_map", () => {
+    const graded = gradeMcqRecompute(
+      { kind: "original", key: "A" },
+      "A",
+      KEY_MAP,
+      OPTIONS
+    );
+    expect(graded.isCorrect).toBe(true);
+    expect(graded.originalKey).toBe("A");
+  });
+
+  it("original A with gradeMcq+map would wrongly map to D", () => {
+    const wrong = gradeMcq("A", "A", KEY_MAP, OPTIONS);
+    expect(wrong.isCorrect).toBe(false);
+    expect(wrong.originalKey).toBe("D");
+  });
+
+  it("display B maps once via gradeMcqRecompute", () => {
+    const graded = gradeMcqRecompute(
+      { kind: "display", key: "B" },
+      "A",
+      KEY_MAP,
+      OPTIONS
+    );
+    expect(graded.isCorrect).toBe(true);
+    expect(graded.originalKey).toBe("A");
   });
 });

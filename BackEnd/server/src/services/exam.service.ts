@@ -61,7 +61,12 @@ import {
   upsertAutosaveSnapshot,
 } from "~/models/examAutosave.model";
 import pool from "~/config/db";
-import { gradeMcq, mcqAnswersEqual, resolveCorrectAnswerKey } from "~/utils/examMcqGrading";
+import {
+  gradeMcqRecompute,
+  mcqAnswersEqual,
+  pickRecomputeMcqInput,
+  resolveCorrectAnswerKey,
+} from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
 import {
   isMalformedClosesAt,
@@ -835,38 +840,37 @@ async function recomputeMcqGradingForSession(
   const versionMaps = await getVersionMapsForSession(session);
   const originalOptionsByQuestion = buildOriginalOptionsByQuestion(allQuestions);
 
-  let rawAnswers: Record<string, string | string[]> = {};
+  /** Autosave FE: { q1: "B" } — B là display key (ô SV bấm), không unshuffle. */
+  const displayByIndex: Record<string, string> = {};
   const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
   if (snapshot?.answers) {
-    const fromAutosave = autosaveToDisplayIndexAnswers(snapshot.answers);
-    if (Object.keys(fromAutosave).length > 0) {
-      rawAnswers = fromAutosave;
-    }
-  }
-  if (Object.keys(rawAnswers).length === 0) {
-    rawAnswers = parseStudentAnswers(session.student_answers);
+    Object.assign(displayByIndex, autosaveToDisplayIndexAnswers(snapshot.answers));
   }
 
   const questionOrder = versionMaps
     ? versionMaps.questionOrder
     : allQuestions.map((q) => q.id);
 
-  if (versionMaps) {
-    const orderSet = new Set(questionOrder);
-    const keysAreQuestionIds = Object.keys(rawAnswers).some((k) => orderSet.has(k));
-    const allSingleLetter = Object.values(rawAnswers).every(
-      (v) => typeof v === "string" && /^[A-D]$/i.test(v.trim())
-    );
-    if (keysAreQuestionIds && allSingleLetter) {
-      const byDisplayIdx: Record<string, string> = {};
-      for (let i = 0; i < questionOrder.length; i += 1) {
-        const qId = questionOrder[i];
-        const val = rawAnswers[qId];
-        if (typeof val === "string") byDisplayIdx[String(i)] = val;
-      }
-      rawAnswers = byDisplayIdx;
+  /** student_answers sau submit: { [question_id]: original_key } */
+  const originalByQuestionId: Record<string, string> = {};
+  const orderSet = new Set(questionOrder);
+  const fromStudent = parseStudentAnswers(session.student_answers);
+  for (const [key, value] of Object.entries(fromStudent)) {
+    if (typeof value !== "string" || !/^[A-D]$/i.test(value.trim())) continue;
+    const letter = value.trim().toUpperCase();
+    if (orderSet.has(key)) {
+      originalByQuestionId[key] = letter;
+      continue;
+    }
+    const idx = parseInt(key, 10);
+    if (Number.isFinite(idx) && String(idx) === key.trim()) {
+      displayByIndex[String(idx)] = letter;
     }
   }
+
+  /** Đã nộp: student_answers là source of truth; autosave có thể stale (flush sau submit). */
+  const preferSubmittedSource =
+    session.status === "submitted" || Object.keys(originalByQuestionId).length > 0;
 
   const existingByQ = new Map(existingDetails.map((d) => [d.question_id, d]));
   let score = 0;
@@ -879,16 +883,21 @@ async function recomputeMcqGradingForSession(
     const q = allQuestions.find((item) => item.id === qId);
     if (!q) continue;
     const prev = existingByQ.get(qId);
-    const displayRaw =
-      rawAnswers[String(i)] ?? rawAnswers[qId] ?? null;
 
     if (q.question_type === "essay") {
+      const essayFromDisplay = displayByIndex[String(i)];
+      const essayFromStudent = fromStudent[qId];
+      const essayFromStudentStr =
+        typeof essayFromStudent === "string" ? essayFromStudent : undefined;
+      const essayRaw = preferSubmittedSource
+        ? essayFromStudentStr ?? essayFromDisplay ?? prev?.submitted
+        : essayFromDisplay ?? essayFromStudentStr ?? prev?.submitted;
       const essayText =
-        displayRaw === null || displayRaw === undefined
-          ? prev?.submitted ?? ""
-          : Array.isArray(displayRaw)
-            ? displayRaw.join("\n")
-            : String(displayRaw);
+        essayRaw === null || essayRaw === undefined
+          ? ""
+          : Array.isArray(essayRaw)
+            ? essayRaw.join("\n")
+            : String(essayRaw);
       const pointsEarned = prev?.points_earned ?? null;
       if (pointsEarned != null) score += Number(pointsEarned);
       const row: GradedDetailRow = {
@@ -914,7 +923,20 @@ async function recomputeMcqGradingForSession(
 
     const optionMap = versionMaps?.optionMaps[qId];
     const opts = originalOptionsByQuestion[qId];
-    const graded = gradeMcq(displayRaw, q.correct_answer, optionMap, opts);
+    const recomputeInput = pickRecomputeMcqInput(
+      i,
+      qId,
+      displayByIndex,
+      originalByQuestionId,
+      prev?.submitted,
+      { preferSubmittedSource }
+    );
+    const graded = gradeMcqRecompute(
+      recomputeInput,
+      q.correct_answer,
+      optionMap,
+      opts
+    );
     const submitted = graded.originalKey;
     if (submitted) unshuffled[qId] = submitted;
 

@@ -402,7 +402,7 @@
     "fullscreen_button": "Bật toàn màn hình",
     "fullscreen_error": "Không thể bật toàn màn hình. Vui lòng bấm lại hoặc thử trên trình duyệt khác.",
     "waiting_teacher_title": "Đang chờ giáo viên bắt đầu",
-    "waiting_teacher_desc": "Hệ thống đang đồng bộ trạng thái bài thi. Khi giáo viên bấm Bắt đầu thi, bạn sẽ thấy nút bật toàn màn hình để làm bài.",
+    "waiting_teacher_desc": "Hệ thống đang đồng bộ trạng thái bài thi. Khi giáo viên bấm Bắt đầu thi, hãy bấm nút bật toàn màn hình (hộp thoại hoặc nút màu xanh) để mở đề — trình duyệt không cho tự bật.",
     "waiting_fullscreen_hint": "Nên bật toàn màn hình ngay để sẵn sàng khi giáo viên mở đề.",
     "exam_started_title": "Giáo viên đã bắt đầu bài thi",
     "exam_started_fullscreen_desc": "Bấm nút bên dưới để bật toàn màn hình và hiển thị đề thi. (Trình duyệt yêu cầu thao tác của bạn.)",

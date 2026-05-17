@@ -66,6 +66,92 @@ export function gradeMcq(
   };
 }
 
+/** Nguồn đáp án khi recompute — tránh map option_map hai lần. */
+export type RecomputeMcqInput =
+  | { kind: "display"; key: string }
+  | { kind: "original"; key: string };
+
+export type PickRecomputeMcqOptions = {
+  /**
+   * true = phiên đã nộp: ưu tiên student_answers / graded_details (original, khớp submit).
+   * false = chỉ có autosave (force-submit, sửa option_maps cũ): ưu tiên display từ autosave.
+   */
+  preferSubmittedSource?: boolean;
+};
+
+function pickDisplayByIndex(
+  displayIdx: number,
+  displayByIndex: Record<string, string>
+): RecomputeMcqInput | null {
+  const fromAutosave = displayByIndex[String(displayIdx)]?.trim();
+  if (fromAutosave && /^[A-D]$/i.test(fromAutosave)) {
+    return { kind: "display", key: fromAutosave.toUpperCase() };
+  }
+  return null;
+}
+
+function pickOriginalByQuestion(
+  questionId: string,
+  originalByQuestionId: Record<string, string>,
+  gradedDetailSubmitted?: unknown
+): RecomputeMcqInput | null {
+  const fromStudent = originalByQuestionId[questionId]?.trim();
+  if (fromStudent && /^[A-D]$/i.test(fromStudent)) {
+    return { kind: "original", key: fromStudent.toUpperCase() };
+  }
+  const fromGraded = normalizeLetterKey(gradedDetailSubmitted);
+  if (fromGraded) return { kind: "original", key: fromGraded };
+  return null;
+}
+
+/**
+ * Chọn nguồn recompute theo ngữ cảnh — tránh autosave stale ghi đè kết quả submit.
+ */
+export function pickRecomputeMcqInput(
+  displayIdx: number,
+  questionId: string,
+  displayByIndex: Record<string, string>,
+  originalByQuestionId: Record<string, string>,
+  gradedDetailSubmitted?: unknown,
+  options?: PickRecomputeMcqOptions
+): RecomputeMcqInput | null {
+  const preferSubmitted = options?.preferSubmittedSource === true;
+  const fromOriginal = pickOriginalByQuestion(
+    questionId,
+    originalByQuestionId,
+    gradedDetailSubmitted
+  );
+  const fromDisplay = pickDisplayByIndex(displayIdx, displayByIndex);
+
+  if (preferSubmitted) {
+    return fromOriginal ?? fromDisplay;
+  }
+  return fromDisplay ?? fromOriginal;
+}
+
+/** Chấm TN khi recompute: display → gradeMcq; original → chỉ so chữ (không option_map). */
+export function gradeMcqRecompute(
+  input: RecomputeMcqInput | null,
+  correctAnswer: string | string[] | null | undefined,
+  optionMap?: Record<string, string> | null,
+  originalOptions?: Record<string, string> | null
+): McqGradeResult {
+  if (!input) {
+    return gradeMcq(null, correctAnswer, optionMap, originalOptions);
+  }
+  if (input.kind === "display") {
+    return gradeMcq(input.key, correctAnswer, optionMap, originalOptions);
+  }
+  const correctKey = resolveCorrectAnswerKey(correctAnswer);
+  const originalKey = normalizeLetterKey(input.key);
+  return {
+    isCorrect: Boolean(originalKey && correctKey && originalKey === correctKey),
+    originalKey,
+    correctKey,
+    displayKey: null,
+  };
+}
+
 /** Sau unshuffle: submitted đã là original_key — chỉ so chữ cái. */
 export function mcqAnswersEqual(
   submittedOriginalKey: unknown,

@@ -145,11 +145,14 @@ const ExamTake = () => {
   const [fullscreenError, setFullscreenError] = useState('');
   const [sessionLoading, setSessionLoading] = useState(false);
   const [fsRevision, setFsRevision] = useState(0);
+  /** GV đã bật thi (socket) — có thể trước khi startSession API xong */
+  const [teacherRuntimeLive, setTeacherRuntimeLive] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  /** Chỉ tắt giám sát khi set rõ VITE_DISABLE_INTEGRITY=true (vd. local dev) */
-  const integrityDisabled = import.meta.env.VITE_DISABLE_INTEGRITY === 'true';
+  const teacherFullscreenModalRef = useRef(false);
+  /** Chỉ dev: production luôn bắt fullscreen (tránh VITE_DISABLE_INTEGRITY trên Vercel). */
+  const integrityDisabled =
+    import.meta.env.DEV && import.meta.env.VITE_DISABLE_INTEGRITY === 'true';
   const inBrowserFullscreen = Boolean(document.fullscreenElement);
-  const examUiAllowed = integrityDisabled || inBrowserFullscreen;
 
   const placeholderQuestion = (n: number): MockExamQuestion => ({
     number: n,
@@ -302,7 +305,11 @@ const ExamTake = () => {
   );
 
   const ensureSessionStarted = useCallback(async () => {
-    if (!examId || sessionId || sessionStartingRef.current) return;
+    if (!examId || sessionStartingRef.current) return;
+    if (sessionId && questions.length > 0) {
+      setExamStarted(true);
+      return;
+    }
     sessionStartingRef.current = true;
     setSessionLoading(true);
     try {
@@ -339,6 +346,8 @@ const ExamTake = () => {
   }, [
     activeExamId,
     examId,
+    examId,
+    questions.length,
     sessionId,
     setBootError,
     setCurrentNumber,
@@ -350,6 +359,72 @@ const ExamTake = () => {
     setVersionCode,
     syncServerTime,
   ]);
+
+  const requestFullscreen = useCallback(async () => {
+    setFullscreenError('');
+    const el = document.documentElement;
+    const req =
+      el.requestFullscreen?.bind(el) ??
+      (el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> })
+        .webkitRequestFullscreen?.bind(el);
+    if (!req) {
+      setFullscreenError(t('exam_take.fullscreen_error'));
+      void trackIntegrityEvent(activeExamId, 'fullscreen_error', { reason: 'unsupported' });
+      return;
+    }
+    try {
+      await req();
+    } catch (error) {
+      setFullscreenError(t('exam_take.fullscreen_error'));
+      void trackIntegrityEvent(activeExamId, 'fullscreen_error', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [activeExamId, t]);
+
+  const requestFullscreenRef = useRef(requestFullscreen);
+  requestFullscreenRef.current = requestFullscreen;
+
+  const promptTeacherStartedFullscreen = useCallback(() => {
+    if (integrityDisabled || document.fullscreenElement) return;
+    if (teacherFullscreenModalRef.current) return;
+    teacherFullscreenModalRef.current = true;
+    const modalId = 'exam-teacher-started-fullscreen';
+    modals.open({
+      modalId,
+      centered: true,
+      closeOnClickOutside: false,
+      closeOnEscape: false,
+      withCloseButton: false,
+      title: t('exam_take.exam_started_title'),
+      children: (
+        <Stack gap="md">
+          <Text size="sm">{t('exam_take.exam_started_fullscreen_desc')}</Text>
+          <Button
+            color="teal"
+            size="md"
+            leftSection={<IconArrowsMaximize size={18} />}
+            onClick={() => {
+              void (async () => {
+                await requestFullscreenRef.current();
+                modals.close(modalId);
+              })();
+            }}
+          >
+            {t('exam_take.exam_started_fullscreen_button')}
+          </Button>
+        </Stack>
+      ),
+    });
+  }, [integrityDisabled, t]);
+
+  const promptTeacherStartedFullscreenRef = useRef(promptTeacherStartedFullscreen);
+  promptTeacherStartedFullscreenRef.current = promptTeacherStartedFullscreen;
+
+  const markTeacherRuntimeLive = useCallback(() => {
+    setTeacherRuntimeLive(true);
+    promptTeacherStartedFullscreenRef.current();
+  }, []);
 
   const forceAutoSubmit = useCallback(() => {
     if (autoSubmitted || submitting) return;
@@ -372,11 +447,16 @@ const ExamTake = () => {
         setViolationLocked(false);
         setRealtimeMessage('');
         violationTriggeredRef.current = false;
+        markTeacherRuntimeLive();
         void ensureSessionStarted();
       } else if (payload.status === 'not_started') {
+        setTeacherRuntimeLive(false);
+        teacherFullscreenModalRef.current = false;
         setExamStarted(false);
         setRealtimeMessage('Giang vien chua bat dau bai thi. Vui long cho...');
       } else if (payload.status === 'ended') {
+        setTeacherRuntimeLive(false);
+        teacherFullscreenModalRef.current = false;
         setExamStarted(false);
         setRealtimeMessage('Bai thi da ket thuc.');
         void forceAutoSubmit();
@@ -390,6 +470,7 @@ const ExamTake = () => {
       setViolationLocked(false);
       violationTriggeredRef.current = false;
       setRealtimeMessage('Bai thi da bat dau. Chuc ban lam bai tot.');
+      markTeacherRuntimeLive();
       void ensureSessionStarted();
     },
     onFinal15: (payload) => {
@@ -458,6 +539,8 @@ const ExamTake = () => {
         setCurrentNumber(1);
         setRemainingSeconds(0);
         setExamStarted(false);
+        setTeacherRuntimeLive(false);
+        teacherFullscreenModalRef.current = false;
       } catch {
         if (canceled) return;
         setBootError('Khong the tai du lieu bai thi hoac khoi tao phien thi.');
@@ -493,7 +576,11 @@ const ExamTake = () => {
       const full = Boolean(document.fullscreenElement);
       setIsFullscreen(full);
       setFsRevision((n) => n + 1);
-      if (full) setFullscreenError('');
+      if (full) {
+        setFullscreenError('');
+        modals.close('exam-teacher-started-fullscreen');
+        teacherFullscreenModalRef.current = false;
+      }
       if (examStarted || full) {
         void trackIntegrityEvent(activeExamId, full ? 'fullscreen_enter' : 'fullscreen_exit');
       }
@@ -645,6 +732,28 @@ const ExamTake = () => {
   }, [activeExamId, accessToken]);
 
   useEffect(() => {
+    if (!teacherRuntimeLive || autoSubmitted || violationLocked || examStarted) return;
+    if (!integrityDisabled && !document.fullscreenElement) return;
+    void ensureSessionStarted();
+  }, [
+    teacherRuntimeLive,
+    examStarted,
+    integrityDisabled,
+    autoSubmitted,
+    violationLocked,
+    fsRevision,
+    ensureSessionStarted,
+  ]);
+
+  /** Đề đã tải nhưng chưa fullscreen → bắt modal/nút (kể cả bỏ lỡ socket teacherRuntimeLive). */
+  useEffect(() => {
+    if (integrityDisabled || autoSubmitted || violationLocked) return;
+    if (!examStarted || total === 0) return;
+    if (document.fullscreenElement) return;
+    promptTeacherStartedFullscreenRef.current();
+  }, [examStarted, total, integrityDisabled, autoSubmitted, violationLocked]);
+
+  useEffect(() => {
     if (!violationLocked || autoSubmitted) return;
     if (!sessionId) return;
     const id = window.setTimeout(() => {
@@ -738,28 +847,6 @@ const ExamTake = () => {
     });
   };
 
-  const requestFullscreen = async () => {
-    setFullscreenError('');
-    const el = rootRef.current ?? document.documentElement;
-    const req =
-      el.requestFullscreen?.bind(el) ??
-      (document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> })
-        .webkitRequestFullscreen?.bind(document.documentElement);
-    if (!req) {
-      setFullscreenError(t('exam_take.fullscreen_error'));
-      void trackIntegrityEvent(activeExamId, 'fullscreen_error', { reason: 'unsupported' });
-      return;
-    }
-    try {
-      await req();
-    } catch (error) {
-      setFullscreenError(t('exam_take.fullscreen_error'));
-      void trackIntegrityEvent(activeExamId, 'fullscreen_error', {
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
-  };
-
   if (bootLoading) {
     return (
       <Box className={classes.root}>
@@ -790,14 +877,18 @@ const ExamTake = () => {
 
   void fsRevision;
 
-  const showTeacherStartedGate =
+  const showFullscreenRequired =
     !integrityDisabled &&
-    examStarted &&
-    total > 0 &&
     !inBrowserFullscreen &&
     !autoSubmitted &&
-    !violationLocked;
-  const showFullscreenGate = !examUiAllowed && !showTeacherStartedGate;
+    !violationLocked &&
+    (teacherRuntimeLive || (examStarted && total > 0));
+
+  const showPreExamFullscreenGate =
+    !integrityDisabled && !inBrowserFullscreen && !teacherRuntimeLive && !examStarted;
+
+  const canShowExamShell =
+    examStarted && total > 0 && (integrityDisabled || inBrowserFullscreen);
 
   return (
     <Box className={classes.root} ref={rootRef}>
@@ -879,7 +970,7 @@ const ExamTake = () => {
         </Paper>
       )}
 
-      {!autoSubmitted && !violationLocked && showFullscreenGate && !showTeacherStartedGate && (
+      {!autoSubmitted && !violationLocked && showPreExamFullscreenGate && (
         <Paper
           withBorder
           radius="md"
@@ -910,7 +1001,7 @@ const ExamTake = () => {
           </Button>
         </Paper>
       )}
-      {showTeacherStartedGate && (
+      {showFullscreenRequired && (
         <Paper
           withBorder
           radius="md"
@@ -939,7 +1030,7 @@ const ExamTake = () => {
           </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && examUiAllowed && !showTeacherStartedGate && sessionLoading && (
+      {!autoSubmitted && !violationLocked && !showFullscreenRequired && sessionLoading && (
         <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
           <Text fw={700} size="lg" mb={8}>
             Dang tai de thi
@@ -949,7 +1040,7 @@ const ExamTake = () => {
           </Text>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && examUiAllowed && !showTeacherStartedGate && !examStarted && !sessionLoading && (
+      {!autoSubmitted && !violationLocked && !showFullscreenRequired && !teacherRuntimeLive && !examStarted && !sessionLoading && (
         <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
           <Text fw={700} size="lg" mb={8}>
             {t('exam_take.waiting_teacher_title')}
@@ -958,9 +1049,19 @@ const ExamTake = () => {
             {realtimeMessage || t('exam_take.waiting_teacher_desc')}
           </Text>
           {!inBrowserFullscreen && (
-            <Text size="sm" c="orange" mb="sm">
-              {t('exam_take.waiting_fullscreen_hint')}
-            </Text>
+            <>
+              <Text size="sm" c="orange" mb="sm">
+                {t('exam_take.waiting_fullscreen_hint')}
+              </Text>
+              <Button
+                mb="md"
+                color="teal"
+                leftSection={<IconArrowsMaximize size={16} />}
+                onClick={() => void requestFullscreen()}
+              >
+                {t('exam_take.fullscreen_button')}
+              </Button>
+            </>
           )}
           <Button
             variant="subtle"
@@ -977,7 +1078,7 @@ const ExamTake = () => {
           </Button>
         </Paper>
       )}
-      {!autoSubmitted && !violationLocked && examUiAllowed && !showTeacherStartedGate && examStarted && total > 0 && inBrowserFullscreen && (
+      {!autoSubmitted && !violationLocked && canShowExamShell && !showFullscreenRequired && (
         <div className={classes.shell}>
           <ExamTakeHeader
             title={examTitle}
