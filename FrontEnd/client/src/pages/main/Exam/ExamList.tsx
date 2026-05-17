@@ -277,7 +277,16 @@ const ExamList = () => {
                               title={pastDeadline ? t('exam_list.take_disabled_deadline') : undefined}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/exam/${item.id}`);
+                                void (async () => {
+                                  try {
+                                    if (document.documentElement.requestFullscreen) {
+                                      await document.documentElement.requestFullscreen();
+                                    }
+                                  } catch {
+                                    /* ExamTake sẽ hiện lại nút bật fullscreen */
+                                  }
+                                  navigate(`/exam/${item.id}`);
+                                })();
                               }}
                             />
                             <ButtonFilled

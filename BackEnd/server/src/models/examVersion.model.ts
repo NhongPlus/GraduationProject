@@ -160,15 +160,16 @@ function shuffleArray<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
+/** display key (A,B,…) → original key whose text is shown under that label */
 function shuffleOptions(
   options: Record<string, string>,
   seed: number
 ): Record<string, string> {
   const keys = Object.keys(options);
-  const values = keys.map((k) => options[k]);
-  const shuffledVals = shuffleArray(values, seed);
-  return keys.reduce((acc, k, i) => {
-    acc[k] = shuffledVals[i];
+  if (keys.length === 0) return {};
+  const shuffledOriginalKeys = shuffleArray(keys, seed);
+  return keys.reduce((acc, displayKey, i) => {
+    acc[displayKey] = shuffledOriginalKeys[i];
     return acc;
   }, {} as Record<string, string>);
 }

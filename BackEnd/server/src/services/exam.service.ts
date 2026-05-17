@@ -484,7 +484,7 @@ export const startSessionWithMeta = async (
     content: q.content,
     question_type: q.question_type,
     options: q.options
-      ? shuffleObject(q.options, version.option_maps[q.id] ?? {})
+      ? buildShuffledOptionsForStudent(q.options, version.option_maps[q.id] ?? {})
       : null,
     points: q.points,
     media_url: q.media_url ?? null,
@@ -548,19 +548,26 @@ async function ensureVersionPool(examId: string): Promise<void> {
   }
 }
 
-function shuffleObject(
+/** Build options shown to student: display label → answer text */
+function buildShuffledOptionsForStudent(
   original: Record<string, string>,
   optionMap: Record<string, string>
 ): Record<string, string> {
-  // optionMap: { A→B, B→A, C→C, D→D }
-  // meaning: original key "B" becomes displayed as "A"
-  // We need to build a shuffled object: displayed_key → displayed_value
-  // where displayed_key comes from reverse of optionMap keys, and value is original[key]
-  const result: Record<string, string> = {};
-  for (const [shuffledKey, originalKey] of Object.entries(optionMap)) {
-    result[shuffledKey] = original[originalKey] ?? "";
+  if (Object.keys(optionMap).length === 0) return { ...original };
+
+  const mapValues = Object.values(optionMap);
+  const looksLikeKeyMap = mapValues.every((v) => /^[A-Z]$/i.test(String(v).trim()));
+
+  if (looksLikeKeyMap) {
+    const result: Record<string, string> = {};
+    for (const [displayKey, originalKey] of Object.entries(optionMap)) {
+      result[displayKey] = original[originalKey] ?? "";
+    }
+    return result;
   }
-  return result;
+
+  // Legacy rows: option_maps stored display text directly
+  return { ...optionMap };
 }
 
 export interface GradedDetailRow {
