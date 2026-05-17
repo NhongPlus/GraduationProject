@@ -27,6 +27,7 @@ function parseJson<T>(value: unknown, fallback: T): T {
 }
 
 function mapAutosaveRow(row: any): ExamAutosaveSnapshot {
+  const serverAt = row.server_at ?? row.saved_at;
   return {
     id: row.id,
     exam_id: row.exam_id,
@@ -34,9 +35,9 @@ function mapAutosaveRow(row: any): ExamAutosaveSnapshot {
     student_id: row.student_id,
     saved_at: row.saved_at,
     answers: parseJson<AutosaveAnswers>(row.answers, {}),
-    server_at: row.server_at,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    server_at: serverAt,
+    created_at: row.created_at ?? serverAt,
+    updated_at: row.updated_at ?? serverAt,
   };
 }
 
@@ -57,8 +58,7 @@ export const upsertAutosaveSnapshot = async (payload: {
        student_id = EXCLUDED.student_id,
        saved_at = EXCLUDED.saved_at,
        answers = EXCLUDED.answers,
-       server_at = NOW(),
-       updated_at = NOW()
+       server_at = NOW()
      RETURNING *`,
     [
       payload.examId,
@@ -79,7 +79,7 @@ export const getLatestAutosaveSnapshotBySession = async (
     `SELECT *
      FROM exam_session_autosaves
      WHERE session_id = $1
-     ORDER BY saved_at DESC, updated_at DESC
+     ORDER BY saved_at DESC, server_at DESC
      LIMIT 1`,
     [sessionId]
   );
