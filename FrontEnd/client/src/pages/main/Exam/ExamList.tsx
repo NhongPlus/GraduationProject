@@ -51,6 +51,8 @@ const ExamList = () => {
     updatingExamId,
     forceSubmittingExamId,
     latestSessionByExam,
+    submittedSessionByExam,
+    hasSubmitted,
     activeSessionCountByExam,
     runtimeActiveByExam,
     filteredExams,
@@ -184,9 +186,10 @@ const ExamList = () => {
                   const activeCount = isStaff ? activeSessionCountByExam[item.id] ?? 0 : 0;
                   const runtimeActive = isStaff ? Boolean(runtimeActiveByExam[item.id]) : false;
                   const examInProgress = runtimeActive || activeCount > 0;
+                  const studentSubmitted = !isStaff && hasSubmitted(item.id);
                   const done = isStaff
                     ? !examInProgress
-                    : Boolean(latest && latest.status !== 'active');
+                    : studentSubmitted;
                   const pastDeadline = isPastExamStartDeadline(item, latest);
                   const deadlineLabel =
                     item.closes_at != null && item.closes_at !== ''
@@ -194,7 +197,7 @@ const ExamList = () => {
                       : t('exam_list.deadline_none');
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
-                    : () => navigate(`/exam/${item.id}`);
+                    : () => navigate(studentSubmitted ? `/result/${item.id}` : `/exam/${item.id}`);
                   return (
                     <Table.Tr
                       key={item.id}
@@ -278,10 +281,17 @@ const ExamList = () => {
                               size="xs"
                               color="blue"
                               label={t('exam_list.action_take')}
-                              disabled={pastDeadline}
-                              title={pastDeadline ? t('exam_list.take_disabled_deadline') : undefined}
+                              disabled={pastDeadline || done}
+                              title={
+                                done
+                                  ? t('exam_list.take_disabled_submitted', 'Bạn đã nộp bài thi này')
+                                  : pastDeadline
+                                    ? t('exam_list.take_disabled_deadline')
+                                    : undefined
+                              }
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (done) return;
                                 void (async () => {
                                   try {
                                     if (document.documentElement.requestFullscreen) {

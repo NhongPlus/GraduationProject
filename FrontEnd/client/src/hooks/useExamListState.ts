@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import examApi, { type Exam, type ExamSession, type ForceSubmitSummary } from '@/services/examApi';
 
 type StatusFilter = 'all' | 'not_done' | 'done';
@@ -8,6 +9,7 @@ export function useExamListState(opts: {
   t: (key: string, options?: any) => string;
 }) {
   const { isStaff, t } = opts;
+  const location = useLocation();
   const [exams, setExams] = useState<Exam[]>([]);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [activeSessionCountByExam, setActiveSessionCountByExam] = useState<Record<string, number>>({});
@@ -35,68 +37,96 @@ export function useExamListState(opts: {
     }, 350);
   };
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        setNotice('');
+  const loadExams = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setNotice('');
 
-        const params: Record<string, string> = {
-          limit: String(LIMIT),
-          offset: String((page - 1) * LIMIT),
-        };
-        if (debouncedSearch) params.search = debouncedSearch;
+      const params: Record<string, string> = {
+        limit: String(LIMIT),
+        offset: String((page - 1) * LIMIT),
+      };
+      if (debouncedSearch) params.search = debouncedSearch;
 
-        const examData = await examApi.getExams(undefined, params);
-        const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
-        setExams(fetchedExams);
-        setRuntimeActiveByExam(
-          Object.fromEntries(
-            fetchedExams.map((exam) => [exam.id, Boolean(exam.runtime_is_active)])
-          )
+      const examData = await examApi.getExams(undefined, params);
+      const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
+      setExams(fetchedExams);
+      setRuntimeActiveByExam(
+        Object.fromEntries(
+          fetchedExams.map((exam) => [exam.id, Boolean(exam.runtime_is_active)])
+        )
+      );
+      setTotalPages(Math.max(1, Math.ceil(fetchedExams.length / LIMIT)));
+
+      if (isStaff) {
+        setSessions([]);
+        const entries = await Promise.all(
+          fetchedExams.map(async (exam) => {
+            try {
+              const examSessions = await examApi.getExamSessions(exam.id);
+              const activeCount = examSessions.filter((s) => s.status === 'active').length;
+              return [exam.id, activeCount] as const;
+            } catch {
+              return [exam.id, 0] as const;
+            }
+          })
         );
-        setTotalPages(Math.max(1, Math.ceil(fetchedExams.length / LIMIT)));
-
-        if (isStaff) {
-          setSessions([]);
-          const entries = await Promise.all(
-            fetchedExams.map(async (exam) => {
-              try {
-                const examSessions = await examApi.getExamSessions(exam.id);
-                const activeCount = examSessions.filter((s) => s.status === 'active').length;
-                return [exam.id, activeCount] as const;
-              } catch {
-                return [exam.id, 0] as const;
-              }
-            })
-          );
-          setActiveSessionCountByExam(Object.fromEntries(entries));
-        } else {
-          const mySessions = await examApi.getMySessions();
-          setSessions(mySessions);
-          setActiveSessionCountByExam({});
-        }
-      } catch {
-        setError(t('errors.exam_list_failed'));
-      } finally {
-        setLoading(false);
+        setActiveSessionCountByExam(Object.fromEntries(entries));
+      } else {
+        const mySessions = await examApi.getMySessions();
+        setSessions(mySessions);
+        setActiveSessionCountByExam({});
       }
-    };
+    } catch {
+      setError(t('errors.exam_list_failed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, isStaff, page, t]);
 
-    void load();
-  }, [isStaff, t, page, debouncedSearch]);
+  useEffect(() => {
+    if (location.pathname !== '/exams') return;
+    void loadExams();
+  }, [loadExams, location.pathname]);
+
+  /** Phiên submitted (nếu có) — ưu tiên hơn phiên active mới hơn theo started_at */
+  const submittedSessionByExam = useMemo(() => {
+    const byExam = new Map<string, ExamSession>();
+    for (const s of sessions) {
+      if (s.status !== 'submitted') continue;
+      const prev = byExam.get(s.exam_id);
+      const sAt = new Date(s.submitted_at ?? s.started_at).getTime();
+      const prevAt = prev ? new Date(prev.submitted_at ?? prev.started_at).getTime() : 0;
+      if (!prev || sAt > prevAt) byExam.set(s.exam_id, s);
+    }
+    return byExam;
+  }, [sessions]);
 
   const latestSessionByExam = useMemo(() => {
     const byExam = new Map<string, ExamSession>();
     for (const s of sessions) {
       const prev = byExam.get(s.exam_id);
-      if (!prev || new Date(s.started_at).getTime() > new Date(prev.started_at).getTime()) {
+      if (!prev) {
         byExam.set(s.exam_id, s);
+        continue;
       }
+      if (prev.status === 'active' && s.status === 'submitted') {
+        byExam.set(s.exam_id, s);
+        continue;
+      }
+      if (prev.status === 'submitted' && s.status === 'active') continue;
+      const prevAt = new Date(prev.submitted_at ?? prev.started_at).getTime();
+      const sAt = new Date(s.submitted_at ?? s.started_at).getTime();
+      if (sAt > prevAt) byExam.set(s.exam_id, s);
     }
     return byExam;
   }, [sessions]);
+
+  const hasSubmitted = useCallback(
+    (examId: string) => submittedSessionByExam.has(examId),
+    [submittedSessionByExam]
+  );
 
   const filteredExams = useMemo(() => {
     return exams.filter((exam) => {
@@ -107,14 +137,13 @@ export function useExamListState(opts: {
         ? inProgress
           ? 'not_done'
           : 'done'
-        : (() => {
-            const latest = latestSessionByExam.get(exam.id);
-            return latest && latest.status !== 'active' ? 'done' : 'not_done';
-          })();
+        : submittedSessionByExam.has(exam.id)
+          ? 'done'
+          : 'not_done';
       const matchesStatus = statusFilter === 'all' || status === statusFilter;
       return matchesText && matchesStatus;
     });
-  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam, runtimeActiveByExam, searchText, statusFilter]);
+  }, [activeSessionCountByExam, exams, isStaff, runtimeActiveByExam, searchText, statusFilter, submittedSessionByExam]);
 
   const doneCount = useMemo(() => {
     if (isStaff) {
@@ -124,8 +153,8 @@ export function useExamListState(opts: {
         return !inProgress;
       }).length;
     }
-    return Array.from(latestSessionByExam.values()).filter((s) => s.status !== 'active').length;
-  }, [activeSessionCountByExam, exams, isStaff, latestSessionByExam, runtimeActiveByExam]);
+    return submittedSessionByExam.size;
+  }, [activeSessionCountByExam, exams, isStaff, runtimeActiveByExam, submittedSessionByExam]);
 
   const handleForceSubmit = async (examId: string) => {
     const ok = window.confirm(t('exam_list.force_submit_confirm'));
@@ -208,6 +237,8 @@ export function useExamListState(opts: {
     updatingExamId,
     forceSubmittingExamId,
     latestSessionByExam,
+    submittedSessionByExam,
+    hasSubmitted,
     activeSessionCountByExam,
     runtimeActiveByExam,
     filteredExams,

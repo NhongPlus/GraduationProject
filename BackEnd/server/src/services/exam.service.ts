@@ -450,6 +450,12 @@ export const startSessionWithMeta = async (
 
   // Create or reuse session (update version if already exists)
   let session = await getActiveSession(examId, studentId);
+  if (!session) {
+    const alreadySubmitted = await getLatestSubmittedSession(examId, studentId);
+    if (alreadySubmitted) {
+      throw httpError(409, "Bạn đã nộp bài thi này. Xem kết quả tại mục Kết quả.");
+    }
+  }
   if (session) {
     // Update version on existing session if not already set
     if (!session.version_id) {

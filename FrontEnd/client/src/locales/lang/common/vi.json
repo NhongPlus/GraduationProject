@@ -270,6 +270,7 @@
     "active_sessions": "Phiên active",
     "deadline_none": "—",
     "take_disabled_deadline": "Đã quá hạn bắt đầu bài thi",
+    "take_disabled_submitted": "Bạn đã nộp bài thi này",
     "force_submit_confirm": "Bạn có chắc muốn force-submit toàn bộ phiên đang active của đề thi này?",
     "force_submit_done": "Đã xử lý force-submit. Active: {{active}}, nộp thành công: {{submitted}}, lỗi: {{failed}}."
   },
