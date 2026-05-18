@@ -17,14 +17,24 @@ export interface GradeRow {
   email: string;
   exam_id: string | null;
   exam_title: string | null;
+  session_id: string | null;
+  version_code: string | null;
   score: number | null;
   max_points: number | null;
   submitted_at: string | null;
   status: string | null;
+  grading_status: string | null;
+}
+
+export interface GradeExamOption {
+  id: string;
+  title: string;
+  submitted_count: number;
 }
 
 export interface GradeReport {
   class_name: string;
+  exam_id: string | null;
   rows: GradeRow[];
 }
 
@@ -60,11 +70,36 @@ const teacherStudentsApi = {
     await apiClient.delete(`/teacher-students/${id}`);
   },
 
-  getGradeReport: async (): Promise<GradeReport> => {
+  getGradeExams: async (): Promise<{ class_name: string; exams: GradeExamOption[] }> => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: { class_name: string; exams: GradeExamOption[] };
+    }>('/teacher-students/grade-report/exams');
+    return res.data.data;
+  },
+
+  getGradeReport: async (examId?: string): Promise<GradeReport> => {
     const res = await apiClient.get<{ success: boolean; data: GradeReport }>(
-      '/teacher-students/grade-report'
+      '/teacher-students/grade-report',
+      { params: examId ? { exam_id: examId } : {} }
     );
     return res.data.data;
+  },
+
+  downloadGradeExport: async (examId: string): Promise<void> => {
+    const res = await apiClient.get('/teacher-students/grade-report/export', {
+      params: { exam_id: examId },
+      responseType: 'blob',
+    });
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cd = res.headers['content-disposition'] as string | undefined;
+    const match = cd?.match(/filename="?([^"]+)"?/);
+    a.download = match?.[1] ?? `bang_diem_chi_tiet.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   },
 
   sendGradeEmail: async (studentIds?: string[]): Promise<{ sent: number; total: number }> => {

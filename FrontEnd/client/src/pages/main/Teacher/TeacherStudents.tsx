@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box, Table, Title, Paper, Text, Stack, Group, Badge, Modal, Loader, Alert,
-  Tabs, Tooltip, ActionIcon,
+  Tabs, Tooltip, ActionIcon, Select,
 } from '@mantine/core';
 import { IconDownload, IconMail, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import teacherStudentsApi from '@/services/teacherStudentsApi';
-import type { StudentItem, GradeRow } from '@/services/teacherStudentsApi';
+import type { StudentItem, GradeRow, GradeExamOption } from '@/services/teacherStudentsApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import InputText from '@/components/Input/InputText/InputText';
@@ -30,8 +30,11 @@ const TeacherStudents = () => {
   const [addErr, setAddErr] = useState('');
 
   const [gradeRows, setGradeRows] = useState<GradeRow[]>([]);
+  const [gradeExams, setGradeExams] = useState<GradeExamOption[]>([]);
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [className, setClassName] = useState('');
   const [gradeLoading, setGradeLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState('');
 
@@ -85,16 +88,47 @@ const TeacherStudents = () => {
     }
   };
 
-  const loadGradeReport = async () => {
+  const loadGradeExams = useCallback(async () => {
+    try {
+      const data = await teacherStudentsApi.getGradeExams();
+      setClassName(data.class_name);
+      setGradeExams(data.exams);
+      setSelectedExamId((prev) => prev ?? data.exams[0]?.id ?? null);
+    } catch {
+      setError(t('teacher_students.grade_load_error'));
+    }
+  }, [t]);
+
+  const loadGradeReport = useCallback(async (examId: string | null) => {
+    if (!examId) {
+      setGradeRows([]);
+      return;
+    }
     try {
       setGradeLoading(true);
-      const r = await teacherStudentsApi.getGradeReport();
+      const r = await teacherStudentsApi.getGradeReport(examId);
       setGradeRows(r.rows);
       setClassName(r.class_name);
     } catch {
       setError(t('teacher_students.grade_load_error'));
     } finally {
       setGradeLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (selectedExamId) void loadGradeReport(selectedExamId);
+  }, [selectedExamId, loadGradeReport]);
+
+  const handleExportCsv = async () => {
+    if (!selectedExamId) return;
+    try {
+      setExportLoading(true);
+      await teacherStudentsApi.downloadGradeExport(selectedExamId);
+    } catch {
+      setError(t('teacher_students.export_error'));
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -112,38 +146,10 @@ const TeacherStudents = () => {
     }
   };
 
-  const exportCsv = () => {
-    if (gradeRows.length === 0) return;
-    const headers = ['Mã SV', 'Họ tên', 'Email', 'Bài thi', 'Điểm', 'Thang điểm', '%', 'Ngày nộp'];
-    const rows = gradeRows.map((r) => [
-      r.username,
-      r.full_name ?? '',
-      r.email,
-      r.exam_title ?? '',
-      r.score != null ? String(r.score) : '',
-      r.max_points != null ? String(r.max_points) : '',
-      r.score != null && r.max_points ? ((r.score / r.max_points) * 100).toFixed(1) : '',
-      r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('vi-VN') : '',
-    ]);
-    const csvContent = '\uFEFF' + [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bang_diem_${className || 'class'}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const gradeByStudent = useMemo(() => {
-    const map = new Map<string, GradeRow[]>();
-    for (const r of gradeRows) {
-      const key = r.student_id;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
-    }
-    return map;
-  }, [gradeRows]);
+  const submittedCount = useMemo(
+    () => gradeRows.filter((r) => r.session_id).length,
+    [gradeRows]
+  );
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -153,7 +159,7 @@ const TeacherStudents = () => {
         accent="teal"
       />
 
-      <Tabs defaultValue="list" onChange={(v) => { if (v === 'grades') void loadGradeReport(); }}>
+      <Tabs defaultValue="list" onChange={(v) => { if (v === 'grades') void loadGradeExams(); }}>
         <Tabs.List mb="md">
           <Tabs.Tab value="list">{t('teacher_students.tab_list')}</Tabs.Tab>
           <Tabs.Tab value="grades">{t('teacher_students.tab_grades')}</Tabs.Tab>
@@ -241,16 +247,30 @@ const TeacherStudents = () => {
         {/* Tab: Bảng điểm */}
         <Tabs.Panel value="grades">
           <Stack gap="md">
-            <Group justify="space-between">
-              <Title order={4}>{t('teacher_students.grade_title', { class: className })}</Title>
+            <Group justify="space-between" align="flex-end" wrap="wrap">
+              <Stack gap="xs" style={{ flex: 1, minWidth: 260 }}>
+                <Title order={4}>{t('teacher_students.grade_title', { class: className })}</Title>
+                <Select
+                  label={t('teacher_students.select_exam')}
+                  placeholder={t('teacher_students.select_exam_placeholder')}
+                  data={gradeExams.map((e) => ({
+                    value: e.id,
+                    label: `${e.title} (${e.submitted_count} ${t('teacher_students.submitted_short')})`,
+                  }))}
+                  value={selectedExamId}
+                  onChange={(v) => setSelectedExamId(v)}
+                  allowDeselect={false}
+                  searchable
+                />
+              </Stack>
               <Group gap="xs">
                 <ButtonLight
-                  label={t('teacher_students.export_csv')}
-                  onClick={exportCsv}
+                  label={exportLoading ? '...' : t('teacher_students.export_detail_csv')}
+                  onClick={handleExportCsv}
                   color="blue"
                   size="sm"
                   leftSection={<IconDownload size={16} />}
-                  disabled={gradeRows.length === 0}
+                  disabled={!selectedExamId || exportLoading}
                 />
                 <ButtonFilled
                   label={emailSending ? '...' : t('teacher_students.send_email')}
@@ -258,49 +278,74 @@ const TeacherStudents = () => {
                   color="teal"
                   size="sm"
                   leftSection={<IconMail size={16} />}
-                  disabled={emailSending || gradeRows.length === 0}
+                  disabled={emailSending || submittedCount === 0}
                 />
               </Group>
             </Group>
 
             {emailResult && <Alert color={emailResult.includes('error') ? 'red' : 'green'} variant="light">{emailResult}</Alert>}
 
-            {gradeLoading ? (
+            {!selectedExamId ? (
+              <Text c="dimmed">{t('teacher_students.select_exam_hint')}</Text>
+            ) : gradeLoading ? (
               <Box p="xl" className="flex justify-center"><Loader size="sm" /></Box>
-            ) : gradeRows.length === 0 ? (
-              <Text c="dimmed">{t('teacher_students.grade_empty')}</Text>
             ) : (
               <Paper withBorder radius="md" p="sm">
+                <Text size="sm" c="dimmed" mb="sm">
+                  {t('teacher_students.grade_summary', {
+                    submitted: submittedCount,
+                    total: gradeRows.length,
+                  })}
+                </Text>
                 <Table highlightOnHover verticalSpacing="sm" striped>
                   <Table.Thead>
                     <Table.Tr>
                       <Table.Th>{t('teacher_students.col_code')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_name')}</Table.Th>
-                      <Table.Th>{t('teacher_students.col_exam')}</Table.Th>
+                      <Table.Th>{t('teacher_students.col_version')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_score')}</Table.Th>
                       <Table.Th>%</Table.Th>
                       <Table.Th>{t('teacher_students.col_date')}</Table.Th>
+                      <Table.Th>{t('teacher_students.col_grading')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {gradeRows.map((r, idx) => {
+                    {gradeRows.map((r) => {
                       const pct =
                         r.score != null && r.max_points && r.max_points > 0
                           ? ((r.score / r.max_points) * 100).toFixed(1)
                           : '—';
+                      const hasSession = Boolean(r.session_id);
                       return (
-                        <Table.Tr key={`${r.student_id}-${r.exam_id ?? idx}`}>
+                        <Table.Tr key={r.student_id} style={hasSession ? undefined : { opacity: 0.65 }}>
                           <Table.Td><Text size="sm" ff="monospace">{r.username}</Text></Table.Td>
                           <Table.Td>{r.full_name || '—'}</Table.Td>
-                          <Table.Td>{r.exam_title || '—'}</Table.Td>
+                          <Table.Td>{r.version_code || '—'}</Table.Td>
                           <Table.Td>
-                            {r.score != null ? `${r.score} / ${r.max_points}` : '—'}
+                            {hasSession ? `${r.score} / ${r.max_points}` : '—'}
                           </Table.Td>
-                          <Table.Td>{pct}</Table.Td>
+                          <Table.Td>{hasSession ? pct : '—'}</Table.Td>
                           <Table.Td>
                             {r.submitted_at
                               ? new Date(r.submitted_at).toLocaleDateString('vi-VN')
                               : '—'}
+                          </Table.Td>
+                          <Table.Td>
+                            {hasSession ? (
+                              <Badge
+                                size="sm"
+                                color={r.grading_status === 'complete' ? 'green' : 'yellow'}
+                                variant="light"
+                              >
+                                {r.grading_status === 'complete'
+                                  ? t('teacher_students.grading_done')
+                                  : t('teacher_students.grading_pending')}
+                              </Badge>
+                            ) : (
+                              <Badge size="sm" color="gray" variant="light">
+                                {t('teacher_students.not_submitted')}
+                              </Badge>
+                            )}
                           </Table.Td>
                         </Table.Tr>
                       );

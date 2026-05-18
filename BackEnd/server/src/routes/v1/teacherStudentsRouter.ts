@@ -6,7 +6,9 @@ import {
   addStudentController,
   updateStudentController,
   deleteStudentController,
+  getGradeReportExamsController,
   getGradeReportController,
+  exportGradeReportController,
   sendGradeReportEmailController,
 } from "~/controllers/teacherStudents.controller";
 
@@ -20,6 +22,8 @@ teacherStudentsRouter.post("/", addStudentController);
 teacherStudentsRouter.patch("/:id", updateStudentController);
 teacherStudentsRouter.delete("/:id", deleteStudentController);
 
+teacherStudentsRouter.get("/grade-report/exams", getGradeReportExamsController);
+teacherStudentsRouter.get("/grade-report/export", exportGradeReportController);
 teacherStudentsRouter.get("/grade-report", getGradeReportController);
 teacherStudentsRouter.post("/grade-report/email", sendGradeReportEmailController);
 

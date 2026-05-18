@@ -147,14 +147,99 @@ interface GradeRow {
   full_name: string | null;
   username: string;
   email: string;
-  exam_id: string;
-  exam_title: string;
+  exam_id: string | null;
+  exam_title: string | null;
+  session_id: string | null;
+  version_code: string | null;
   score: number | null;
   max_points: number | null;
   submitted_at: string | null;
-  status: string;
+  status: string | null;
+  grading_status: string | null;
 }
 
+interface GradedDetailParsed {
+  question_id: string;
+  question_type: string;
+  is_correct: boolean;
+  points_earned: number | null;
+  max_points: number;
+  pending_grading?: boolean;
+}
+
+function parseGradedDetails(raw: unknown): GradedDetailParsed[] {
+  if (raw == null) return [];
+  let arr: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      arr = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(arr) ? (arr as GradedDetailParsed[]) : [];
+}
+
+function csvEscape(v: string): string {
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+  return v;
+}
+
+async function getClassName(adminClassId: string): Promise<string> {
+  const classR = await pool.query(
+    `SELECT display_name FROM admin_classes WHERE id = $1`,
+    [adminClassId]
+  );
+  return classR.rows[0]?.display_name ?? "";
+}
+
+/** Danh sách bài thi của lớp (để chọn khi xem bảng điểm). */
+export const getGradeReportExamsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const adminClassId = await getTeacherAdminClassId(user.userId);
+    if (!adminClassId) {
+      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+    }
+
+    const r = await pool.query<{
+      id: string;
+      title: string;
+      submitted_count: number;
+    }>(
+      `
+      SELECT
+        e.id,
+        e.title,
+        COUNT(es.id) FILTER (WHERE es.status = 'submitted')::int AS submitted_count
+      FROM exams e
+      LEFT JOIN exam_sessions es ON es.exam_id = e.id
+      WHERE e.admin_class_id = $1
+      GROUP BY e.id, e.title
+      ORDER BY e.title
+      `,
+      [adminClassId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        class_name: await getClassName(adminClassId),
+        exams: r.rows,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** Bảng điểm: có exam_id → 1 dòng/SV; không có → chỉ phiên đã nộp. */
 export const getGradeReportController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
@@ -163,42 +248,247 @@ export const getGradeReportController = async (req: Request, res: Response, next
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
 
-    const r = await pool.query<GradeRow>(
-      `
-      SELECT
-        a.id AS student_id,
-        a.full_name,
-        a.username,
-        a.email,
-        e.id AS exam_id,
-        e.title AS exam_title,
-        es.score,
-        es.max_points,
-        es.submitted_at::text,
-        es.status
-      FROM accounts a
-      LEFT JOIN exam_sessions es ON es.student_id = a.id AND es.status = 'submitted'
-      LEFT JOIN exams e ON e.id = es.exam_id
-      WHERE a.admin_class_id = $1 AND a.role = 'student'
-      ORDER BY a.full_name NULLS LAST, a.username, e.title NULLS LAST
-      `,
-      [adminClassId]
-    );
+    const examId = (req.query.exam_id as string | undefined)?.trim();
 
-    const classR = await pool.query(
-      `SELECT display_name FROM admin_classes WHERE id = $1`,
-      [adminClassId]
-    );
-    const className = classR.rows[0]?.display_name ?? "";
+    let rows: GradeRow[];
+    if (examId) {
+      const examCheck = await pool.query(
+        `SELECT id, title FROM exams WHERE id = $1 AND admin_class_id = $2`,
+        [examId, adminClassId]
+      );
+      if (!examCheck.rows[0]) {
+        return res.status(404).json({ success: false, message: "Không tìm thấy bài thi" });
+      }
+
+      const r = await pool.query<GradeRow>(
+        `
+        SELECT
+          a.id AS student_id,
+          a.full_name,
+          a.username,
+          a.email,
+          e.id AS exam_id,
+          e.title AS exam_title,
+          es.id::text AS session_id,
+          es.version_code,
+          es.score,
+          es.max_points,
+          es.submitted_at::text,
+          es.status,
+          es.grading_status
+        FROM accounts a
+        LEFT JOIN exam_sessions es
+          ON es.student_id = a.id AND es.exam_id = $2 AND es.status = 'submitted'
+        LEFT JOIN exams e ON e.id = $2
+        WHERE a.admin_class_id = $1 AND a.role = 'student'
+        ORDER BY a.full_name NULLS LAST, a.username
+        `,
+        [adminClassId, examId]
+      );
+      rows = r.rows;
+    } else {
+      const r = await pool.query<GradeRow>(
+        `
+        SELECT
+          a.id AS student_id,
+          a.full_name,
+          a.username,
+          a.email,
+          e.id AS exam_id,
+          e.title AS exam_title,
+          es.id::text AS session_id,
+          es.version_code,
+          es.score,
+          es.max_points,
+          es.submitted_at::text,
+          es.status,
+          es.grading_status
+        FROM exam_sessions es
+        JOIN accounts a ON a.id = es.student_id
+        JOIN exams e ON e.id = es.exam_id
+        WHERE a.admin_class_id = $1
+          AND a.role = 'student'
+          AND es.status = 'submitted'
+          AND e.admin_class_id = $1
+        ORDER BY e.title, a.full_name NULLS LAST, a.username
+        `,
+        [adminClassId]
+      );
+      rows = r.rows;
+    }
 
     res.json({
       success: true,
       data: {
-        class_name: className,
-        rows: r.rows,
+        class_name: await getClassName(adminClassId),
+        exam_id: examId ?? null,
+        rows,
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** Xuất CSV chi tiết: STT, Họ tên, Mã SV, từng câu (Đ/S + Điểm). */
+export const exportGradeReportController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const adminClassId = await getTeacherAdminClassId(user.userId);
+    if (!adminClassId) {
+      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+    }
+
+    const examId = (req.query.exam_id as string | undefined)?.trim();
+    if (!examId) {
+      return res.status(400).json({ success: false, message: "exam_id là bắt buộc" });
+    }
+
+    const examR = await pool.query<{ title: string }>(
+      `SELECT title FROM exams WHERE id = $1 AND admin_class_id = $2`,
+      [examId, adminClassId]
+    );
+    if (!examR.rows[0]) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy bài thi" });
+    }
+    const examTitle = examR.rows[0].title;
+    const className = await getClassName(adminClassId);
+
+    const studentsR = await pool.query<{
+      id: string;
+      username: string;
+      full_name: string | null;
+    }>(
+      `SELECT id, username, full_name FROM accounts
+       WHERE admin_class_id = $1 AND role = 'student'
+       ORDER BY full_name NULLS LAST, username`,
+      [adminClassId]
+    );
+
+    const sessionsR = await pool.query<{
+      student_id: string;
+      session_id: string;
+      version_code: string | null;
+      score: number | null;
+      max_points: number | null;
+      graded_details: unknown;
+    }>(
+      `SELECT student_id, id::text AS session_id, version_code, score, max_points, graded_details
+       FROM exam_sessions
+       WHERE exam_id = $1 AND status = 'submitted'`,
+      [examId]
+    );
+
+    const sessionByStudent = new Map(sessionsR.rows.map((s) => [s.student_id, s]));
+
+    const questionsR = await pool.query<{
+      id: string;
+      display_order: number;
+      version_index: number;
+    }>(
+      `SELECT id, display_order, version_index FROM questions
+       WHERE exam_id = $1 ORDER BY version_index, display_order`,
+      [examId]
+    );
+
+    const questionsByVersion = new Map<number, { id: string; order: number }[]>();
+    for (const q of questionsR.rows) {
+      const v = q.version_index ?? 0;
+      if (!questionsByVersion.has(v)) questionsByVersion.set(v, []);
+      questionsByVersion.get(v)!.push({ id: q.id, order: q.display_order });
+    }
+
+    let maxQ = 0;
+    for (const list of questionsByVersion.values()) {
+      maxQ = Math.max(maxQ, list.length);
+    }
+    if (maxQ === 0) maxQ = 50;
+
+    const header1 = ["STT", "Họ tên", "Mã SV", "Mã đề", "Tổng điểm", "Thang", "%"];
+    for (let i = 1; i <= maxQ; i++) {
+      header1.push(String(i), "");
+    }
+
+    const header2 = ["", "", "", "", "", "", ""];
+    for (let i = 1; i <= maxQ; i++) {
+      header2.push("Đ/S", "Điểm");
+    }
+
+    const dataRows: string[][] = [];
+    let stt = 0;
+    for (const stu of studentsR.rows) {
+      stt += 1;
+      const sess = sessionByStudent.get(stu.id);
+      const row: string[] = [
+        String(stt),
+        stu.full_name ?? "",
+        stu.username,
+        sess?.version_code ?? "",
+        sess?.score != null ? String(sess.score) : "",
+        sess?.max_points != null ? String(sess.max_points) : "",
+        sess?.score != null && sess?.max_points && sess.max_points > 0
+          ? ((sess.score / sess.max_points) * 100).toFixed(1)
+          : "",
+      ];
+
+      const details = parseGradedDetails(sess?.graded_details);
+      const detailMap = new Map(details.map((d) => [d.question_id, d]));
+
+      let qList = questionsByVersion.get(0) ?? [];
+      if (sess?.version_code) {
+        const vMatch = /^D(\d+)$/i.exec(sess.version_code);
+        if (vMatch) {
+          const vIdx = Number(vMatch[1]) - 1;
+          qList = questionsByVersion.get(vIdx) ?? qList;
+        }
+      }
+
+      for (let i = 0; i < maxQ; i++) {
+        const q = qList[i];
+        if (!q || !sess) {
+          row.push("", "");
+          continue;
+        }
+        const d = detailMap.get(q.id);
+        if (!d) {
+          row.push("", "");
+          continue;
+        }
+        if (d.question_type === "essay" || d.pending_grading) {
+          row.push("TL", d.points_earned != null ? String(d.points_earned) : "");
+        } else {
+          row.push(d.is_correct ? "Đ" : "S", d.points_earned != null ? String(d.points_earned) : "0");
+        }
+      }
+      dataRows.push(row);
+    }
+
+    const titleRow = [
+      `BẢNG ĐIỂM CHI TIẾT — ${examTitle} — ${className}`,
+      ...Array(header1.length - 1).fill(""),
+    ];
+    const lines = [
+      titleRow.map(csvEscape).join(","),
+      header1.map(csvEscape).join(","),
+      header2.map(csvEscape).join(","),
+      ...dataRows.map((r) => r.map(csvEscape).join(",")),
+    ];
+    const csv = "\uFEFF" + lines.join("\n");
+
+    const safeName = examTitle.replace(/[^\w\u00C0-\u024F\s-]/g, "").slice(0, 40);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="bang_diem_chi_tiet_${safeName}.csv"`
+    );
+    res.send(csv);
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const sendGradeReportEmailController = async (
