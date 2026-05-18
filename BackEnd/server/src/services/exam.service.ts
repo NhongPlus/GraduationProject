@@ -1321,10 +1321,14 @@ async function buildReviewQuestionsForSession(
       correctForUi =
         originalKeyToDisplayKey(optionMap, correctOriginal) ?? correctOriginal;
     }
+    const essayPoints =
+      q.question_type === "essay" ? detail?.points_earned ?? null : null;
     const isCorrect =
       q.question_type === "mcq"
         ? mcqAnswersEqual(submittedOriginalResolved, q.correct_answer)
-        : (detail?.is_correct ?? false);
+        : essayPoints != null && !detail?.pending_grading
+          ? essayPoints >= Number(q.points)
+          : false;
     reviewQuestions.push({
       question_id: q.id,
       question_type: q.question_type,
@@ -1527,11 +1531,14 @@ export const gradeEssaySessionService = async (
     }
     const idx = details.findIndex((d) => d.question_id === qid);
     if (idx < 0) throw httpError(400, "Không tìm thấy câu trong bài nộp");
+    const maxPts = Number(q.points);
     details[idx] = {
       ...details[idx],
       points_earned: g.points_awarded,
       pending_grading: false,
       teacher_comment: g.comment ?? null,
+      /** Tự luận chỉ "đúng" khi đạt tối đa điểm câu; điểm một phần không coi là đúng/sai nhị phân. */
+      is_correct: g.points_awarded >= maxPts,
     };
   }
 
@@ -1543,6 +1550,7 @@ export const gradeEssaySessionService = async (
     (d) => d.question_type === "essay" && d.pending_grading
   );
   const gradingStatus: GradingStatus = pendingEssay ? "pending_manual" : "complete";
+  const wasPendingManual = meta.grading_status === "pending_manual";
 
   const updated = await updateSessionGrading(sessionId, {
     score,
@@ -1550,6 +1558,23 @@ export const gradeEssaySessionService = async (
     grading_status: gradingStatus,
   });
   if (!updated) throw httpError(500, "Cập nhật chấm thất bại");
+
+  if (
+    gradingStatus === "complete" &&
+    wasPendingManual &&
+    updated.student_id
+  ) {
+    const maxPts =
+      updated.max_points != null ? Number(updated.max_points) : score;
+    void createNotification(
+      updated.student_id,
+      "[Kết quả] Đã chấm tự luận xong",
+      `Bài thi "${meta.exam_title}" đã được giảng viên chấm xong. Điểm: ${score}/${maxPts}. Vào xem kết quả chi tiết.`,
+      "success",
+      `/result/${meta.exam_id}`
+    ).catch(() => { /* non-critical */ });
+  }
+
   return updated;
 };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Box, Button, Divider, Group, Menu, Text, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { Bell, Check, CheckCheck, ExternalLink } from 'lucide-react';
@@ -26,6 +27,7 @@ function typeColor(type: UserNotificationItem['type']): string {
 
 export default function NotificationBell() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<UserNotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -152,9 +154,21 @@ export default function NotificationBell() {
                     <Text size="xs" c="dimmed">{timeAgo(n.created_at)}</Text>
                     {n.link && (
                       <Tooltip label={t('notification.go_to')}>
-                        <a href={n.link} target="_blank" rel="noreferrer" onClick={() => { void handleMarkOne(n.id); }}>
+                        <Button
+                          variant="subtle"
+                          size="xs"
+                          p={2}
+                          onClick={() => {
+                            void handleMarkOne(n.id);
+                            if (n.link!.startsWith('/')) {
+                              navigate(n.link!);
+                            } else {
+                              window.open(n.link!, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                        >
                           <ExternalLink size={12} />
-                        </a>
+                        </Button>
                       </Tooltip>
                     )}
                   </Group>

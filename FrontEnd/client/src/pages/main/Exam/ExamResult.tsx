@@ -3,11 +3,23 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Title, Text, Loader, Badge, Paper, Group, Alert, Stack, Accordion, ThemeIcon, Progress,
 } from '@mantine/core';
-import { IconCheck, IconX, IconClock, IconAlertCircle } from '@tabler/icons-react';
+import { IconCheck, IconX, IconClock, IconAlertCircle, IconCircleHalf2 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { SessionReview } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import {
+  countFullyCorrectQuestions,
+  getEssayGradeState,
+  getFullyCorrectPercent,
+  getQuestionStatusColor,
+  getQuestionStatusIcon,
+  getSummaryResultTone,
+  hasPartialCreditEssay,
+  isQuestionFullyCorrect,
+  sumEssayScore,
+  sumMcqScore,
+} from './examResultDisplay';
 
 const ExamResult = () => {
   const { t } = useTranslation();
@@ -84,14 +96,34 @@ const ExamResult = () => {
   const questions = review.questions;
   const mcqQuestions = questions.filter((q) => q.question_type === 'mcq');
   const essayQuestions = questions.filter((q) => q.question_type === 'essay');
+  const hasEssay = essayQuestions.length > 0;
   const hasPendingEssay =
-    review.grading_status === 'pending_manual' && essayQuestions.length > 0;
-  const mcqCorrect = mcqQuestions.filter((q) => q.is_correct).length;
-  const mcqScore = mcqQuestions.reduce((s, q) => s + (q.points_earned ?? 0), 0);
-  const mcqMax = mcqQuestions.reduce((s, q) => s + q.max_points, 0);
-  const scorePct =
-    mcqMax > 0 ? Math.round((mcqScore / mcqMax) * 100) : null;
-  const scoreColor = scorePct == null ? 'gray' : scorePct >= 80 ? 'green' : scorePct >= 50 ? 'yellow' : 'red';
+    review.grading_status === 'pending_manual' && hasEssay;
+  const totalQuestions = questions.length;
+  const fullyCorrectCount = countFullyCorrectQuestions(questions);
+  const { earned: mcqScore, max: mcqMax } = sumMcqScore(questions);
+  const essayScore = sumEssayScore(questions);
+  const fullyCorrectPct = getFullyCorrectPercent(questions);
+  const summaryTone = getSummaryResultTone(questions);
+  const partialEssay = hasPartialCreditEssay(questions);
+  const scoreColor =
+    summaryTone === 'all_correct'
+      ? 'green'
+      : summaryTone === 'mixed'
+        ? 'yellow'
+        : fullyCorrectPct != null && fullyCorrectPct >= 50
+          ? 'yellow'
+          : 'red';
+
+  const renderStatusIcon = (q: (typeof questions)[0]) => {
+    const kind = getQuestionStatusIcon(q);
+    const color = getQuestionStatusColor(q);
+    const size = 12;
+    if (kind === 'clock') return <IconClock size={size} />;
+    if (kind === 'partial') return <IconCircleHalf2 size={size} />;
+    if (kind === 'check') return <IconCheck size={size} />;
+    return <IconX size={size} />;
+  };
 
   const getOptionLabel = (options: Record<string, string> | null, key: string) => {
     if (!options) return key;
@@ -108,21 +140,43 @@ const ExamResult = () => {
           <Paper withBorder radius="md" p="md">
             <Text size="sm" c="dimmed">{t('exam_result.correct_label')}</Text>
             <Group gap={4} align="center">
-              <Text fw={700} size="xl">{mcqCorrect}/{mcqQuestions.length || questions.length}</Text>
-              <ThemeIcon color="green" size="sm" radius="xl" variant="filled">
-                <IconCheck size={12} />
-              </ThemeIcon>
+              <Text fw={700} size="xl">
+                {totalQuestions > 0 ? `${fullyCorrectCount}/${totalQuestions}` : '—'}
+              </Text>
+              {totalQuestions > 0 && (
+                <ThemeIcon
+                  color={
+                    summaryTone === 'all_correct'
+                      ? 'green'
+                      : summaryTone === 'mixed'
+                        ? 'yellow'
+                        : 'red'
+                  }
+                  size="sm"
+                  radius="xl"
+                  variant="filled"
+                >
+                  {summaryTone === 'all_correct' ? (
+                    <IconCheck size={12} />
+                  ) : summaryTone === 'mixed' ? (
+                    <IconCircleHalf2 size={12} />
+                  ) : (
+                    <IconX size={12} />
+                  )}
+                </ThemeIcon>
+              )}
             </Group>
+            <Text size="xs" c="dimmed" mt={4}>
+              {t('exam_result.correct_full_points_hint')}
+            </Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">
-              {hasPendingEssay ? t('exam_result.mcq_score_label') : t('exam_result.score_label')}
-            </Text>
+            <Text size="sm" c="dimmed">{t('exam_result.score_label')}</Text>
             <Text fw={700} size="xl">
-              {hasPendingEssay
-                ? `${mcqScore}/${mcqMax}`
-                : review.score != null && review.max_points != null
-                  ? `${review.score}/${review.max_points}`
+              {review.score != null && review.max_points != null
+                ? `${review.score}/${review.max_points}`
+                : hasPendingEssay
+                  ? `${mcqScore}/${mcqMax}`
                   : t('exam_result.pending_score')}
             </Text>
             {hasPendingEssay && (
@@ -134,11 +188,21 @@ const ExamResult = () => {
           <Paper withBorder radius="md" p="md">
             <Text size="sm" c="dimmed">{t('exam_result.percentage_label')}</Text>
             <Group gap="xs" align="center">
-              <Text fw={700} size="xl" c={scoreColor}>{scorePct != null ? `${scorePct}%` : '—'}</Text>
-              {scorePct != null && (
-                <Progress value={scorePct} color={scoreColor} size="sm" w={80} />
+              <Text fw={700} size="xl" c={scoreColor}>
+                {fullyCorrectPct != null ? `${fullyCorrectPct}%` : '—'}
+              </Text>
+              {fullyCorrectPct != null && (
+                <Progress value={fullyCorrectPct} color={scoreColor} size="sm" w={80} />
               )}
             </Group>
+            {hasEssay && !hasPendingEssay && essayScore.earned != null && (
+              <Text size="xs" c="dimmed" mt={4}>
+                {t('exam_result.essay_score_summary', {
+                  earned: essayScore.earned,
+                  max: essayScore.max,
+                })}
+              </Text>
+            )}
           </Paper>
         </Group>
 
@@ -147,6 +211,25 @@ const ExamResult = () => {
             {t('exam_result.pending_manual')}
           </Alert>
         )}
+        {(hasEssay && !hasPendingEssay) || partialEssay ? (
+          <Alert color="yellow" variant="light" icon={<IconCircleHalf2 size={16} />}>
+            <Text size="sm" fw={600} mb={4}>{t('exam_result.score_legend_title')}</Text>
+            <Stack gap={4}>
+              <Group gap="xs">
+                <ThemeIcon color="green" size="xs" radius="xl"><IconCheck size={10} /></ThemeIcon>
+                <Text size="xs">{t('exam_result.legend_full')}</Text>
+              </Group>
+              <Group gap="xs">
+                <ThemeIcon color="yellow" size="xs" radius="xl"><IconCircleHalf2 size={10} /></ThemeIcon>
+                <Text size="xs">{t('exam_result.legend_partial')}</Text>
+              </Group>
+              <Group gap="xs">
+                <ThemeIcon color="red" size="xs" radius="xl"><IconX size={10} /></ThemeIcon>
+                <Text size="xs">{t('exam_result.legend_wrong')}</Text>
+              </Group>
+            </Stack>
+          </Alert>
+        ) : null}
         {mcqQuestions.length > 0 && (
           <Alert color="blue" variant="light">
             {t('exam_result.mcq_revealed_hint')}
@@ -160,8 +243,10 @@ const ExamResult = () => {
           ) : (
             <Accordion variant="separated" radius="md" defaultValue={undefined}>
               {questions.map((q, idx) => {
-                const isCorrect = q.is_correct;
-                const pendingGrading = q.pending_grading;
+                const isMcq = q.question_type === 'mcq';
+                const essayState = !isMcq ? getEssayGradeState(q) : null;
+                const isFullyCorrect = isQuestionFullyCorrect(q);
+                const pendingGrading = q.pending_grading || essayState === 'pending';
                 const pointsEarned = q.points_earned;
                 const maxPts = q.max_points;
                 const teacherComment = q.teacher_comment;
@@ -187,12 +272,12 @@ const ExamResult = () => {
                     <Accordion.Control
                       icon={
                         <ThemeIcon
-                          color={isCorrect ? 'green' : pendingGrading ? 'yellow' : 'red'}
+                          color={getQuestionStatusColor(q)}
                           size="sm"
                           radius="xl"
                           variant="filled"
                         >
-                          {pendingGrading ? <IconClock size={12} /> : isCorrect ? <IconCheck size={12} /> : <IconX size={12} />}
+                          {renderStatusIcon(q)}
                         </ThemeIcon>
                       }
                     >
@@ -271,9 +356,23 @@ const ExamResult = () => {
                             <Text
                               size="sm"
                               fw={500}
-                              c={isCorrect ? 'green' : pendingGrading ? 'yellow' : 'red'}
+                              c={
+                                isMcq
+                                  ? isFullyCorrect
+                                    ? 'green'
+                                    : pendingGrading
+                                      ? 'yellow'
+                                      : 'red'
+                                  : essayState === 'partial'
+                                    ? 'yellow.8'
+                                    : essayState === 'full'
+                                      ? 'green'
+                                      : pendingGrading
+                                        ? 'yellow'
+                                        : 'dimmed'
+                              }
                             >
-                              {q.question_type === 'mcq' && !pendingGrading
+                              {isMcq && !pendingGrading
                                 ? formatMcqAnswer(
                                     Array.isArray(submitted) ? submitted[0] : (submitted as string | null)
                                   )
@@ -281,24 +380,68 @@ const ExamResult = () => {
                             </Text>
                           </Box>
                           <Box style={{ flex: 1 }}>
-                            <Text size="xs" c="dimmed" mb={4}>{t('exam_result.correct_answer')}</Text>
-                            <Text size="sm" fw={500} c={q.question_type === 'mcq' ? 'green' : 'dimmed'}>
-                              {q.question_type === 'mcq'
+                            <Text size="xs" c="dimmed" mb={4}>
+                              {isMcq
+                                ? t('exam_result.correct_answer')
+                                : t('exam_result.essay_grading_label')}
+                            </Text>
+                            <Text
+                              size="sm"
+                              fw={500}
+                              c={
+                                isMcq
+                                  ? 'green'
+                                  : essayState === 'partial'
+                                    ? 'yellow.8'
+                                    : essayState === 'full'
+                                      ? 'green'
+                                      : 'dimmed'
+                              }
+                            >
+                              {isMcq
                                 ? formatMcqAnswer(
                                     Array.isArray(correctAnswer) ? correctAnswer[0] : (correctAnswer as string | null)
                                   )
-                                : t('exam_result.essay_no_correct_yet')}
+                                : pendingGrading
+                                  ? t('exam_result.essay_no_correct_yet')
+                                  : essayState === 'partial'
+                                    ? t('exam_result.essay_partial_grade', {
+                                        earned: pointsEarned ?? 0,
+                                        max: maxPts,
+                                      })
+                                    : essayState === 'full'
+                                      ? t('exam_result.essay_full_grade')
+                                      : t('exam_result.essay_graded_by_teacher')}
                             </Text>
                           </Box>
                         </Group>
 
-                        {pointsEarned != null && (
+                        {(pointsEarned != null || pendingGrading) && (
                           <Group gap="xs">
-                            <Badge color={pointsEarned === maxPts ? 'green' : pointsEarned > 0 ? 'yellow' : 'red'}>
-                              {pointsEarned}/{maxPts} {t('exam_result.points_unit')}
-                            </Badge>
+                            {!pendingGrading && pointsEarned != null && (
+                              <Badge
+                                color={
+                                  isMcq
+                                    ? pointsEarned === maxPts
+                                      ? 'green'
+                                      : 'red'
+                                    : pointsEarned === maxPts
+                                      ? 'green'
+                                      : pointsEarned > 0
+                                        ? 'yellow'
+                                        : 'red'
+                                }
+                              >
+                                {pointsEarned}/{maxPts} {t('exam_result.points_unit')}
+                              </Badge>
+                            )}
                             {pendingGrading && (
-                              <Badge color="yellow">{t('exam_result.pending_essay')}</Badge>
+                              <Badge color="yellow">{t('exam_result.pending_grade')}</Badge>
+                            )}
+                            {!isMcq && !pendingGrading && essayState === 'partial' && (
+                              <Badge color="yellow" variant="light">
+                                {t('exam_result.essay_partial_badge')}
+                              </Badge>
                             )}
                           </Group>
                         )}
