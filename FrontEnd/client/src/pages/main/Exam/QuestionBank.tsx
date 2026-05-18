@@ -14,6 +14,7 @@ import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import subjectApi, { type SubjectDto } from '@/services/subjectApi';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
+import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker/SubjectCategoryPicker';
 
 type QBDifficulty = 'DE' | 'TRUNGBINH' | 'KHO';
 type QuestionType = 'mcq' | 'essay';
@@ -112,11 +113,11 @@ const QuestionBankPage = () => {
     try {
       const data = await subjectApi.getSubjects();
       setSubjects(data);
-      if (!importSubjectId && data.length > 0) setImportSubjectId(data[0].id);
+      setImportSubjectId((prev) => prev ?? data[0]?.id ?? null);
     } catch {
       // keep page usable even when subjects fail
     }
-  }, [accessToken, importSubjectId]);
+  }, [accessToken]);
 
   useEffect(() => {
     void fetchItems(filter, page);
@@ -261,14 +262,18 @@ const QuestionBankPage = () => {
         <Paper withBorder radius="md" p="md">
           <Stack gap="xs">
             <Text fw={600}>{t('question_bank.bulk_import_title')}</Text>
-            <Group grow>
-              <Select
+            <Group grow align="flex-start">
+              <SubjectCategoryPicker
                 label={t('question_bank.subject')}
-                placeholder={t('question_bank.select_subject')}
-                data={subjects.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
+                size="sm"
+                subjects={subjects}
+                placeholder={
+                  loading ? t('exam_authoring.loading') : t('question_bank.select_subject')
+                }
+                disabled={loading || subjects.length === 0}
                 value={importSubjectId}
                 onChange={setImportSubjectId}
-                searchable
+                required
               />
               <FileInput
                 label={t('question_bank.docx_file')}
@@ -295,7 +300,19 @@ const QuestionBankPage = () => {
 
         {/* Filters */}
         <Paper withBorder radius="md" p="md">
-          <Group gap="sm" wrap="wrap">
+          <Group gap="sm" wrap="wrap" align="flex-end">
+            <SubjectCategoryPicker
+              label={t('question_bank.subject')}
+              size="sm"
+              subjects={subjects}
+              placeholder={t('question_bank.select_subject')}
+              disabled={loading || subjects.length === 0}
+              value={filter.subject_id ?? null}
+              onChange={(id) => {
+                setFilter((prev) => ({ ...prev, subject_id: id ?? undefined }));
+                setPage(1);
+              }}
+            />
             <TextInput
               placeholder={t('question_bank.search_placeholder')}
               leftSection={<IconSearch size={14} />}
@@ -511,6 +528,7 @@ type QBFormProps = {
 };
 
 function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState(initial?.content ?? '');
   const [questionType, setQuestionType] = useState<QuestionType>(initial?.question_type ?? 'mcq');
   const [points, setPoints] = useState(initial?.points ?? 1);
@@ -550,15 +568,17 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
         rows={3}
         required
       />
+      <SubjectCategoryPicker
+        label={t('question_bank.form_subject')}
+        size="sm"
+        subjects={subjects}
+        placeholder={t('question_bank.select_subject')}
+        disabled={subjects.length === 0}
+        value={subjectId}
+        onChange={setSubjectId}
+        required
+      />
       <Group grow>
-        <Select
-          label={t('question_bank.form_subject')}
-          value={subjectId}
-          onChange={setSubjectId}
-          data={subjects.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
-          searchable
-          required
-        />
         <Stack gap={4}>
           <Text size="sm" fw={500}>{t('question_bank.form_question_type')}</Text>
           <SegmentedControl
