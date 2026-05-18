@@ -158,6 +158,18 @@ export const protectedRoutes: Routes = [
       order: 1,
     },
   },
+  {
+    key: 'teacher-students',
+    path: '/teacher/students',
+    component: lazy(() => import('@/pages/main/Teacher/TeacherStudents')),
+    authority: ['teacher'],
+    nav: {
+      labelKey: 'nav.teacher_student_list',
+      position: 'sub',
+      groupKey: 'student_management',
+      order: 2,
+    },
+  },
   // --- Index pages (no param, list view) ---
   {
     key: 'grading',

@@ -496,7 +496,8 @@
     "security": "Bảo mật",
     "enable_2fa": "Bật 2FA",
     "change_password": "Đổi mật khẩu",
-    "recovery_codes": "Mã khôi phục"
+    "recovery_codes": "Mã khôi phục",
+    "teacher_student_list": "Sinh viên lớp tôi"
   },
   "password_reset": {
     "title": "Yêu cầu đặt lại mật khẩu",
@@ -742,6 +743,35 @@
     "page_size_option": "{{size}}/trang",
     "go_to": "Đến trang",
     "page_label": "Trang"
+  },
+  "teacher_students": {
+    "title": "Quản lý sinh viên",
+    "subtitle": "Danh sách sinh viên lớp hành chính của bạn",
+    "tab_list": "Danh sách",
+    "tab_grades": "Bảng điểm",
+    "search_placeholder": "Tìm theo tên, mã SV, email…",
+    "add_student": "Thêm sinh viên",
+    "add_modal_title": "Thêm sinh viên mới",
+    "add_validation": "Mã SV, email và mật khẩu là bắt buộc",
+    "confirm_delete": "Bạn có chắc muốn xóa sinh viên này?",
+    "col_code": "Mã SV",
+    "col_name": "Họ tên",
+    "col_email": "Email",
+    "col_status": "Trạng thái",
+    "col_exam": "Bài thi",
+    "col_score": "Điểm",
+    "col_date": "Ngày nộp",
+    "active": "Hoạt động",
+    "inactive": "Khóa",
+    "empty": "Chưa có sinh viên nào trong lớp",
+    "grade_title": "Bảng điểm — {{class}}",
+    "grade_empty": "Chưa có dữ liệu điểm",
+    "grade_load_error": "Không tải được bảng điểm",
+    "export_csv": "Xuất CSV",
+    "send_email": "Gửi email bảng điểm",
+    "confirm_send_email": "Gửi email bảng điểm cho tất cả sinh viên có điểm?",
+    "email_sent_result": "Đã gửi {{sent}}/{{total}} email",
+    "email_send_error": "Gửi email thất bại"
   },
   "notification": {
     "title": "Thông báo",

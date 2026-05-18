@@ -19,6 +19,7 @@ import examCollaboratorsRouter from "./examCollaboratorsRouter";
 import examSharingRouter from "./examSharingRouter";
 import exportRouter from "./exportRouter";
 import shuffleRouter from "./shuffleRouter";
+import teacherStudentsRouter from "./teacherStudentsRouter";
 
 const RouterV1 = Router();
 
@@ -42,5 +43,6 @@ RouterV1.use("/exam-sharing", examSharingRouter);
 RouterV1.use("/exam-collaborators", examCollaboratorsRouter);
 RouterV1.use("/exports", exportRouter);
 RouterV1.use("/shuffle", shuffleRouter);
+RouterV1.use("/teacher-students", teacherStudentsRouter);
 
 export default RouterV1;
