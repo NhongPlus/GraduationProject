@@ -8,6 +8,7 @@
   "exam_force_submit_failed": "Failed to force-submit exam sessions.",
   "user_list_failed": "Failed to load user list.",
   "user_add_failed": "Failed to add user.",
+  "user_update_failed": "Failed to update user.",
   "user_delete_failed": "Failed to delete user.",
   "realtime_timeout": "Realtime connection timed out",
   "realtime_connect_failed": "Could not connect to realtime server",

@@ -8,6 +8,7 @@
   "exam_force_submit_failed": "Force-submit bài thi thất bại.",
   "user_list_failed": "Không tải được danh sách người dùng.",
   "user_add_failed": "Thêm user thất bại.",
+  "user_update_failed": "Cập nhật user thất bại.",
   "user_delete_failed": "Xóa user thất bại.",
   "realtime_timeout": "Hết thời gian chờ kết nối realtime",
   "realtime_connect_failed": "Không kết nối được tới máy chủ realtime",

@@ -10,6 +10,8 @@ import {
   getGradeReportController,
   exportGradeReportController,
   sendGradeReportEmailController,
+  getStudentTranscriptController,
+  exportStudentTranscriptController,
 } from "~/controllers/teacherStudents.controller";
 
 const teacherStudentsRouter = Router();
@@ -19,6 +21,10 @@ teacherStudentsRouter.use(roleMiddleware(["teacher"]));
 
 teacherStudentsRouter.get("/", listStudentsController);
 teacherStudentsRouter.post("/", addStudentController);
+
+teacherStudentsRouter.get("/:id/transcript/export", exportStudentTranscriptController);
+teacherStudentsRouter.get("/:id/transcript", getStudentTranscriptController);
+
 teacherStudentsRouter.patch("/:id", updateStudentController);
 teacherStudentsRouter.delete("/:id", deleteStudentController);
 

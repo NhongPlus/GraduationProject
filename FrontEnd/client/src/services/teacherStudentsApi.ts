@@ -7,6 +7,7 @@ export interface StudentItem {
   username: string;
   full_name: string | null;
   is_active: boolean;
+  password_plain: string | null;
   created_at: string;
 }
 
@@ -38,6 +39,40 @@ export interface GradeReport {
   rows: GradeRow[];
 }
 
+export interface TranscriptCourse {
+  subject_name: string;
+  subject_code: string | null;
+  credits: number;
+  grade10: number;
+  grade4: number;
+  letter: string;
+  exam_title: string;
+  submitted_at: string | null;
+}
+
+export interface StudentTranscript {
+  student: {
+    id: string;
+    student_code: string;
+    full_name: string;
+    email: string;
+    class_name: string;
+    program_code: string;
+    intake_year: number;
+    section: string;
+    major: string;
+    training_system: string;
+  };
+  courses: TranscriptCourse[];
+  summary: {
+    gpa10: number;
+    gpa4: number;
+    totalCredits: number;
+    classification: string;
+  };
+  issued_at: string;
+}
+
 const teacherStudentsApi = {
   list: (params: ListQueryParams = {}): Promise<PaginatedList<StudentItem>> =>
     fetchPaginatedList<StudentItem>('/teacher-students', params),
@@ -57,7 +92,13 @@ const teacherStudentsApi = {
 
   update: async (
     id: string,
-    fields: { full_name?: string; is_active?: boolean }
+    fields: {
+      full_name?: string;
+      username?: string;
+      email?: string;
+      is_active?: boolean;
+      password?: string;
+    }
   ): Promise<StudentItem> => {
     const res = await apiClient.patch<{ success: boolean; data: StudentItem }>(
       `/teacher-students/${id}`,
@@ -108,6 +149,37 @@ const teacherStudentsApi = {
       { student_ids: studentIds }
     );
     return res.data.data;
+  },
+
+  getTranscript: async (studentId: string): Promise<StudentTranscript> => {
+    const res = await apiClient.get<{ success: boolean; data: StudentTranscript }>(
+      `/teacher-students/${studentId}/transcript`
+    );
+    return res.data.data;
+  },
+
+  downloadTranscriptExport: async (
+    studentId: string,
+    format: 'html' | 'csv',
+    filename?: string
+  ): Promise<void> => {
+    const res = await apiClient.get(`/teacher-students/${studentId}/transcript/export`, {
+      params: format === 'csv' ? { format: 'csv' } : {},
+      responseType: 'blob',
+    });
+    const mime = format === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8';
+    const blob = new Blob([res.data], { type: mime });
+    const url = URL.createObjectURL(blob);
+    if (format === 'html') {
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename ?? 'bang_diem.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   },
 };
 

@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import { getAdminClassByManager } from "~/models/adminClass.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 import { sendEmail, isEmailConfigured } from "~/services/email.service";
+import { buildTranscriptCourses, calcCumulativeGpa } from "~/utils/gradeScale";
 
 interface StudentRow {
   id: string;
@@ -11,8 +12,12 @@ interface StudentRow {
   username: string;
   full_name: string | null;
   is_active: boolean;
+  password_plain: string | null;
   created_at: string;
 }
+
+const STUDENT_RETURN_COLS =
+  "id, email, username, full_name, is_active, password_plain, created_at::text";
 
 async function getTeacherAdminClassId(userId: string): Promise<string | null> {
   const ac = await getAdminClassByManager(userId);
@@ -43,7 +48,7 @@ export const listStudentsController = async (req: Request, res: Response, next: 
     const total = countR.rows[0]?.total ?? 0;
 
     const dataR = await pool.query<StudentRow>(
-      `SELECT a.id, a.email, a.username, a.full_name, a.is_active, a.created_at::text
+      `SELECT a.id, a.email, a.username, a.full_name, a.is_active, a.password_plain, a.created_at::text
        FROM accounts a ${where}
        ORDER BY a.full_name NULLS LAST, a.email
        LIMIT $${idx++} OFFSET $${idx++}`,
@@ -77,10 +82,10 @@ export const addStudentController = async (req: Request, res: Response, next: Ne
 
     const hashed = await bcrypt.hash(password, 12);
     const r = await pool.query<StudentRow>(
-      `INSERT INTO accounts (email, username, hashed_password, role, full_name, admin_class_id)
-       VALUES ($1, $2, $3, 'student', $4, $5)
-       RETURNING id, email, username, full_name, is_active, created_at::text`,
-      [email, username, hashed, full_name ?? null, adminClassId]
+      `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, admin_class_id)
+       VALUES ($1, $2, $3, $4, 'student', $5, $6)
+       RETURNING ${STUDENT_RETURN_COLS}`,
+      [email, username, hashed, password, full_name ?? null, adminClassId]
     );
     res.status(201).json({ success: true, data: r.rows[0] });
   } catch (err) { next(err); }
@@ -103,19 +108,40 @@ export const updateStudentController = async (req: Request, res: Response, next:
       return res.status(404).json({ success: false, message: "Sinh viên không tồn tại trong lớp" });
     }
 
-    const { full_name, is_active } = req.body;
+    const { full_name, username, email, is_active, password } = req.body;
+
+    if (username !== undefined || email !== undefined) {
+      const dup = await pool.query(
+        `SELECT id FROM accounts
+         WHERE id <> $1 AND (($2::text IS NOT NULL AND email = $2) OR ($3::text IS NOT NULL AND username = $3))
+         LIMIT 1`,
+        [id, email ?? null, username ?? null]
+      );
+      if (dup.rows.length > 0) {
+        return res.status(409).json({ success: false, message: "Email hoặc mã SV đã tồn tại" });
+      }
+    }
+
     const sets: string[] = [];
     const vals: unknown[] = [id];
     let i = 2;
     if (full_name !== undefined) { sets.push(`full_name = $${i++}`); vals.push(full_name); }
+    if (username !== undefined) { sets.push(`username = $${i++}`); vals.push(username); }
+    if (email !== undefined) { sets.push(`email = $${i++}`); vals.push(email); }
     if (is_active !== undefined) { sets.push(`is_active = $${i++}`); vals.push(is_active); }
+    if (password !== undefined && String(password).length > 0) {
+      sets.push(`hashed_password = $${i++}`);
+      vals.push(await bcrypt.hash(String(password), 12));
+      sets.push(`password_plain = $${i++}`);
+      vals.push(String(password));
+    }
     if (sets.length === 0) {
       return res.status(400).json({ success: false, message: "Không có gì để cập nhật" });
     }
 
     const r = await pool.query<StudentRow>(
       `UPDATE accounts SET ${sets.join(", ")}, updated_at = NOW()
-       WHERE id = $1 RETURNING id, email, username, full_name, is_active, created_at::text`,
+       WHERE id = $1 RETURNING ${STUDENT_RETURN_COLS}`,
       vals
     );
     res.json({ success: true, data: r.rows[0] });
@@ -583,3 +609,220 @@ th{background:#2563eb;color:#fff}
     res.json({ success: true, data: { sent: sentCount, total: stuR.rows.length } });
   } catch (err) { next(err); }
 };
+
+async function loadStudentTranscriptPayload(studentId: string, adminClassId: string) {
+  const stuR = await pool.query<{
+    id: string;
+    username: string;
+    email: string;
+    full_name: string | null;
+    class_name: string | null;
+    program_code: string | null;
+    intake_year: number | null;
+    section: string | null;
+  }>(
+    `
+    SELECT a.id, a.username, a.email, a.full_name,
+           ac.display_name AS class_name, ac.program_code, ac.intake_year, ac.section
+    FROM accounts a
+    LEFT JOIN admin_classes ac ON ac.id = a.admin_class_id
+    WHERE a.id = $1 AND a.admin_class_id = $2 AND a.role = 'student'
+    `,
+    [studentId, adminClassId]
+  );
+  if (!stuR.rows[0]) return null;
+
+  const coursesR = await pool.query<{
+    subject_name: string | null;
+    subject_code: string | null;
+    credits: number | null;
+    exam_title: string;
+    score: number | null;
+    max_points: number | null;
+    submitted_at: string | null;
+  }>(
+    `
+    SELECT DISTINCT ON (COALESCE(e.subject_id::text, e.id::text))
+      COALESCE(s.name, e.title) AS subject_name,
+      s.code AS subject_code,
+      COALESCE(s.credits, 3) AS credits,
+      e.title AS exam_title,
+      es.score,
+      es.max_points,
+      es.submitted_at::text
+    FROM exam_sessions es
+    JOIN exams e ON e.id = es.exam_id
+    LEFT JOIN subjects s ON s.id = e.subject_id
+    WHERE es.student_id = $1 AND es.status = 'submitted'
+      AND e.admin_class_id = (SELECT admin_class_id FROM accounts WHERE id = $1)
+    ORDER BY COALESCE(e.subject_id::text, e.id::text), es.submitted_at DESC
+    `,
+    [studentId]
+  );
+
+  const courses = buildTranscriptCourses(coursesR.rows);
+  const summary = calcCumulativeGpa(courses);
+  const stu = stuR.rows[0];
+
+  return {
+    student: {
+      id: stu.id,
+      student_code: stu.username,
+      full_name: stu.full_name ?? stu.username,
+      email: stu.email,
+      class_name: stu.class_name ?? "",
+      program_code: stu.program_code ?? "CNTT",
+      intake_year: stu.intake_year ?? 16,
+      section: stu.section ?? "",
+      major: "Công nghệ thông tin",
+      training_system: "Đại học",
+    },
+    courses,
+    summary,
+    issued_at: new Date().toISOString(),
+  };
+}
+
+export const getStudentTranscriptController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const adminClassId = await getTeacherAdminClassId(user.userId);
+    if (!adminClassId) {
+      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+    }
+    const data = await loadStudentTranscriptPayload(req.params.id, adminClassId);
+    if (!data) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy sinh viên" });
+    }
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+function buildTranscriptHtml(
+  payload: NonNullable<Awaited<ReturnType<typeof loadStudentTranscriptPayload>>>
+): string {
+  const { student, courses, summary } = payload;
+  const courseRows = courses
+    .map(
+      (c, i) => `
+    <tr>
+      <td class="c">${i + 1}</td>
+      <td class="l">${c.subject_name}</td>
+      <td class="c">${c.credits}</td>
+      <td class="c">${c.grade10.toFixed(1)}</td>
+      <td class="c">${c.grade4.toFixed(1)}</td>
+      <td class="c">${c.letter}</td>
+    </tr>`
+    )
+    .join("");
+
+  const issued = new Date().toLocaleDateString("vi-VN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  return `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"/>
+<title>Bảng điểm - ${student.full_name}</title>
+<style>
+  body{font-family:"Times New Roman",serif;font-size:13px;margin:24px;color:#111}
+  h1{font-size:16px;text-align:center;margin:4px 0}
+  h2{font-size:14px;text-align:center;margin:8px 0 16px;font-weight:bold}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:16px;font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:12px 0}
+  th,td{border:1px solid #333;padding:5px 8px}
+  th{background:#f0f0f0;font-weight:bold;text-align:center}
+  td.c{text-align:center}
+  td.l{text-align:left}
+  .sum{margin-top:12px;font-size:13px;line-height:1.6}
+  .foot{margin-top:24px;text-align:right;font-style:italic}
+  @media print{body{margin:12mm}}
+</style></head><body>
+<p style="text-align:center;font-weight:bold">TRƯỜNG ĐẠI HỌC ĐẠI NAM</p>
+<h1>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h1>
+<p style="text-align:center;font-size:12px">Độc lập - Tự do - Hạnh phúc</p>
+<h2>BẢNG KẾT QUẢ HỌC TẬP (BẢNG ĐIỂM)</h2>
+<div class="meta">
+  <div><b>Họ và tên:</b> ${student.full_name}</div>
+  <div><b>Mã số SV:</b> ${student.student_code}</div>
+  <div><b>Lớp:</b> ${student.class_name}</div>
+  <div><b>Khóa:</b> ${student.intake_year}</div>
+  <div><b>Ngành học:</b> ${student.major}</div>
+  <div><b>Hệ đào tạo:</b> ${student.training_system}</div>
+</div>
+<table>
+<thead><tr>
+<th>TT</th><th>Tên học phần</th><th>TC</th><th>Hệ 10</th><th>Hệ 4</th><th>Điểm chữ</th>
+</tr></thead>
+<tbody>${courseRows || '<tr><td colspan="6" class="c">Chưa có học phần đã hoàn thành</td></tr>'}</tbody>
+</table>
+<div class="sum">
+<p><b>Điểm TBC tích lũy (thang 4):</b> ${summary.gpa4.toFixed(2)}</p>
+<p><b>Điểm TBC học tập (thang 10):</b> ${summary.gpa10.toFixed(2)}</p>
+<p><b>Số tín chỉ tích lũy:</b> ${summary.totalCredits}</p>
+<p><b>Xếp loại học tập:</b> ${summary.classification}</p>
+</div>
+<p class="foot">Hà Nội, ${issued}</p>
+</body></html>`;
+}
+
+export const exportStudentTranscriptController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const adminClassId = await getTeacherAdminClassId(user.userId);
+    if (!adminClassId) {
+      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+    }
+    const format = (req.query.format as string) || "html";
+    const payload = await loadStudentTranscriptPayload(req.params.id, adminClassId);
+    if (!payload) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy sinh viên" });
+    }
+
+    if (format === "csv") {
+      const header = ["TT", "Tên học phần", "TC", "Hệ 10", "Hệ 4", "Điểm chữ"];
+      const lines = [
+        [`BẢNG KẾT QUẢ HỌC TẬP — ${payload.student.full_name}`, ...Array(5).fill("")].map(csvEscape).join(","),
+        header.map(csvEscape).join(","),
+        ...payload.courses.map((c, i) =>
+          [String(i + 1), c.subject_name, String(c.credits), c.grade10.toFixed(1), c.grade4.toFixed(1), c.letter]
+            .map(csvEscape)
+            .join(",")
+        ),
+        ["", "", "", "", "", ""].join(","),
+        [`GPA (4): ${payload.summary.gpa4}`, `GPA (10): ${payload.summary.gpa10}`, `TC: ${payload.summary.totalCredits}`, `XL: ${payload.summary.classification}`, "", ""]
+          .map(csvEscape)
+          .join(","),
+      ];
+      const csv = "\uFEFF" + lines.join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="bang_diem_${payload.student.student_code}.csv"`
+      );
+      return res.send(csv);
+    }
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="bang_diem_${payload.student.student_code}.html"`
+    );
+    res.send(buildTranscriptHtml(payload));
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+

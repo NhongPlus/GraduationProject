@@ -3,10 +3,14 @@ import {
   Box, Table, Title, Paper, Text, Stack, Group, Badge, Modal, Loader, Alert,
   Tabs, Tooltip, ActionIcon, Select,
 } from '@mantine/core';
-import { IconDownload, IconMail, IconPlus, IconTrash } from '@tabler/icons-react';
+import {
+  IconDownload, IconEye, IconEyeOff, IconMail, IconPencil, IconPlus,
+  IconReportAnalytics, IconTrash,
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import teacherStudentsApi from '@/services/teacherStudentsApi';
-import type { StudentItem, GradeRow, GradeExamOption } from '@/services/teacherStudentsApi';
+import type { StudentItem, GradeRow, GradeExamOption, StudentTranscript } from '@/services/teacherStudentsApi';
+import StudentTranscriptModal from '@/pages/main/Teacher/StudentTranscriptModal';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import InputText from '@/components/Input/InputText/InputText';
@@ -29,6 +33,18 @@ const TeacherStudents = () => {
   const [addForm, setAddForm] = useState({ full_name: '', username: '', email: '', password: 'Test@123' });
   const [addErr, setAddErr] = useState('');
 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    id: '',
+    full_name: '',
+    username: '',
+    email: '',
+    is_active: true,
+    password: '',
+  });
+  const [editErr, setEditErr] = useState('');
+  const [visiblePasswordIds, setVisiblePasswordIds] = useState<Set<string>>(new Set());
+
   const [gradeRows, setGradeRows] = useState<GradeRow[]>([]);
   const [gradeExams, setGradeExams] = useState<GradeExamOption[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
@@ -37,6 +53,12 @@ const TeacherStudents = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState('');
+
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptLoading, setTranscriptLoading] = useState(false);
+  const [transcriptData, setTranscriptData] = useState<StudentTranscript | null>(null);
+  const [transcriptStudentId, setTranscriptStudentId] = useState<string | null>(null);
+  const [transcriptExportLoading, setTranscriptExportLoading] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => { setSearchDebounced(search.trim()); setPage(1); }, 350);
@@ -75,6 +97,50 @@ const TeacherStudents = () => {
       void loadStudents();
     } catch (e: any) {
       setAddErr(e?.response?.data?.message || t('errors.user_add_failed'));
+    }
+  };
+
+  const togglePasswordVisible = (id: string) => {
+    setVisiblePasswordIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const openEdit = (s: StudentItem) => {
+    setEditForm({
+      id: s.id,
+      full_name: s.full_name ?? '',
+      username: s.username,
+      email: s.email,
+      is_active: s.is_active,
+      password: '',
+    });
+    setEditErr('');
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    setEditErr('');
+    if (!editForm.username.trim() || !editForm.email.trim()) {
+      setEditErr(t('teacher_students.edit_validation'));
+      return;
+    }
+    try {
+      await teacherStudentsApi.update(editForm.id, {
+        full_name: editForm.full_name.trim() || undefined,
+        username: editForm.username.trim(),
+        email: editForm.email.trim(),
+        is_active: editForm.is_active,
+        ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
+      });
+      setEditOpen(false);
+      void loadStudents();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setEditErr(msg || t('errors.user_update_failed'));
     }
   };
 
@@ -151,6 +217,39 @@ const TeacherStudents = () => {
     [gradeRows]
   );
 
+  const openTranscript = async (studentId: string) => {
+    setTranscriptStudentId(studentId);
+    setTranscriptOpen(true);
+    setTranscriptData(null);
+    try {
+      setTranscriptLoading(true);
+      const data = await teacherStudentsApi.getTranscript(studentId);
+      setTranscriptData(data);
+    } catch {
+      setError(t('teacher_students.transcript_load_error'));
+      setTranscriptOpen(false);
+    } finally {
+      setTranscriptLoading(false);
+    }
+  };
+
+  const handleTranscriptExport = async (format: 'html' | 'csv') => {
+    if (!transcriptStudentId) return;
+    try {
+      setTranscriptExportLoading(true);
+      const code = transcriptData?.student.student_code ?? 'bang_diem';
+      await teacherStudentsApi.downloadTranscriptExport(
+        transcriptStudentId,
+        format,
+        format === 'csv' ? `bang_diem_${code}.csv` : undefined
+      );
+    } catch {
+      setError(t('teacher_students.export_error'));
+    } finally {
+      setTranscriptExportLoading(false);
+    }
+  };
+
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
       <PageHeader
@@ -205,6 +304,7 @@ const TeacherStudents = () => {
                       <Table.Th>{t('teacher_students.col_code')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_name')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_email')}</Table.Th>
+                      <Table.Th>{t('teacher_students.col_password')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_status')}</Table.Th>
                       <Table.Th>{t('common.actions')}</Table.Th>
                     </Table.Tr>
@@ -217,22 +317,58 @@ const TeacherStudents = () => {
                         <Table.Td>{s.full_name || '—'}</Table.Td>
                         <Table.Td>{s.email}</Table.Td>
                         <Table.Td>
+                          <Group gap={4} wrap="nowrap">
+                            <Text size="sm" ff="monospace">
+                              {visiblePasswordIds.has(s.id)
+                                ? (s.password_plain ?? 'Test@123')
+                                : '••••••••'}
+                            </Text>
+                            <ActionIcon
+                              variant="subtle"
+                              size="sm"
+                              color="gray"
+                              aria-label={visiblePasswordIds.has(s.id) ? 'Hide' : 'Show'}
+                              onClick={() => togglePasswordVisible(s.id)}
+                            >
+                              {visiblePasswordIds.has(s.id)
+                                ? <IconEyeOff size={16} />
+                                : <IconEye size={16} />}
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
                           <Badge color={s.is_active ? 'green' : 'gray'} size="sm">
                             {s.is_active ? t('teacher_students.active') : t('teacher_students.inactive')}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
-                          <Tooltip label={t('common.delete')}>
-                            <ActionIcon color="red" variant="light" onClick={() => handleDelete(s.id)}>
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Tooltip>
+                          <Group gap={4} wrap="nowrap">
+                            <Tooltip label={t('teacher_students.edit_student')}>
+                              <ActionIcon color="blue" variant="light" onClick={() => openEdit(s)}>
+                                <IconPencil size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label={t('teacher_students.transcript_btn')}>
+                              <ActionIcon
+                                color="teal"
+                                variant="light"
+                                onClick={() => void openTranscript(s.id)}
+                              >
+                                <IconReportAnalytics size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <Tooltip label={t('common.delete')}>
+                              <ActionIcon color="red" variant="light" onClick={() => handleDelete(s.id)}>
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
                         </Table.Td>
                       </Table.Tr>
                     ))}
                     {!loading && students.length === 0 && (
                       <Table.Tr>
-                        <Table.Td colSpan={6}>
+                        <Table.Td colSpan={7}>
                           <Text c="dimmed" ta="center" py="md">{t('teacher_students.empty')}</Text>
                         </Table.Td>
                       </Table.Tr>
@@ -357,6 +493,58 @@ const TeacherStudents = () => {
           </Stack>
         </Tabs.Panel>
       </Tabs>
+
+      <StudentTranscriptModal
+        opened={transcriptOpen}
+        onClose={() => setTranscriptOpen(false)}
+        loading={transcriptLoading}
+        data={transcriptData}
+        exportLoading={transcriptExportLoading}
+        onExportHtml={() => void handleTranscriptExport('html')}
+        onExportCsv={() => void handleTranscriptExport('csv')}
+      />
+
+      <Modal
+        opened={editOpen}
+        onClose={() => setEditOpen(false)}
+        title={t('teacher_students.edit_modal_title')}
+      >
+        <Stack gap="sm">
+          <InputText
+            label={t('teacher_students.col_name')}
+            value={editForm.full_name}
+            onChange={(e) => setEditForm((p) => ({ ...p, full_name: e.currentTarget.value }))}
+          />
+          <InputText
+            label={t('teacher_students.col_code')}
+            value={editForm.username}
+            onChange={(e) => setEditForm((p) => ({ ...p, username: e.currentTarget.value }))}
+          />
+          <InputText
+            label="Email"
+            value={editForm.email}
+            onChange={(e) => setEditForm((p) => ({ ...p, email: e.currentTarget.value }))}
+          />
+          <Select
+            label={t('teacher_students.col_status')}
+            value={editForm.is_active ? 'active' : 'inactive'}
+            onChange={(v) => setEditForm((p) => ({ ...p, is_active: v === 'active' }))}
+            data={[
+              { value: 'active', label: t('teacher_students.status_active') },
+              { value: 'inactive', label: t('teacher_students.status_inactive') },
+            ]}
+            allowDeselect={false}
+          />
+          <InputText
+            label={t('common.password')}
+            placeholder={t('teacher_students.password_placeholder')}
+            value={editForm.password}
+            onChange={(e) => setEditForm((p) => ({ ...p, password: e.currentTarget.value }))}
+          />
+          {editErr && <Text c="red" size="sm">{editErr}</Text>}
+          <ButtonFilled label={t('common.save')} disabled={false} onClick={handleEdit} color="teal" />
+        </Stack>
+      </Modal>
 
       {/* Modal thêm SV */}
       <Modal opened={addOpen} onClose={() => setAddOpen(false)} title={t('teacher_students.add_modal_title')}>
