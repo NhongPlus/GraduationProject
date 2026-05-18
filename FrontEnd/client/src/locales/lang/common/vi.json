@@ -714,12 +714,17 @@
     "question_bank_empty": "Chưa có câu nào trong ngân hàng môn này.",
     "question_bank_go_manage": "Mở trang Ngân hàng câu hỏi",
     "question_bank_search": "Tìm trong ngân hàng...",
-    "question_bank_select_all": "Chọn tất cả",
+    "question_bank_select_all": "Chọn tất cả trên trang này",
     "question_bank_selected": "Đã chọn: {{count}}",
     "question_bank_add_btn": "Thêm {{count}} câu vào {{code}}",
     "question_bank_all_added": "Các câu trong danh sách đã có trong mã đề này.",
     "question_bank_in_exam": "Đã thêm",
     "question_bank_added": "Đã thêm {{count}} câu từ ngân hàng vào {{code}}."
+  },
+  "pagination": {
+    "showing_range": "Hiển thị {{from}}–{{to}} / {{total}}",
+    "empty": "Không có bản ghi",
+    "select_all_page": "Chọn tất cả trên trang này"
   },
   "notification": {
     "title": "Thông báo",

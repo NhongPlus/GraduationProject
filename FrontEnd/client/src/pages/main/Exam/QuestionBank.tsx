@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Box, Title, Text, Loader, Paper, Group, Stack, Button, TextInput, Select,
   Badge, Table, ActionIcon, Modal, Textarea, NumberInput, SegmentedControl,
-  Pagination, Tooltip, Alert, FileInput,
+  Tooltip, Alert, FileInput,
 } from '@mantine/core';
 import {
   IconSearch, IconTrash, IconEdit, IconDownload, IconFilter, IconFileWord,
@@ -13,6 +13,9 @@ import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import subjectApi, { type SubjectDto } from '@/services/subjectApi';
+import questionBankApi from '@/services/questionBankApi';
+import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { DEFAULT_PAGE_SIZE, pageToOffset, clampPage } from '@/utils/pagination';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker/SubjectCategoryPicker';
 
@@ -79,34 +82,32 @@ const QuestionBankPage = () => {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
-  const LIMIT = 20;
+  const LIMIT = DEFAULT_PAGE_SIZE;
 
   const fetchItems = useCallback(async (f: QBFilter, p: number) => {
     if (!accessToken) return;
     try {
       setLoading(true);
-      const params: Record<string, string> = {
-        limit: String(LIMIT),
-        offset: String((p - 1) * LIMIT),
-      };
-      if (f.search) params.search = f.search;
-      if (f.question_type) params.question_type = f.question_type;
-      if (f.difficulty) params.difficulty = f.difficulty;
-      if (f.subject_id) params.subject_id = f.subject_id;
-      if (f.chapter != null) params.chapter = String(f.chapter);
-
-      const res = await apiClient.get<{ success: boolean; data: { items: QBItem[]; total: number } }>(
-        '/question-bank',
-        { params, headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      setItems(res.data.data.items);
-      setTotal(res.data.data.total);
+      const data = await questionBankApi.list({
+        limit: LIMIT,
+        offset: pageToOffset(p, LIMIT),
+        search: f.search,
+        question_type: f.question_type,
+        difficulty: f.difficulty,
+        subject_id: f.subject_id,
+        chapter: f.chapter,
+      });
+      setItems(data.items as QBItem[]);
+      setTotal(data.total);
+      if (data.items.length === 0 && data.total > 0 && p > 1) {
+        setPage(clampPage(p - 1, data.total, LIMIT));
+      }
     } catch {
       setError(t('question_bank.error_load_failed'));
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, t]);
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
@@ -236,8 +237,6 @@ const QuestionBankPage = () => {
       setImporting(false);
     }
   };
-
-  const totalPages = Math.ceil(total / LIMIT);
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -437,13 +436,12 @@ const QuestionBankPage = () => {
           </Paper>
         )}
 
-        {totalPages > 1 && (
-          <Group justify="center">
-            <Pagination total={totalPages} value={page} onChange={setPage} />
-          </Group>
-        )}
-
-        <Text size="sm" c="dimmed">{t('question_bank.total_questions', { total })}</Text>
+        <ListPaginationBar
+          page={page}
+          total={total}
+          limit={LIMIT}
+          onPageChange={setPage}
+        />
       </Stack>
 
       {/* Create Modal */}

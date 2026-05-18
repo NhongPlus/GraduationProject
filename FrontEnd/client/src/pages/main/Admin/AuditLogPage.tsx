@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Stack, Select, Pagination, Alert,
+  Box, Text, Loader, Table, Badge, Paper, Group, Stack, Select, Alert,
 } from '@mantine/core';
+import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { DEFAULT_PAGE_SIZE } from '@/utils/pagination';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '@/components/EmptyState/EmptyState';
 import apiClient from '@/services/apiClient';
@@ -40,7 +42,7 @@ const AuditLogPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState<string | null>(null);
-  const limit = 20;
+  const limit = DEFAULT_PAGE_SIZE;
 
   const load = async (pageNum: number) => {
     try {
@@ -66,8 +68,6 @@ const AuditLogPage = () => {
   useEffect(() => {
     void load(page);
   }, [page, actionFilter]);
-
-  const totalPages = Math.ceil(total / limit);
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
@@ -152,11 +152,7 @@ const AuditLogPage = () => {
           </Table>
         </Paper>
 
-        {totalPages > 1 && (
-          <Group justify="center">
-            <Pagination value={page} onChange={setPage} total={totalPages} />
-          </Group>
-        )}
+        <ListPaginationBar page={page} total={total} limit={limit} onPageChange={setPage} />
       </Stack>
     </Box>
   );

@@ -16,6 +16,10 @@ import {
 } from '@mantine/core';
 import { IconChevronDown, IconChevronUp, IconDatabase, IconSearch } from '@tabler/icons-react';
 import questionBankApi, { type QuestionBankItem } from '@/services/questionBankApi';
+import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
+
+const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 const DIFFICULTY_COLORS = { DE: 'green', TRUNGBINH: 'yellow', KHO: 'red' } as const;
 
@@ -49,6 +53,7 @@ export default function ExamQuestionBankPicker({
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<QuestionBankItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -64,7 +69,8 @@ export default function ExamQuestionBankPicker({
       const data = await questionBankApi.list({
         subject_id: subjectId,
         search: search || undefined,
-        limit: 100,
+        limit: PAGE_SIZE,
+        offset: pageToOffset(page, PAGE_SIZE),
       });
       setItems(data.items);
       setTotal(data.total);
@@ -74,11 +80,15 @@ export default function ExamQuestionBankPicker({
     } finally {
       setLoading(false);
     }
+  }, [subjectId, search, page]);
+
+  useEffect(() => {
+    setPage(1);
+    setSelected(new Set());
   }, [subjectId, search]);
 
   useEffect(() => {
     void fetchBank();
-    setSelected(new Set());
   }, [fetchBank]);
 
   const selectableItems = useMemo(
@@ -95,12 +105,21 @@ export default function ExamQuestionBankPicker({
     });
   };
 
-  const toggleAll = () => {
-    if (selected.size === selectableItems.length) {
+  const toggleAllOnPage = () => {
+    if (selected.size === selectableItems.length && selectableItems.length > 0) {
       setSelected(new Set());
       return;
     }
     setSelected(new Set(selectableItems.map((i) => i.id)));
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    setSelected(new Set());
+    setPage(nextPage);
+  };
+
+  const handleSearchApply = () => {
+    setSearch(searchInput.trim());
   };
 
   const handleAdd = () => {
@@ -187,27 +206,42 @@ export default function ExamQuestionBankPicker({
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') setSearch(searchInput.trim());
+                    if (e.key === 'Enter') handleSearchApply();
                   }}
                 />
-                <Button size="xs" variant="light" onClick={() => setSearch(searchInput.trim())}>
+                <Button size="xs" variant="light" onClick={handleSearchApply}>
                   {t('question_bank.filter')}
                 </Button>
               </Group>
 
+              <ListPaginationBar
+                page={page}
+                total={total}
+                limit={PAGE_SIZE}
+                onPageChange={handlePageChange}
+                size="xs"
+              />
+
               {selectableItems.length === 0 ? (
                 <Text size="sm" c="dimmed">
-                  {t('exam_authoring.question_bank_all_added')}
+                  {items.length === 0
+                    ? t('pagination.empty')
+                    : t('exam_authoring.question_bank_all_added')}
                 </Text>
               ) : (
                 <>
                   <Group justify="space-between">
                     <Checkbox
                       size="xs"
-                      label={t('exam_authoring.question_bank_select_all')}
-                      checked={selected.size > 0 && selected.size === selectableItems.length}
-                      indeterminate={selected.size > 0 && selected.size < selectableItems.length}
-                      onChange={toggleAll}
+                      label={t('pagination.select_all_page')}
+                      checked={
+                        selectableItems.length > 0 &&
+                        selected.size === selectableItems.length
+                      }
+                      indeterminate={
+                        selected.size > 0 && selected.size < selectableItems.length
+                      }
+                      onChange={toggleAllOnPage}
                     />
                     <Text size="xs" c="dimmed">
                       {t('exam_authoring.question_bank_selected', { count: selected.size })}
@@ -236,19 +270,22 @@ export default function ExamQuestionBankPicker({
                                 {item.content}
                               </Text>
                               <Group gap={6} mt={4}>
-                                <Badge size="xs" variant="light" color={item.question_type === 'mcq' ? 'blue' : 'violet'}>
+                                <Badge
+                                  size="xs"
+                                  variant="light"
+                                  color={item.question_type === 'mcq' ? 'blue' : 'violet'}
+                                >
                                   {item.question_type === 'mcq'
                                     ? t('exam_authoring.mcq')
                                     : t('exam_authoring.essay')}
                                 </Badge>
-                                <Badge size="xs" variant="light" color={DIFFICULTY_COLORS[item.difficulty]}>
+                                <Badge
+                                  size="xs"
+                                  variant="light"
+                                  color={DIFFICULTY_COLORS[item.difficulty]}
+                                >
                                   {item.points} {t('exam_authoring.points')}
                                 </Badge>
-                                {alreadyLinkedBankIds.has(item.id) && (
-                                  <Badge size="xs" color="gray">
-                                    {t('exam_authoring.question_bank_in_exam')}
-                                  </Badge>
-                                )}
                               </Group>
                             </Box>
                           </Group>

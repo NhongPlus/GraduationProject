@@ -29,11 +29,23 @@ router.get("/", async (req, res, next) => {
       created_by: req.query.created_by as string | undefined,
     };
 
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
-    const offset = Number(req.query.offset) || 0;
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
 
     const result = await getQuestionBankItems(filter, limit, offset);
-    res.json({ success: true, data: result });
+    const totalPages = result.total > 0 ? Math.ceil(result.total / limit) : 1;
+    const page = limit > 0 ? Math.floor(offset / limit) + 1 : 1;
+    res.json({
+      success: true,
+      data: {
+        items: result.items,
+        total: result.total,
+        limit,
+        offset,
+        page,
+        total_pages: totalPages,
+      },
+    });
   } catch (err) {
     next(err);
   }
