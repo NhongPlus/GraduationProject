@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Box, Text, Loader, Table, Badge, Paper, Group, Stack, Select, Alert,
 } from '@mantine/core';
-import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE } from '@/utils/pagination';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '@/components/EmptyState/EmptyState';

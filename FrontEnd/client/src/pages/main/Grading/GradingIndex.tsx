@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ListPaginationBar } from '@/components/ListPagination';
+import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Text, Loader, Table, Badge, Paper, Alert, Stack, Group, Select, TextInput,
@@ -19,6 +21,8 @@ const GradingIndex = () => {
   const [keyword, setKeyword] = useState('');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const LIMIT = DEFAULT_PAGE_SIZE;
 
   useEffect(() => {
     const load = async () => {
@@ -101,6 +105,15 @@ const GradingIndex = () => {
     });
   }, [sessions, exams, keyword, subjectFilter, timeRange]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, subjectFilter, timeRange]);
+
+  const paginatedSessions = useMemo(
+    () => slicePage(filteredSessions, page, LIMIT),
+    [filteredSessions, page]
+  );
+
   if (loading) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
@@ -131,13 +144,19 @@ const GradingIndex = () => {
             label={t('grading.filter_keyword')}
             placeholder={t('grading.filter_keyword_placeholder')}
             value={keyword}
-            onChange={(e) => setKeyword(e.currentTarget.value)}
+            onChange={(e) => {
+              setKeyword(e.currentTarget.value);
+              setPage(1);
+            }}
           />
           <Select
             label={t('grading.filter_subject')}
             data={subjectOptions}
             value={subjectFilter}
-            onChange={(value) => setSubjectFilter(value || 'all')}
+            onChange={(value) => {
+              setSubjectFilter(value || 'all');
+              setPage(1);
+            }}
           />
           <Select
             label={t('grading.filter_time')}
@@ -148,7 +167,10 @@ const GradingIndex = () => {
               { value: '90d', label: t('grading.filter_time_90d') },
             ]}
             value={timeRange}
-            onChange={(value) => setTimeRange(value || 'all')}
+            onChange={(value) => {
+              setTimeRange(value || 'all');
+              setPage(1);
+            }}
           />
         </Group>
 
@@ -171,9 +193,9 @@ const GradingIndex = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredSessions.map((session, idx) => (
+                {paginatedSessions.map((session, idx) => (
                   <Table.Tr key={session.id}>
-                    <Table.Td>{idx + 1}</Table.Td>
+                    <Table.Td>{(page - 1) * LIMIT + idx + 1}</Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={500}>{exams[session.exam_id]?.title || session.exam_id}</Text>
                       <Text size="xs" c="dimmed">{exams[session.exam_id]?.subject_name || '—'}</Text>
@@ -212,6 +234,12 @@ const GradingIndex = () => {
                 ))}
               </Table.Tbody>
             </Table>
+            <ListPaginationBar
+              page={page}
+              total={filteredSessions.length}
+              limit={LIMIT}
+              onPageChange={setPage}
+            />
           </Paper>
         )}
       </Stack>

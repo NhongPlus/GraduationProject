@@ -49,3 +49,9 @@ export function pageItemRange(
 export function clampPage(page: number, total: number, limit = DEFAULT_PAGE_SIZE): number {
   return Math.min(Math.max(1, page), calcTotalPages(total, limit));
 }
+
+/** Phân trang client-side (slice mảng đã load) */
+export function slicePage<T>(items: T[], page: number, limit = DEFAULT_PAGE_SIZE): T[] {
+  const start = pageToOffset(page, limit);
+  return items.slice(start, start + limit);
+}

@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider,
-  Pagination,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { ExamSession } from '@/services/examApi';
-import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import PageHeader from '@/components/PageHeader/PageHeader';
+import { ListPaginationBar } from '@/components/ListPagination';
+import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 
 const ExamSessions = () => {
   const { t } = useTranslation();
@@ -19,25 +19,29 @@ const ExamSessions = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const LIMIT = 20;
+  const LIMIT = DEFAULT_PAGE_SIZE;
 
   useEffect(() => {
     if (!examId) return;
     const load = async () => {
       try {
         setLoading(true);
-        const data = await examApi.getExamSessions(examId, { page, limit: LIMIT });
+        const data = await examApi.getExamSessions(examId);
         setSessions(data);
-        setTotalPages(Math.max(1, Math.ceil(data.length / LIMIT)));
+        setPage(1);
       } catch {
         setError(t('errors.session_list_failed'));
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, [examId, t, page]);
+    void load();
+  }, [examId, t]);
+
+  const paginatedSessions = useMemo(
+    () => slicePage(sessions, page, LIMIT),
+    [sessions, page]
+  );
 
   if (loading) {
     return (
@@ -108,9 +112,9 @@ const ExamSessions = () => {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {sessions.map((session, idx) => (
+              {paginatedSessions.map((session, idx) => (
                 <Table.Tr key={session.id}>
-                  <Table.Td>{idx + 1}</Table.Td>
+                  <Table.Td>{(page - 1) * LIMIT + idx + 1}</Table.Td>
                   <Table.Td>
                     <Text size="sm" fw={500}>
                       {session.student_name || session.full_name || session.student_id}
@@ -118,6 +122,9 @@ const ExamSessions = () => {
                     {session.student_email && (
                       <Text size="xs" c="dimmed">{session.student_email}</Text>
                     )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{session.version_code ?? '—'}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Badge color={session.status === 'submitted' ? 'green' : session.status === 'active' ? 'orange' : 'gray'}>
@@ -171,6 +178,13 @@ const ExamSessions = () => {
           </Table>
         </Paper>
 
+        <ListPaginationBar
+          page={page}
+          total={sessions.length}
+          limit={LIMIT}
+          onPageChange={setPage}
+        />
+
         <Group>
           <ButtonLight
             size="sm"
@@ -180,12 +194,6 @@ const ExamSessions = () => {
             onClick={() => navigate('/exams')}
           />
         </Group>
-
-        {totalPages > 1 && (
-          <Group justify="center">
-            <Pagination total={totalPages} value={page} onChange={setPage} />
-          </Group>
-        )}
       </Stack>
     </Box>
   );

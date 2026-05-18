@@ -14,7 +14,7 @@ import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import subjectApi, { type SubjectDto } from '@/services/subjectApi';
 import questionBankApi from '@/services/questionBankApi';
-import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset, clampPage } from '@/utils/pagination';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker/SubjectCategoryPicker';

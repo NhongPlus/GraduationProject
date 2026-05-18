@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -32,6 +33,8 @@ import { useExamListState } from '@/hooks/useExamListState';
 import InputText from '@/components/Input/InputText/InputText';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { isPastExamStartDeadline } from '@/utils/examDeadline';
+import { ListPaginationBar } from '@/components/ListPagination';
+import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 
 const ExamList = () => {
   const { t } = useTranslation();
@@ -61,6 +64,18 @@ const ExamList = () => {
     handleUpdateDuration,
     handleForceSubmit,
   } = useExamListState({ isStaff, t });
+
+  const [listPage, setListPage] = useState(1);
+  const LIST_LIMIT = DEFAULT_PAGE_SIZE;
+
+  useEffect(() => {
+    setListPage(1);
+  }, [searchText, statusFilter]);
+
+  const paginatedExams = useMemo(
+    () => slicePage(filteredExams, listPage, LIST_LIMIT),
+    [filteredExams, listPage]
+  );
 
   const handleDeleteExam = (examId: string, examTitle: string) => {
     modals.open({
@@ -154,7 +169,10 @@ const ExamList = () => {
           <Select
             label={t('common.filter_status')}
             value={statusFilter}
-            onChange={(value) => setStatusFilter((value as 'all' | 'not_done' | 'done') ?? 'all')}
+            onChange={(value) => {
+              setStatusFilter((value as 'all' | 'not_done' | 'done') ?? 'all');
+              setListPage(1);
+            }}
             data={[
               { value: 'all', label: t('exam_list.status_all') },
               { value: 'not_done', label: t('exam_list.status_not_done') },
@@ -181,7 +199,7 @@ const ExamList = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredExams.map((item, idx) => {
+                {paginatedExams.map((item, idx) => {
                   const latest = latestSessionByExam.get(item.id);
                   const activeCount = isStaff ? activeSessionCountByExam[item.id] ?? 0 : 0;
                   const runtimeActive = isStaff ? Boolean(runtimeActiveByExam[item.id]) : false;
@@ -204,7 +222,7 @@ const ExamList = () => {
                       style={{ cursor: 'pointer' }}
                       onClick={rowNavigate}
                     >
-                      <Table.Td>{idx + 1}</Table.Td>
+                      <Table.Td>{(listPage - 1) * LIST_LIMIT + idx + 1}</Table.Td>
                       <Table.Td>
                         <Text fw={500}>{item.title}</Text>
                       </Table.Td>
@@ -323,6 +341,12 @@ const ExamList = () => {
                 })}
               </Table.Tbody>
             </Table>
+            <ListPaginationBar
+              page={listPage}
+              total={filteredExams.length}
+              limit={LIST_LIMIT}
+              onPageChange={setListPage}
+            />
           </Paper>
         )}
       </Stack>

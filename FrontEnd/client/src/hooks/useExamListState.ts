@@ -23,9 +23,6 @@ export function useExamListState(opts: {
   const [startingExamId, setStartingExamId] = useState<string | null>(null);
   const [updatingExamId, setUpdatingExamId] = useState<string | null>(null);
   const [forceSubmittingExamId, setForceSubmittingExamId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const LIMIT = 20;
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSetSearchText = (value: string) => {
@@ -33,7 +30,6 @@ export function useExamListState(opts: {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(value);
-      setPage(1);
     }, 350);
   };
 
@@ -43,13 +39,7 @@ export function useExamListState(opts: {
       setError('');
       setNotice('');
 
-      const params: Record<string, string> = {
-        limit: String(LIMIT),
-        offset: String((page - 1) * LIMIT),
-      };
-      if (debouncedSearch) params.search = debouncedSearch;
-
-      const examData = await examApi.getExams(undefined, params);
+      const examData = await examApi.getExams();
       const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
       setExams(fetchedExams);
       setRuntimeActiveByExam(
@@ -57,8 +47,6 @@ export function useExamListState(opts: {
           fetchedExams.map((exam) => [exam.id, Boolean(exam.runtime_is_active)])
         )
       );
-      setTotalPages(Math.max(1, Math.ceil(fetchedExams.length / LIMIT)));
-
       if (isStaff) {
         setSessions([]);
         const entries = await Promise.all(
@@ -83,7 +71,7 @@ export function useExamListState(opts: {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, isStaff, page, t]);
+  }, [debouncedSearch, isStaff, t]);
 
   useEffect(() => {
     if (location.pathname !== '/exams') return;
@@ -246,8 +234,5 @@ export function useExamListState(opts: {
     handleStartExam,
     handleUpdateDuration,
     handleForceSubmit,
-    page,
-    setPage,
-    totalPages,
   };
 }

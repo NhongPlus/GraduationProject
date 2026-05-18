@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Title, Table, Modal, Group, Stack, Text, Loader, Badge,
-  ActionIcon, TextInput, NumberInput, Select, Switch, Pagination,
+  ActionIcon, TextInput, NumberInput, Select, Switch,
   Button,
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '@tabler/icons-react';
+import { ListPaginationBar } from '@/components/ListPagination';
+import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import apiClient from '@/services/apiClient';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -76,7 +78,7 @@ const SubjectManagementPage = () => {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const LIMIT = 20;
+  const LIMIT = DEFAULT_PAGE_SIZE;
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
@@ -142,8 +144,7 @@ const SubjectManagementPage = () => {
     s.code.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filtered.length / LIMIT);
-  const paginated = filtered.slice((page - 1) * LIMIT, page * LIMIT);
+  const paginated = slicePage(filtered, page, LIMIT);
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -226,14 +227,14 @@ const SubjectManagementPage = () => {
                 )}
               </Table.Tbody>
             </Table>
-            {totalPages > 1 && (
-              <Group justify="center">
-                <Pagination total={totalPages} value={page} onChange={setPage} />
-              </Group>
-            )}
+            <ListPaginationBar
+              page={page}
+              total={filtered.length}
+              limit={LIMIT}
+              onPageChange={setPage}
+            />
           </>
         )}
-        <Text size="sm" c="dimmed">Tổng: {filtered.length} môn học</Text>
       </Stack>
 
       {/* Create Modal */}

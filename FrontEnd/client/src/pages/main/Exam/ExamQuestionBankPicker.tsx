@@ -16,7 +16,7 @@ import {
 } from '@mantine/core';
 import { IconChevronDown, IconChevronUp, IconDatabase, IconSearch } from '@tabler/icons-react';
 import questionBankApi, { type QuestionBankItem } from '@/services/questionBankApi';
-import ListPaginationBar from '@/components/ListPagination/ListPaginationBar';
+import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
 const PAGE_SIZE = DEFAULT_PAGE_SIZE;
