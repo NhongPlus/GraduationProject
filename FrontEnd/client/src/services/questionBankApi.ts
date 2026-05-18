@@ -1,7 +1,7 @@
 import apiClient from './apiClient';
 import type { QuestionType } from './examApi';
 import type { PaginationMeta } from '@/utils/pagination';
-import { buildPaginationMeta } from '@/utils/pagination';
+import { unwrapPaginatedData } from '@/utils/pagination';
 
 export type QBDifficulty = 'DE' | 'TRUNGBINH' | 'KHO';
 
@@ -60,20 +60,7 @@ const questionBankApi = {
     if (params.chapter != null) query.chapter = String(params.chapter);
 
     const res = await apiClient.get<ListResponseBody>('/question-bank', { params: query });
-    const body = res.data.data;
-    const meta =
-      body.limit != null && body.offset != null
-        ? {
-            total: body.total,
-            limit: body.limit,
-            offset: body.offset,
-            page: body.page ?? Math.floor(body.offset / Math.max(1, body.limit)) + 1,
-            total_pages:
-              body.total_pages ?? Math.max(1, Math.ceil(body.total / Math.max(1, body.limit))),
-          }
-        : buildPaginationMeta(body.total, limit, offset);
-
-    return { items: body.items, ...meta };
+    return unwrapPaginatedData<QuestionBankItem>(res.data.data);
   },
 
   importToExam: async (
@@ -87,6 +74,18 @@ const questionBankApi = {
     }>(`/question-bank/${questionBankId}/import/${examId}`, opts ?? {});
     return res.data.data;
   },
+
+  remove: async (id: string): Promise<void> => {
+    await apiClient.delete(`/question-bank/${id}`);
+  },
+
+  bulkRemove: async (ids: string[]): Promise<{ deleted: number; failed: number }> => {
+    if (ids.length === 0) return { deleted: 0, failed: 0 };
+    const results = await Promise.allSettled(ids.map((id) => questionBankApi.remove(id)));
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    return { deleted: ids.length - failed, failed };
+  },
+
 };
 
 export default questionBankApi;

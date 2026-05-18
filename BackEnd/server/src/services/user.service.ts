@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import {
   getAllUsers,
+  queryUsersPaginated,
   getUserById,
   getUserByEmail,
   getUserByUsername,
@@ -14,6 +15,12 @@ import {
 export const getUsers = async (): Promise<PublicUser[]> => {
   return getAllUsers();
 };
+
+export const listUsersPaginated = async (
+  limit: number,
+  offset: number,
+  opts?: { role?: User["role"]; search?: string }
+) => queryUsersPaginated(limit, offset, opts);
 
 export const getUserDetail = async (id: string): Promise<PublicUser | null> => {
   const user = await getUserById(id);

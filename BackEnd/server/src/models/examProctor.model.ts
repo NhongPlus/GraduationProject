@@ -213,8 +213,25 @@ export const getProctorLogsByExam = async (
   examId: string,
   options?: { limit?: number; offset?: number }
 ): Promise<ProctorLogRow[]> => {
-  const limit = options?.limit ?? 500;
-  const offset = options?.offset ?? 0;
+  const { items } = await queryProctorLogsByExamPaginated(
+    examId,
+    options?.limit ?? 500,
+    options?.offset ?? 0
+  );
+  return items;
+};
+
+export const queryProctorLogsByExamPaginated = async (
+  examId: string,
+  limit: number,
+  offset: number
+): Promise<{ items: ProctorLogRow[]; total: number }> => {
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM exam_proctor_logs WHERE exam_id = $1`,
+    [examId]
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
   const result = await pool.query(
     `SELECT pl.*, a.full_name AS student_name
      FROM exam_proctor_logs pl
@@ -224,7 +241,7 @@ export const getProctorLogsByExam = async (
      LIMIT $2 OFFSET $3`,
     [examId, limit, offset]
   );
-  return result.rows as ProctorLogRow[];
+  return { items: result.rows as ProctorLogRow[], total };
 };
 
 /** Get proctor logs for a specific student in an exam */

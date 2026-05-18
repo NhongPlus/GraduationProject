@@ -52,12 +52,12 @@ const AuditLogPage = () => {
         offset: (pageNum - 1) * limit,
       };
       if (actionFilter) params.action = actionFilter;
-      const res = await apiClient.get<{ success: boolean; logs: AuditLogItem[]; total: number }>(
-        '/audit-logs',
-        { params }
-      );
-      setLogs(res.data.logs);
-      setTotal(res.data.total);
+      const res = await apiClient.get<{
+        success: boolean;
+        data: { items: AuditLogItem[]; total: number };
+      }>('/audit-logs', { params });
+      setLogs(res.data.data.items);
+      setTotal(res.data.data.total);
     } catch {
       setError('Không tải được audit log.');
     } finally {

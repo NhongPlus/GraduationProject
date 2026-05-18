@@ -1,12 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box, Title, Text, Loader, Paper, Group, Stack, Button, TextInput, Select,
   Badge, Table, ActionIcon, Modal, Textarea, NumberInput, SegmentedControl,
-  Tooltip, Alert, FileInput,
+  Tooltip, Alert, FileInput, Checkbox,
 } from '@mantine/core';
 import {
-  IconSearch, IconTrash, IconEdit, IconDownload, IconFilter, IconFileWord,
+  IconSearch, IconTrash, IconEdit, IconFilter, IconFileWord,
 } from '@tabler/icons-react';
 import apiClient from '@/services/apiClient';
 import useAuth from '@/hooks/useAuth';
@@ -57,12 +57,18 @@ const DIFFICULTY_LABELS: Record<QBDifficulty, string> = {
   KHO: 'Khó',
 };
 
+const SUBJECT_LABEL_MAX_LEN = 30;
+
+function truncateWithEllipsis(text: string, maxLen: number): { display: string; truncated: boolean } {
+  if (text.length <= maxLen) return { display: text, truncated: false };
+  return { display: `${text.slice(0, maxLen)}…`, truncated: true };
+}
+
 const QuestionBankPage = () => {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
-  const [examIdInputOpen, setExamIdInputOpen] = useState(false);
-  const [importingQbId, setImportingQbId] = useState<string | null>(null);
-  const [examIdInput, setExamIdInput] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [items, setItems] = useState<QBItem[]>([]);
   const [subjects, setSubjects] = useState<SubjectDto[]>([]);
@@ -83,6 +89,51 @@ const QuestionBankPage = () => {
   const [error, setError] = useState('');
 
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  const pageItemIds = useMemo(() => items.map((i) => i.id), [items]);
+
+  const subjectById = useMemo(() => {
+    const map = new Map<string, SubjectDto>();
+    subjects.forEach((s) => map.set(s.id, s));
+    return map;
+  }, [subjects]);
+
+  const formatSubjectLabel = (subjectId: string | null) => {
+    if (!subjectId) return '—';
+    const s = subjectById.get(subjectId);
+    if (!s) return '—';
+    return s.code ? `${s.code} — ${s.name}` : s.name;
+  };
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handlePageChange = useCallback((next: number) => {
+    clearSelection();
+    setPage(next);
+  }, [clearSelection]);
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllOnPage = () => {
+    if (pageItemIds.length === 0) return;
+    if (selectedIds.size === pageItemIds.length) {
+      clearSelection();
+      return;
+    }
+    setSelectedIds(new Set(pageItemIds));
+  };
+
+  const allOnPageSelected =
+    pageItemIds.length > 0 && selectedIds.size === pageItemIds.length;
+  const someOnPageSelected =
+    selectedIds.size > 0 && selectedIds.size < pageItemIds.length;
 
   const fetchItems = useCallback(async (f: QBFilter, p: number, limit: number) => {
     if (!accessToken) return;
@@ -129,6 +180,7 @@ const QuestionBankPage = () => {
   }, [fetchSubjects]);
 
   const handleSearch = () => {
+    clearSelection();
     setPage(1);
     setFilter(prev => ({ ...prev, search: search || undefined }));
   };
@@ -136,13 +188,38 @@ const QuestionBankPage = () => {
   const handleDelete = async (id: string) => {
     if (!confirm(t('question_bank.confirm_delete'))) return;
     try {
-      await apiClient.delete(`/question-bank/${id}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      await questionBankApi.remove(id);
       setNotice(t('question_bank.notice_deleted'));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_delete_failed'));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    if (!confirm(t('question_bank.confirm_bulk_delete', { count: ids.length }))) return;
+    setBulkDeleting(true);
+    setError('');
+    try {
+      const { deleted, failed } = await questionBankApi.bulkRemove(ids);
+      clearSelection();
+      if (failed > 0) {
+        setError(t('question_bank.error_bulk_delete_partial', { deleted, failed }));
+      } else {
+        setNotice(t('question_bank.notice_bulk_deleted', { count: deleted }));
+      }
+      void fetchItems(filter, page, pageSize);
+    } catch {
+      setError(t('question_bank.error_delete_failed'));
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -169,18 +246,6 @@ const QuestionBankPage = () => {
       void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_update_failed'));
-    }
-  };
-
-  const handleImportToExam = async (qbId: string, examId: string) => {
-    if (!examId) return;
-    try {
-      await apiClient.post(`/question-bank/${qbId}/import/${examId}`, {}, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setNotice(t('question_bank.notice_imported'));
-    } catch {
-      setError(t('question_bank.error_import_failed'));
     }
   };
 
@@ -308,6 +373,7 @@ const QuestionBankPage = () => {
               disabled={loading || subjects.length === 0}
               value={filter.subject_id ?? null}
               onChange={(id) => {
+                clearSelection();
                 setFilter((prev) => ({ ...prev, subject_id: id ?? undefined }));
                 setPage(1);
               }}
@@ -328,7 +394,7 @@ const QuestionBankPage = () => {
               ]}
               clearable
               value={filter.question_type}
-              onChange={v => { setFilter(prev => ({ ...prev, question_type: v as QuestionType || undefined })); setPage(1); }}
+              onChange={v => { clearSelection(); setFilter(prev => ({ ...prev, question_type: v as QuestionType || undefined })); setPage(1); }}
               w={140}
             />
             <Select
@@ -340,7 +406,7 @@ const QuestionBankPage = () => {
               ]}
               clearable
               value={filter.difficulty}
-              onChange={v => { setFilter(prev => ({ ...prev, difficulty: v as QBDifficulty || undefined })); setPage(1); }}
+              onChange={v => { clearSelection(); setFilter(prev => ({ ...prev, difficulty: v as QBDifficulty || undefined })); setPage(1); }}
               w={140}
             />
             <Button onClick={handleSearch} leftSection={<IconFilter size={14} />}>
@@ -357,20 +423,59 @@ const QuestionBankPage = () => {
               page={page}
               total={total}
               limit={pageSize}
-              onPageChange={setPage}
+              onPageChange={handlePageChange}
               onLimitChange={(next) => {
+                clearSelection();
                 setPageSize(next);
                 setPage(1);
               }}
             />
+            {selectedIds.size > 0 && (
+              <Group
+                px="md"
+                py="xs"
+                gap="sm"
+                wrap="wrap"
+                style={{
+                  borderBottom: '1px solid var(--mantine-color-gray-3)',
+                  background: 'var(--mantine-color-blue-0)',
+                }}
+              >
+                <Text size="sm" fw={600}>
+                  {t('question_bank.selected_count', { count: selectedIds.size })}
+                </Text>
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="red"
+                  leftSection={<IconTrash size={14} />}
+                  loading={bulkDeleting}
+                  onClick={() => void handleBulkDelete()}
+                >
+                  {t('question_bank.bulk_delete')}
+                </Button>
+                <Button size="xs" variant="subtle" onClick={clearSelection}>
+                  {t('common.cancel')}
+                </Button>
+              </Group>
+            )}
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
+                  <Table.Th w={40}>
+                    <Checkbox
+                      size="xs"
+                      checked={allOnPageSelected}
+                      indeterminate={someOnPageSelected}
+                      onChange={toggleAllOnPage}
+                      aria-label={t('pagination.select_all_page')}
+                    />
+                  </Table.Th>
                   <Table.Th>#</Table.Th>
                   <Table.Th>{t('question_bank.col_content')}</Table.Th>
                   <Table.Th>{t('question_bank.col_type')}</Table.Th>
                   <Table.Th>{t('question_bank.col_difficulty')}</Table.Th>
-                  <Table.Th>{t('question_bank.col_tags')}</Table.Th>
+                  <Table.Th>{t('question_bank.col_subject')}</Table.Th>
                   <Table.Th>{t('question_bank.col_points')}</Table.Th>
                   <Table.Th>{t('question_bank.col_usage')}</Table.Th>
                   <Table.Th>{t('question_bank.col_actions')}</Table.Th>
@@ -378,7 +483,18 @@ const QuestionBankPage = () => {
               </Table.Thead>
               <Table.Tbody>
                 {items.map((item, idx) => (
-                  <Table.Tr key={item.id}>
+                  <Table.Tr
+                    key={item.id}
+                    bg={selectedIds.has(item.id) ? 'var(--mantine-color-blue-0)' : undefined}
+                  >
+                    <Table.Td>
+                      <Checkbox
+                        size="xs"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleOne(item.id)}
+                        aria-label={t('question_bank.col_content')}
+                      />
+                    </Table.Td>
                     <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                     <Table.Td style={{ maxWidth: 400 }}>
                       <Text size="sm" lineClamp={2}>{item.content}</Text>
@@ -393,15 +509,23 @@ const QuestionBankPage = () => {
                         {DIFFICULTY_LABELS[item.difficulty]}
                       </Badge>
                     </Table.Td>
-                    <Table.Td>
-                      <Group gap={4}>
-                        {item.tags.slice(0, 2).map(tag => (
-                          <Badge key={tag} size="xs" variant="light">{tag}</Badge>
-                        ))}
-                        {item.tags.length > 2 && (
-                          <Badge size="xs" variant="light">+{item.tags.length - 2}</Badge>
-                        )}
-                      </Group>
+                    <Table.Td style={{ maxWidth: 220 }}>
+                      {(() => {
+                        const full = formatSubjectLabel(item.subject_id);
+                        const { display, truncated } = truncateWithEllipsis(full, SUBJECT_LABEL_MAX_LEN);
+                        const label = (
+                          <Text size="sm" component="span" style={{ cursor: truncated ? 'help' : undefined }}>
+                            {display}
+                          </Text>
+                        );
+                        return truncated ? (
+                          <Tooltip label={full} multiline w={320} withArrow>
+                            {label}
+                          </Tooltip>
+                        ) : (
+                          label
+                        );
+                      })()}
                     </Table.Td>
                     <Table.Td><Text size="sm">{item.points}</Text></Table.Td>
                     <Table.Td><Text size="sm" c="dimmed">{item.usage_count}</Text></Table.Td>
@@ -421,22 +545,13 @@ const QuestionBankPage = () => {
                             <IconTrash size={16} />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label={t('question_bank.add_to_exam')}>
-                          <ActionIcon variant="subtle" color="teal" onClick={() => {
-                            setImportingQbId(item.id);
-                            setExamIdInput('');
-                            setExamIdInputOpen(true);
-                          }}>
-                            <IconDownload size={16} />
-                          </ActionIcon>
-                        </Tooltip>
                       </Group>
                     </Table.Td>
                   </Table.Tr>
                 ))}
                 {items.length === 0 && (
                   <Table.Tr>
-                    <Table.Td colSpan={8}>
+                    <Table.Td colSpan={9}>
                       <Text c="dimmed" ta="center">{t('question_bank.empty')}</Text>
                     </Table.Td>
                   </Table.Tr>
@@ -477,47 +592,6 @@ const QuestionBankPage = () => {
         />
       )}
 
-      {/* Import to exam ID input modal */}
-      <Modal
-        opened={examIdInputOpen}
-        onClose={() => setExamIdInputOpen(false)}
-        title={t('question_bank.import_exam_modal_title')}
-        size="sm"
-        centered
-      >
-        <Stack gap="sm">
-          <TextInput
-            label={t('question_bank.exam_id_label')}
-            placeholder={t('question_bank.exam_id_placeholder')}
-            value={examIdInput}
-            onChange={(e) => setExamIdInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && examIdInput.trim()) {
-                void handleImportToExam(importingQbId!, examIdInput.trim());
-                setExamIdInputOpen(false);
-              }
-            }}
-            autoFocus
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setExamIdInputOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              color="teal"
-              disabled={!examIdInput.trim()}
-              onClick={() => {
-                if (importingQbId && examIdInput.trim()) {
-                  void handleImportToExam(importingQbId, examIdInput.trim());
-                  setExamIdInputOpen(false);
-                }
-              }}
-            >
-              {t('question_bank.confirm_import')}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </Box>
   );
 };
@@ -539,7 +613,6 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
     initial?.options ?? { A: '', B: '', C: '', D: '' }
   );
   const [correctAnswer, setCorrectAnswer] = useState<string>('');
-  const [tags, setTags] = useState(initial?.tags?.join(', ') ?? '');
   const [chapter, setChapter] = useState<number | ''>(initial?.chapter ?? '');
   const [subjectId, setSubjectId] = useState<string | null>(initial?.subject_id ?? subjects[0]?.id ?? null);
 
@@ -556,7 +629,7 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
       subject_id: subjectId ?? undefined,
       options: parsedOptions,
       correct_answer: parsedCorrect,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+      tags: [],
       chapter: chapter === '' ? undefined : Number(chapter),
     });
   };
@@ -623,15 +696,7 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
           />
         </>
       )}
-      <Group grow>
-        <NumberInput label={t('question_bank.form_chapter')} value={chapter} onChange={v => setChapter(v === '' ? '' : Number(v))} min={1} />
-        <TextInput
-          label={t('question_bank.form_tags')}
-          value={tags}
-          onChange={e => setTags(e.target.value)}
-          placeholder="python, loop, function"
-        />
-      </Group>
+      <NumberInput label={t('question_bank.form_chapter')} value={chapter} onChange={v => setChapter(v === '' ? '' : Number(v))} min={1} />
       <Group justify="flex-end" mt="sm">
         <Button variant="default" onClick={onCancel}>{t('common.cancel')}</Button>
         <Button onClick={handleSubmit} color="teal">{t('common.save')}</Button>

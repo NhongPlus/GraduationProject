@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { fetchPaginatedList, fetchAllListItems, type ListQueryParams, type PaginatedList } from './listApi';
 
 export interface SubjectDto {
   id: string;
@@ -27,10 +28,10 @@ export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
 };
 
 const subjectApi = {
-  getSubjects: async (): Promise<SubjectDto[]> => {
-    const res = await apiClient.get<{ success: boolean; data: SubjectDto[] }>('/subjects');
-    return res.data.data;
-  },
+  listSubjects: async (params: ListQueryParams = {}): Promise<PaginatedList<SubjectDto>> =>
+    fetchPaginatedList<SubjectDto>('/subjects', params),
+
+  getSubjects: async (): Promise<SubjectDto[]> => fetchAllListItems<SubjectDto>('/subjects'),
   createSubject: async (data: Partial<SubjectDto>): Promise<SubjectDto> => {
     const res = await apiClient.post<{ success: boolean; data: SubjectDto }>('/subjects', data);
     return res.data.data;

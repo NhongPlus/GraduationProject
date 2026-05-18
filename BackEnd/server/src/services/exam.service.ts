@@ -1,5 +1,6 @@
 import {
   getAllExams,
+  queryExamsPaginated,
   getExamsByClass,
   getExamsByAdminClass,
   getExamById,
@@ -88,6 +89,12 @@ export function httpError(status: number, message: string): Error & { status: nu
 }
 
 export const listExams = async (): Promise<ExamDetail[]> => getAllExams();
+
+export const listExamsPaginated = async (
+  filter: { class_id?: string; admin_class_id?: string; search?: string },
+  limit: number,
+  offset: number
+) => queryExamsPaginated(filter, limit, offset);
 export const listExamsByClass = async (classId: string): Promise<Exam[]> =>
   getExamsByClass(classId);
 export const listExamsByAdminClass = async (adminClassId: string): Promise<Exam[]> =>

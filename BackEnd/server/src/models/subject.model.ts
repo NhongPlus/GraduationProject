@@ -18,6 +18,40 @@ export const getAllSubjects = async (): Promise<Subject[]> => {
   return result.rows;
 };
 
+export const querySubjectsPaginated = async (
+  limit: number,
+  offset: number,
+  search?: string
+): Promise<{ items: Subject[]; total: number }> => {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (search?.trim()) {
+    conditions.push(
+      `(name ILIKE $${idx} OR code ILIKE $${idx} OR category ILIKE $${idx})`
+    );
+    values.push(`%${search.trim()}%`);
+    idx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM subjects ${where}`,
+    values
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const result = await pool.query(
+    `SELECT * FROM subjects ${where}
+     ORDER BY semester ASC, name ASC
+     LIMIT $${idx++} OFFSET $${idx++}`,
+    [...values, limit, offset]
+  );
+  return { items: result.rows as Subject[], total };
+};
+
 export const getSubjectById = async (id: string): Promise<Subject | null> => {
   const result = await pool.query(
     "SELECT * FROM subjects WHERE id = $1",

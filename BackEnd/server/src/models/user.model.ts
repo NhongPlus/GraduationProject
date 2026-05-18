@@ -47,6 +47,44 @@ export const getAllUsers = async (): Promise<PublicUser[]> => {
   return result.rows;
 };
 
+export const queryUsersPaginated = async (
+  limit: number,
+  offset: number,
+  opts?: { role?: UserRole; search?: string }
+): Promise<{ items: PublicUser[]; total: number }> => {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (opts?.role) {
+    conditions.push(`role = $${idx++}`);
+    values.push(opts.role);
+  }
+  if (opts?.search?.trim()) {
+    conditions.push(
+      `(email ILIKE $${idx} OR username ILIKE $${idx} OR COALESCE(full_name, '') ILIKE $${idx})`
+    );
+    values.push(`%${opts.search.trim()}%`);
+    idx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const baseSelect =
+    "SELECT id, email, username, role, full_name, is_active, created_at, updated_at FROM accounts";
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM accounts ${where}`,
+    values
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const result = await pool.query(
+    `${baseSelect} ${where} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+    [...values, limit, offset]
+  );
+  return { items: result.rows as PublicUser[], total };
+};
+
 export const createUser = async (
   email: string,
   username: string,

@@ -1,5 +1,11 @@
 import apiClient from './apiClient';
 import type { ForceSubmitSummary } from './examRealtimeSocket';
+import {
+  fetchPaginatedList,
+  fetchAllListItems,
+  type ListQueryParams,
+  type PaginatedList,
+} from './listApi';
 
 export type { ForceSubmitSummary };
 
@@ -243,12 +249,17 @@ export interface PredictionRecomputeSummary {
 }
 
 const examApi = {
+  listExams: async (params: ListQueryParams & { class_id?: string; admin_class_id?: string } = {}): Promise<PaginatedList<Exam>> => {
+    const query: ListQueryParams = { ...params };
+    return fetchPaginatedList<Exam>('/exams', query);
+  },
+
+  /** Lấy tối đa 500 đề — dùng cho dashboard/filter client-side */
   getExams: async (classId?: string, extraParams?: Record<string, string>): Promise<Exam[]> => {
     const params: Record<string, string> = {};
     if (classId) params.class_id = classId;
     if (extraParams) Object.assign(params, extraParams);
-    const res = await apiClient.get<{ success: boolean; data: Exam[] }>('/exams', { params });
-    return res.data.data;
+    return fetchAllListItems<Exam>('/exams', params);
   },
 
   getExam: async (id: string): Promise<Exam> => {
@@ -420,12 +431,24 @@ const examApi = {
     return res.data.data;
   },
 
-  getExamSessions: async (examId: string, params?: { page?: number; limit?: number }): Promise<ExamSession[]> => {
-    const query = params ? `?page=${params.page ?? 1}&limit=${params.limit ?? 20}` : '';
-    const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
-      `/exams/${examId}/sessions${query}`
-    );
-    return res.data.data;
+  listExamSessions: async (
+    examId: string,
+    params: ListQueryParams = {}
+  ): Promise<PaginatedList<ExamSession>> =>
+    fetchPaginatedList<ExamSession>(`/exams/${examId}/sessions`, params),
+
+  getExamSessions: async (
+    examId: string,
+    params?: { page?: number; limit?: number; offset?: number }
+  ): Promise<ExamSession[]> => {
+    const limit = params?.limit ?? 500;
+    const offset =
+      params?.offset ?? (params?.page != null ? (params.page - 1) * limit : 0);
+    const result = await fetchPaginatedList<ExamSession>(`/exams/${examId}/sessions`, {
+      limit,
+      offset,
+    });
+    return result.items;
   },
 
   forceSubmitExam: async (examId: string): Promise<ForceSubmitSummary> => {

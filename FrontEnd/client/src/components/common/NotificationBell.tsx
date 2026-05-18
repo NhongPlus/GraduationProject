@@ -40,7 +40,7 @@ export default function NotificationBell() {
         getNotifications({ limit: 10 }),
         getUnreadCount(),
       ]);
-      setNotifications(listRes.data);
+      setNotifications(listRes.items);
       setUnreadCount(countRes);
     } catch (err) {
       // Non-critical — but log so deploy/DB issues are visible in DevTools

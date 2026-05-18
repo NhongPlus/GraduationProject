@@ -129,11 +129,17 @@ export const resetPassword = async (token: string, password: string): Promise<vo
   await apiClient.post("/auth/reset-password", { token, password });
 };
 
-export const getPendingPasswordResets = async (): Promise<PasswordResetRequestItem[]> => {
-  const res = await apiClient.get<{ success: boolean; data: PasswordResetRequestItem[] }>(
-    "/password-reset/pending"
+export const getPendingPasswordResets = async (params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<PasswordResetRequestItem[]> => {
+  const res = await apiClient.get<{ success: boolean; data: unknown }>(
+    "/password-reset/pending",
+    { params }
   );
-  return res.data.data;
+  const body = res.data.data;
+  if (Array.isArray(body)) return body as PasswordResetRequestItem[];
+  return (body as { items: PasswordResetRequestItem[] }).items ?? [];
 };
 
 export const createPasswordResetRequest = async (userId: string): Promise<{ requestId: string }> => {

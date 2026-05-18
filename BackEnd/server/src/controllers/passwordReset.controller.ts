@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import {
   requestPasswordReset,
-  getPendingResetRequestsService,
+  listPendingResetRequestsPaginated,
   approveResetRequest,
   rejectResetRequest,
   getMyResetRequests,
 } from "~/services/passwordReset.service";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 export const createResetRequestController = async (
   req: Request,
@@ -31,8 +32,12 @@ export const getPendingResetRequestsController = async (
   next: NextFunction
 ) => {
   try {
-    const data = await getPendingResetRequestsService();
-    res.json({ success: true, data });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const result = await listPendingResetRequestsPaginated(limit, offset);
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err: any) {
     next(err);
   }

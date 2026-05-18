@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { fetchPaginatedList, type ListQueryParams, type PaginatedList } from './listApi';
 
 export type UserRole = 'admin' | 'teacher' | 'student';
 
@@ -14,9 +15,16 @@ export interface UserAccount {
 }
 
 const userApi = {
-  getUsers: async (): Promise<UserAccount[]> => {
-    const res = await apiClient.get<{ success: boolean; data: UserAccount[] }>('/users');
-    return res.data.data;
+  listUsers: async (params: ListQueryParams & { role?: UserRole } = {}): Promise<PaginatedList<UserAccount>> =>
+    fetchPaginatedList<UserAccount>('/users', params),
+
+  getUsers: async (params?: { role?: UserRole; limit?: number }): Promise<UserAccount[]> => {
+    const result = await fetchPaginatedList<UserAccount>('/users', {
+      limit: params?.limit ?? 500,
+      offset: 0,
+      role: params?.role,
+    });
+    return result.items;
   },
 
   getUser: async (id: string): Promise<UserAccount> => {

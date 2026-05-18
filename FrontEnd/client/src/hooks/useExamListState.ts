@@ -39,8 +39,7 @@ export function useExamListState(opts: {
       setError('');
       setNotice('');
 
-      const examData = await examApi.getExams();
-      const fetchedExams = Array.isArray(examData) ? examData : examData.data ?? [];
+      const fetchedExams = await examApi.getExams();
       setExams(fetchedExams);
       setRuntimeActiveByExam(
         Object.fromEntries(

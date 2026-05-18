@@ -10,6 +10,7 @@ import {
   importToExam,
 } from "~/models/questionBank.model";
 import type { QuestionBankFilter } from "~/models/questionBank.model";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 const router = Router();
 
@@ -29,22 +30,14 @@ router.get("/", async (req, res, next) => {
       created_by: req.query.created_by as string | undefined,
     };
 
-    const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
-    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>, {
+      maxLimit: 100,
+    });
 
     const result = await getQuestionBankItems(filter, limit, offset);
-    const totalPages = result.total > 0 ? Math.ceil(result.total / limit) : 1;
-    const page = limit > 0 ? Math.floor(offset / limit) + 1 : 1;
     res.json({
       success: true,
-      data: {
-        items: result.items,
-        total: result.total,
-        limit,
-        offset,
-        page,
-        total_pages: totalPages,
-      },
+      data: buildPaginatedList(result.items, result.total, limit, offset),
     });
   } catch (err) {
     next(err);

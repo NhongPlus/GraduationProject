@@ -10,6 +10,34 @@ export type PaginationMeta = {
   total_pages: number;
 };
 
+export type PaginatedList<T> = PaginationMeta & {
+  items: T[];
+};
+
+/** Chuẩn hóa `data` từ API list — hỗ trợ cả mảng thuần (legacy) và `{ items, total, … }` */
+export function unwrapPaginatedData<T>(data: unknown): PaginatedList<T> {
+  if (Array.isArray(data)) {
+    const items = data as T[];
+    return {
+      items,
+      ...buildPaginationMeta(items.length, items.length || 1, 0),
+    };
+  }
+  const body = data as Partial<PaginatedList<T>> & { items?: T[] };
+  const items = body.items ?? [];
+  const total = body.total ?? items.length;
+  const limit = body.limit ?? (items.length || DEFAULT_PAGE_SIZE);
+  const offset = body.offset ?? 0;
+  return {
+    items,
+    total,
+    limit,
+    offset,
+    page: body.page ?? Math.floor(offset / Math.max(1, limit)) + 1,
+    total_pages: body.total_pages ?? calcTotalPages(total, limit),
+  };
+}
+
 export function pageToOffset(page: number, limit = DEFAULT_PAGE_SIZE): number {
   return Math.max(0, (Math.max(1, page) - 1) * limit);
 }

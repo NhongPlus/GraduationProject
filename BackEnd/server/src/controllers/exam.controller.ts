@@ -2,9 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Request, Response, NextFunction } from "express";
 import {
-  listExams,
-  listExamsByClass,
-  listExamsByAdminClass,
+  listExamsPaginated,
   getExam,
   createExamService,
   updateExamService,
@@ -32,8 +30,9 @@ import {
 } from "~/services/exam.service";
 import { parseExamImportDocx, aiRecomposeExam } from "~/services/examImport.service";
 import { getIntegrityEventsByExam } from "~/models/examIntegrity.model";
-import { getActivePresenceByExam, getProctorLogsByExam } from "~/models/examProctor.model";
-import { getSessionsByExamWithStudent } from "~/models/examsession.model";
+import { getActivePresenceByExam, queryProctorLogsByExamPaginated } from "~/models/examProctor.model";
+import { querySessionsByExamPaginated } from "~/models/examsession.model";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 import { uploadMediaBuffer } from "~/services/cloudinary.service";
 import { emitForceSubmitNotification, startExamRuntimeFromServer, emitViolationConfirmed } from "~/socket/examSocket";
 import { auditGradeSession, auditForceSubmit } from "~/services/auditHelpers";
@@ -41,13 +40,19 @@ import type { QuestionType } from "~/models/question.model";
 
 export const getExamListController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { class_id, admin_class_id } = req.query;
-    const data = admin_class_id
-      ? await listExamsByAdminClass(String(admin_class_id))
-      : class_id
-        ? await listExamsByClass(String(class_id))
-        : await listExams();
-    res.json({ success: true, data });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const class_id = req.query.class_id as string | undefined;
+    const admin_class_id = req.query.admin_class_id as string | undefined;
+    const search = req.query.search as string | undefined;
+    const result = await listExamsPaginated(
+      { class_id, admin_class_id, search },
+      limit,
+      offset
+    );
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err) {
     next(err);
   }
@@ -351,8 +356,12 @@ export const getMySessionsController = async (req: Request, res: Response, next:
 
 export const getExamSessionsController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await getSessionsByExamWithStudent(req.params.examId);
-    res.json({ success: true, data });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const result = await querySessionsByExamPaginated(req.params.examId, limit, offset);
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err) {
     next(err);
   }
@@ -530,10 +539,15 @@ export const getProctorLogsController = async (
   next: NextFunction
 ) => {
   try {
-    const limit = req.query.limit ? Number(req.query.limit) : 500;
-    const offset = req.query.offset ? Number(req.query.offset) : 0;
-    const logs = await getProctorLogsByExam(req.params.examId, { limit, offset });
-    res.json({ success: true, data: logs });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>, {
+      defaultLimit: 50,
+      maxLimit: 500,
+    });
+    const result = await queryProctorLogsByExamPaginated(req.params.examId, limit, offset);
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err) {
     next(err);
   }

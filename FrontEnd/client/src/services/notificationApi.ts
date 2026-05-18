@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { unwrapPaginatedData, type PaginatedList } from '@/utils/pagination';
 
 export interface UserNotificationItem {
   id: string;
@@ -11,14 +12,9 @@ export interface UserNotificationItem {
   created_at: string;
 }
 
-export interface NotificationListResponse {
+export type NotificationListResult = PaginatedList<UserNotificationItem> & {
   success: boolean;
-  data: UserNotificationItem[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+};
 
 export interface NotificationCountResponse {
   success: boolean;
@@ -28,9 +24,10 @@ export interface NotificationCountResponse {
 export const getNotifications = async (params?: {
   page?: number;
   limit?: number;
-}): Promise<NotificationListResponse> => {
-  const res = await apiClient.get<NotificationListResponse>('/notifications', { params });
-  return res.data;
+}): Promise<NotificationListResult> => {
+  const res = await apiClient.get<{ success: boolean; data: unknown }>('/notifications', { params });
+  const list = unwrapPaginatedData<UserNotificationItem>(res.data.data);
+  return { success: res.data.success, ...list };
 };
 
 export const getUnreadCount = async (): Promise<number> => {

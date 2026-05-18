@@ -1,17 +1,24 @@
 import { Request, Response, NextFunction } from "express";
 import {
-  getUsers,
+  listUsersPaginated,
   getUserDetail,
   createUserService,
   updateUserService,
   deleteUserService,
 } from "~/services/user.service";
 import { changePasswordService } from "~/services/auth.service";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 export const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const users = await getUsers();
-    res.json({ success: true, data: users });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const role = req.query.role as "admin" | "teacher" | "student" | undefined;
+    const search = req.query.search as string | undefined;
+    const result = await listUsersPaginated(limit, offset, { role, search });
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err) { next(err); }
 };
 

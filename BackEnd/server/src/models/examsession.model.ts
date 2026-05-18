@@ -231,3 +231,26 @@ export const getSessionsByExamWithStudent = async (
   );
   return result.rows as SessionWithStudent[];
 };
+
+export const querySessionsByExamPaginated = async (
+  examId: string,
+  limit: number,
+  offset: number
+): Promise<{ items: SessionWithStudent[]; total: number }> => {
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM exam_sessions WHERE exam_id = $1`,
+    [examId]
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const result = await pool.query(
+    `SELECT es.*, a.full_name AS student_name, a.email AS student_email
+     FROM exam_sessions es
+     JOIN accounts a ON a.id = es.student_id
+     WHERE es.exam_id = $1
+     ORDER BY es.created_at ASC
+     LIMIT $2 OFFSET $3`,
+    [examId, limit, offset]
+  );
+  return { items: result.rows as SessionWithStudent[], total };
+};

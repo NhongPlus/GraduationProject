@@ -3,13 +3,14 @@ import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 import {
   createSubject,
-  getAllSubjects,
+  querySubjectsPaginated,
   getSubjectById,
   updateSubject,
   deleteSubject,
   type CreateSubjectInput,
   type UpdateSubjectInput,
 } from "~/models/subject.model";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 const router = Router();
 
@@ -20,8 +21,13 @@ router.use(roleMiddleware(["admin", "teacher"]));
 // GET /v1/subjects — list all
 router.get("/", async (req, res, next) => {
   try {
-    const subjects = await getAllSubjects();
-    res.json({ success: true, data: subjects });
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const search = req.query.search as string | undefined;
+    const result = await querySubjectsPaginated(limit, offset, search);
+    res.json({
+      success: true,
+      data: buildPaginatedList(result.items, result.total, limit, offset),
+    });
   } catch (err) {
     next(err);
   }

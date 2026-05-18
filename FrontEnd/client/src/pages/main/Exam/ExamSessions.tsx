@@ -9,7 +9,7 @@ import type { ExamSession } from '@/services/examApi';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import PageHeader from '@/components/PageHeader/PageHeader';
 import { ListPaginationBar } from '@/components/ListPagination';
-import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
+import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
 const ExamSessions = () => {
   const { t } = useTranslation();
@@ -20,15 +20,24 @@ const ExamSessions = () => {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [sessionStats, setSessionStats] = useState<ExamSession[]>([]);
 
   useEffect(() => {
     if (!examId) return;
     const load = async () => {
       try {
         setLoading(true);
-        const data = await examApi.getExamSessions(examId);
-        setSessions(data);
-        setPage(1);
+        const pageData = await examApi.listExamSessions(examId, {
+          limit: pageSize,
+          offset: pageToOffset(page, pageSize),
+        });
+        setSessions(pageData.items);
+        setTotal(pageData.total);
+        if (page === 1) {
+          const all = await examApi.listExamSessions(examId, { limit: 500, offset: 0 });
+          setSessionStats(all.items);
+        }
       } catch {
         setError(t('errors.session_list_failed'));
       } finally {
@@ -36,12 +45,9 @@ const ExamSessions = () => {
       }
     };
     void load();
-  }, [examId, t]);
+  }, [examId, page, pageSize, t]);
 
-  const paginatedSessions = useMemo(
-    () => slicePage(sessions, page, pageSize),
-    [sessions, page, pageSize]
-  );
+  const statsSource = sessionStats.length > 0 ? sessionStats : sessions;
 
   if (loading) {
     return (
@@ -59,10 +65,10 @@ const ExamSessions = () => {
     );
   }
 
-  const pendingGrading = sessions.filter((s) => s.grading_status === 'pending_manual');
+  const pendingGrading = statsSource.filter((s) => s.grading_status === 'pending_manual');
   const versionCountLabel = (() => {
     const map = new Map<string, number>();
-    for (const s of sessions) {
+    for (const s of statsSource) {
       const code = s.version_code ?? '—';
       map.set(code, (map.get(code) ?? 0) + 1);
     }
@@ -81,8 +87,8 @@ const ExamSessions = () => {
           accent="teal"
           action={
             <Group gap="xs">
-              <Badge color="blue" size="lg">{sessions.length} {t('exam_sessions.total')}</Badge>
-              {sessions.length > 0 && versionCountLabel && (
+              <Badge color="blue" size="lg">{total} {t('exam_sessions.total')}</Badge>
+              {total > 0 && versionCountLabel && (
                 <Badge color="violet" size="lg" variant="light">
                   {versionCountLabel}
                 </Badge>
@@ -100,7 +106,7 @@ const ExamSessions = () => {
         <Paper withBorder radius="md">
           <ListPaginationBar
             page={page}
-            total={sessions.length}
+              total={total}
             limit={pageSize}
             onPageChange={setPage}
             onLimitChange={(next) => {
@@ -122,7 +128,7 @@ const ExamSessions = () => {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {paginatedSessions.map((session, idx) => (
+              {sessions.map((session, idx) => (
                 <Table.Tr key={session.id}>
                   <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                   <Table.Td>

@@ -64,6 +64,36 @@ export const getPendingResetRequests = async (): Promise<
   return result.rows as PasswordResetRequestWithUser[];
 };
 
+const pendingResetBaseSql = `
+  FROM password_reset_requests pr
+  JOIN accounts u ON u.id = pr.user_id
+  JOIN accounts rb ON rb.id = pr.requested_by
+  LEFT JOIN accounts apb ON apb.id = pr.approved_by
+  WHERE pr.status = 'pending' AND pr.expires_at > NOW()
+`;
+
+export const queryPendingResetRequestsPaginated = async (
+  limit: number,
+  offset: number
+): Promise<{ items: PasswordResetRequestWithUser[]; total: number }> => {
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total ${pendingResetBaseSql}`
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const result = await pool.query(
+    `SELECT pr.*,
+            u.full_name AS user_full_name, u.email AS user_email,
+            rb.full_name AS requested_by_full_name,
+            apb.full_name AS approved_by_full_name
+     ${pendingResetBaseSql}
+     ORDER BY pr.created_at DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+  return { items: result.rows as PasswordResetRequestWithUser[], total };
+};
+
 export const getResetRequestsByUser = async (
   userId: string
 ): Promise<PasswordResetRequest[]> => {

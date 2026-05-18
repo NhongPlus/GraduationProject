@@ -2,6 +2,7 @@ import { httpError } from "~/services/exam.service";
 import {
   createPasswordResetRequest,
   getPendingResetRequests,
+  queryPendingResetRequestsPaginated,
   getResetRequestsByUser,
   getPasswordResetRequestById,
   updateResetRequestStatus,
@@ -44,6 +45,9 @@ export const requestPasswordReset = async (
 export const getPendingResetRequestsService = async () => {
   return getPendingResetRequests();
 };
+
+export const listPendingResetRequestsPaginated = async (limit: number, offset: number) =>
+  queryPendingResetRequestsPaginated(limit, offset);
 
 export const approveResetRequest = async (
   requestId: string,

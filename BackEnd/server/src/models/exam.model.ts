@@ -49,6 +49,57 @@ export const getAllExams = async (): Promise<ExamDetail[]> => {
   return result.rows;
 };
 
+export interface ExamListFilter {
+  class_id?: string;
+  admin_class_id?: string;
+  search?: string;
+}
+
+export const queryExamsPaginated = async (
+  filter: ExamListFilter,
+  limit: number,
+  offset: number
+): Promise<{ items: ExamDetail[]; total: number }> => {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (filter.admin_class_id) {
+    conditions.push(`e.admin_class_id = $${idx++}`);
+    values.push(filter.admin_class_id);
+  }
+  if (filter.class_id) {
+    conditions.push(`e.class_id = $${idx++}`);
+    values.push(filter.class_id);
+  }
+  if (filter.search?.trim()) {
+    conditions.push(
+      `(e.title ILIKE $${idx} OR COALESCE(s.name, s2.name) ILIKE $${idx} OR COALESCE(s.code, s2.code) ILIKE $${idx})`
+    );
+    values.push(`%${filter.search.trim()}%`);
+    idx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM exams e
+     LEFT JOIN subjects s ON s.id = e.subject_id
+     LEFT JOIN classes c ON c.id = e.class_id
+     LEFT JOIN subjects s2 ON s2.id = c.subject_id
+     ${where}`,
+    values
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const result = await pool.query(
+    `${examSelectBase} ${where} ORDER BY e.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+    [...values, limit, offset]
+  );
+  return { items: result.rows as ExamDetail[], total };
+};
+
 export const getExamsByAdminClass = async (adminClassId: string): Promise<Exam[]> => {
   const result = await pool.query(
     "SELECT * FROM exams WHERE admin_class_id = $1 ORDER BY created_at DESC",

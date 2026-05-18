@@ -11,6 +11,7 @@ import {
   markAllNotificationsRead,
   type NotificationType,
 } from "~/models/userNotification.model";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 function asNotificationType(kind: "info" | "warning" | "exam"): NotificationType {
   if (kind === "warning") return "warning";
@@ -24,19 +25,15 @@ notificationRouter.use(authMiddleware);
 // GET /notifications  → paginated in-app notifications for the current user
 notificationRouter.get("/", async (req, res) => {
   const userId = (req as any).user?.userId;
-  const page = Math.max(1, Number(req.query["page"]) || 1);
-  const limit = Math.min(50, Math.max(1, Number(req.query["limit"]) || 20));
-  const offset = (page - 1) * limit;
+  const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>, {
+    maxLimit: 50,
+  });
 
   try {
     const { notifications, total } = await getNotificationsByUser(userId, limit, offset);
     res.json({
       success: true,
-      data: notifications,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      data: buildPaginatedList(notifications, total, limit, offset),
     });
   } catch (err: any) {
     console.error("notificationRouter error:", err?.message ?? err);

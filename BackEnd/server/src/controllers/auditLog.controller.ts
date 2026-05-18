@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuditLogsService } from "~/services/auditLog.service";
+import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 export const getAuditLogsController = async (
   req: Request,
@@ -7,6 +8,9 @@ export const getAuditLogsController = async (
   next: NextFunction
 ) => {
   try {
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>, {
+      defaultLimit: 50,
+    });
     const filter = {
       action: req.query.action as any,
       actor_id: req.query.actor_id as string | undefined,
@@ -14,11 +18,12 @@ export const getAuditLogsController = async (
       resource_id: req.query.resource_id as string | undefined,
       from_date: req.query.from_date as string | undefined,
       to_date: req.query.to_date as string | undefined,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
-      offset: req.query.offset ? Number(req.query.offset) : 0,
+      limit,
+      offset,
     };
     const result = await getAuditLogsService(filter);
-    res.json({ success: true, ...result });
+    const data = buildPaginatedList(result.logs, result.total, limit, offset);
+    res.json({ success: true, data });
   } catch (err: any) {
     next(err);
   }

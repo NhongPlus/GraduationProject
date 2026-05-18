@@ -6,7 +6,8 @@ import {
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '@tabler/icons-react';
 import { ListPaginationBar } from '@/components/ListPagination';
-import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
+import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
+import subjectApi from '@/services/subjectApi';
 import apiClient from '@/services/apiClient';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -79,22 +80,31 @@ const SubjectManagementPage = () => {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
     try {
       setLoading(true);
-      const res = await apiClient.get<{ success: boolean; data: Subject[] }>(
-        '/subjects',
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      setSubjects(res.data.data);
+      const data = await subjectApi.listSubjects({
+        limit: pageSize,
+        offset: pageToOffset(page, pageSize),
+        search: debouncedSearch || undefined,
+      });
+      setSubjects(data.items as Subject[]);
+      setTotal(data.total);
     } catch {
       setError('Không tải được danh sách môn học.');
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     void fetchSubjects();
@@ -139,13 +149,6 @@ const SubjectManagementPage = () => {
     }
   };
 
-  const filtered = subjects.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.code.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const paginated = slicePage(filtered, page, pageSize);
-
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
       <Stack gap="md">
@@ -176,7 +179,7 @@ const SubjectManagementPage = () => {
             <Paper withBorder radius="md">
             <ListPaginationBar
               page={page}
-              total={filtered.length}
+              total={total}
               limit={pageSize}
               onPageChange={setPage}
               onLimitChange={(next) => {
@@ -197,7 +200,7 @@ const SubjectManagementPage = () => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {paginated.map(subject => (
+                {subjects.map(subject => (
                   <Table.Tr key={subject.id}>
                     <Table.Td><Text fw={500}>{subject.name}</Text></Table.Td>
                     <Table.Td><Text size="sm" c="dimmed">{subject.code || '—'}</Text></Table.Td>
@@ -229,7 +232,7 @@ const SubjectManagementPage = () => {
                     </Table.Td>
                   </Table.Tr>
                 ))}
-                {paginated.length === 0 && (
+                {subjects.length === 0 && (
                   <Table.Tr>
                     <Table.Td colSpan={7}>
                       <Text c="dimmed" ta="center">Chưa có môn học nào</Text>
