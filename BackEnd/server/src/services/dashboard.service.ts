@@ -8,6 +8,7 @@ import {
   getTeacherOverview,
   getRecentStudents,
   getTeacherRecentSessions,
+  getTeacherRecentStudents,
   getAdminRecentSessions,
 } from "~/models/dashboard.model";
 import { isPastClosesAt } from "~/utils/examStartDeadline";
@@ -266,7 +267,13 @@ export const buildStaffDashboard = async (
   }
 
   const o = await getTeacherOverview(userId);
-  const recent_activity = await getTeacherRecentSessions(userId, 12);
+  const recent_activity = await getTeacherRecentSessions(userId, 20);
+  const recent_students = (await getTeacherRecentStudents(userId, 10)).map((r) => ({
+    id: r.id,
+    full_name: r.full_name,
+    username: r.username,
+    email: r.email,
+  }));
   return {
     viewer: "teacher",
     metrics: [
@@ -275,7 +282,7 @@ export const buildStaffDashboard = async (
       { key: "students", label_key: "dashboard.metric.my_students", value: o.total_students },
       { key: "sessions", label_key: "dashboard.metric.my_sessions", value: o.total_sessions },
     ],
-    recent_students: [],
+    recent_students,
     recent_activity,
   };
 };

@@ -235,21 +235,32 @@ export const getAdminOverview = async (): Promise<StaffOverviewRow> => {
   );
 };
 
+/** Đề thi thuộc phạm vi GV: chủ nhiệm lớp HC, người tạo, hoặc cộng tác viên. */
+const TEACHER_EXAM_SCOPE_SQL = `
+  e.created_by = $1
+  OR EXISTS (
+    SELECT 1 FROM admin_classes ac
+    WHERE ac.id = e.admin_class_id AND ac.manager_teacher_id = $1
+  )
+  OR EXISTS (
+    SELECT 1 FROM exam_collaborators ec
+    WHERE ec.exam_id = e.id AND ec.teacher_id = $1
+  )
+`;
+
 export const getTeacherOverview = async (teacherId: string): Promise<StaffOverviewRow> => {
   const r = await pool.query<StaffOverviewRow>(
     `
     SELECT
-      (SELECT COUNT(*)::int FROM classes WHERE teacher_id = $1) AS total_classes,
-      (SELECT COUNT(*)::int FROM exams e
-        JOIN classes c ON c.id = e.class_id
-        WHERE c.teacher_id = $1) AS total_exams,
-      (SELECT COUNT(DISTINCT en.student_id)::int FROM enrollments en
-        JOIN classes c ON c.id = en.class_id
-        WHERE c.teacher_id = $1) AS total_students,
+      (SELECT COUNT(*)::int FROM admin_classes WHERE manager_teacher_id = $1) AS total_classes,
+      (SELECT COUNT(*)::int FROM exams e WHERE ${TEACHER_EXAM_SCOPE_SQL}) AS total_exams,
+      (SELECT COUNT(*)::int FROM accounts s
+        WHERE s.role = 'student'
+          AND s.admin_class_id IN (
+            SELECT id FROM admin_classes WHERE manager_teacher_id = $1
+          )) AS total_students,
       (SELECT COUNT(*)::int FROM exam_sessions es
-        JOIN exams e ON e.id = es.exam_id
-        JOIN classes c ON c.id = e.class_id
-        WHERE c.teacher_id = $1) AS total_sessions,
+        WHERE es.exam_id IN (SELECT e.id FROM exams e WHERE ${TEACHER_EXAM_SCOPE_SQL})) AS total_sessions,
       0::int AS total_accounts,
       0::int AS total_teachers
     `,
@@ -312,13 +323,37 @@ export const getTeacherRecentSessions = async (
       a.full_name AS student_name,
       a.email AS student_email,
       es.status,
-      es.created_at::text AS updated_at
+      COALESCE(es.submitted_at, es.started_at, es.created_at)::text AS updated_at
     FROM exam_sessions es
     JOIN exams e ON e.id = es.exam_id
-    JOIN classes c ON c.id = e.class_id
     JOIN accounts a ON a.id = es.student_id
-    WHERE c.teacher_id = $1
-    ORDER BY COALESCE(es.submitted_at, es.created_at) DESC
+    WHERE ${TEACHER_EXAM_SCOPE_SQL}
+    ORDER BY COALESCE(es.submitted_at, es.started_at, es.created_at) DESC
+    LIMIT $2
+    `,
+    [teacherId, limit]
+  );
+  return r.rows;
+};
+
+export const getTeacherRecentStudents = async (
+  teacherId: string,
+  limit = 10
+): Promise<RecentStudentRow[]> => {
+  const r = await pool.query<RecentStudentRow>(
+    `
+    SELECT DISTINCT ON (a.id)
+      a.id::text,
+      a.full_name,
+      a.username,
+      a.email,
+      a.created_at::text
+    FROM accounts a
+    WHERE a.role = 'student'
+      AND a.admin_class_id IN (
+        SELECT id FROM admin_classes WHERE manager_teacher_id = $1
+      )
+    ORDER BY a.id, a.full_name NULLS LAST, a.email
     LIMIT $2
     `,
     [teacherId, limit]
