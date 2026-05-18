@@ -28,6 +28,22 @@ type Essay = {
   points?: number;
 };
 
+const MCQ_KEYS = ["A", "B", "C", "D"] as const;
+
+/** options: mảng 4 phần tử → { A, B, C, D } */
+function mcqOptionsRecord(options: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < Math.min(4, options.length); i++) {
+    out[MCQ_KEYS[i]] = options[i];
+  }
+  return out;
+}
+
+/** chỉ số 0–3 → "A"–"D" (chuẩn hệ thống) */
+function mcqCorrectLetter(correctIndex: number): string {
+  return MCQ_KEYS[correctIndex] ?? "A";
+}
+
 // ─── Import question banks ───────────────────────────────────────────────────
 import { netQ1, netQ2 } from "./questions/net301";
 import { bisQ1, bisQ2 } from "./questions/bis401";
@@ -135,14 +151,16 @@ async function main() {
 
     let order = 1;
     for (const q of exam.mcqs) {
+      const optionsObj = mcqOptionsRecord(q.options);
+      const correctLetter = mcqCorrectLetter(q.correct);
       await pool.query(
         `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order, explanation, version_index)
          VALUES ($1, $2, 'mcq', $3, $4, 0.2, $5, $6, 0)`,
         [
           examId,
           q.content,
-          JSON.stringify(q.options),
-          JSON.stringify(q.correct),
+          JSON.stringify(optionsObj),
+          JSON.stringify(correctLetter),
           order++,
           q.explanation ?? null,
         ]
