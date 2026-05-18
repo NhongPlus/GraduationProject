@@ -74,6 +74,7 @@
     "welcome_note_stats": "サーバーの データ: もう だした しけん {{taken}} かい。とうろくクラスに {{upcoming}} しけん。したの は GET /v1/dashboard から。",
     "view_schedule": "しけんの よていを みる",
     "load_error": "ダッシュボードを よみこめませんでした。もういちど ためしてください。",
+    "activity_load_error": "かつどうリストを よみこめませんでした。もういちど ためしてください。",
     "need_login": "ログインしてください。",
     "unsupported_role": "この やくわりは ダッシュボードで つかえません。",
     "upcoming_empty": "とうろくした クラスに しけんが ありません。",

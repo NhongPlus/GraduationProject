@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
-import { getDashboardController } from "~/controllers/dashboard.controller";
+import {
+  getDashboardController,
+  getDashboardActivityController,
+} from "~/controllers/dashboard.controller";
 
 const dashboardRouter = Router();
 
@@ -12,5 +15,10 @@ dashboardRouter.get("/ping", (_req, res) => {
 
 dashboardRouter.use(authMiddleware);
 dashboardRouter.get("/", roleMiddleware(["admin", "teacher", "student"]), getDashboardController);
+dashboardRouter.get(
+  "/activity",
+  roleMiddleware(["admin", "teacher"]),
+  getDashboardActivityController
+);
 
 export default dashboardRouter;

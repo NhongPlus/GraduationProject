@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box, Table, Title, SimpleGrid, Paper, Text, Stack, Group, Badge, Select, TextInput,
+  Box, Table, Title, SimpleGrid, Paper, Text, Stack, Group, Badge, Select, TextInput, Loader,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import type { StaffDashboardDto } from '@/services/dashboardApi';
+import { ListPaginationBar } from '@/components/ListPagination';
+import dashboardApi from '@/services/dashboardApi';
+import type { StaffDashboardDto, StaffRecentActivityDto } from '@/services/dashboardApi';
+import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
 type AdminDashboardProps = {
   data: StaffDashboardDto;
@@ -18,23 +21,51 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
   const [activityStatus, setActivityStatus] = useState<string>('all');
   const [activityTime, setActivityTime] = useState<string>('all');
   const [keyword, setKeyword] = useState('');
+  const [keywordDebounced, setKeywordDebounced] = useState('');
+  const [activity, setActivity] = useState<StaffRecentActivityDto[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
 
-  const filteredActivity = useMemo(() => {
-    const now = Date.now();
-    const term = keyword.trim().toLowerCase();
-    return data.recent_activity.filter((row) => {
-      const matchesStatus = activityStatus === 'all' || row.status === activityStatus;
-      let matchesTime = true;
-      if (activityTime !== 'all') {
-        const updatedAt = new Date(row.updated_at).getTime();
-        const maxAge = activityTime === '7d' ? 7 : activityTime === '30d' ? 30 : 90;
-        matchesTime = now - updatedAt <= maxAge * 24 * 60 * 60 * 1000;
+  useEffect(() => {
+    const timer = window.setTimeout(() => setKeywordDebounced(keyword.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [keyword]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activityStatus, activityTime, keywordDebounced]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setActivityLoading(true);
+        setActivityError('');
+        const result = await dashboardApi.listActivity({
+          limit: pageSize,
+          offset: pageToOffset(page, pageSize),
+          status: activityStatus === 'all' ? undefined : activityStatus,
+          keyword: keywordDebounced || undefined,
+          time: activityTime === 'all' ? undefined : activityTime,
+        });
+        if (!cancelled) {
+          setActivity(result.items);
+          setTotal(result.total);
+        }
+      } catch {
+        if (!cancelled) setActivityError(t('dashboard.activity_load_error'));
+      } finally {
+        if (!cancelled) setActivityLoading(false);
       }
-      const hay = `${row.exam_title} ${row.student_name || ''} ${row.student_email || ''}`.toLowerCase();
-      const matchesKeyword = !term || hay.includes(term);
-      return matchesStatus && matchesTime && matchesKeyword;
-    });
-  }, [data.recent_activity, activityStatus, activityTime, keyword]);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageSize, activityStatus, activityTime, keywordDebounced, t]);
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -134,42 +165,62 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
           />
         </Group>
 
-        {filteredActivity.length === 0 ? (
-          <Text size="sm" c="dimmed">
-            {t('dashboard.activity_empty')}
-          </Text>
-        ) : (
-          <Table highlightOnHover verticalSpacing="sm" withTableBorder>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('dashboard.col_exam')}</Table.Th>
-                <Table.Th>{t('dashboard.col_student')}</Table.Th>
-                <Table.Th>{t('dashboard.col_status')}</Table.Th>
-                <Table.Th>{t('dashboard.col_updated')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredActivity.map((row) => (
-                <Table.Tr key={row.session_id}>
-                  <Table.Td>{row.exam_title}</Table.Td>
-                  <Table.Td>
-                    {row.student_name || row.student_email || '—'}
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={row.status === 'submitted' ? 'green' : row.status === 'active' ? 'orange' : 'gray'}>
-                      {t(`dashboard.status_${row.status}`, { defaultValue: row.status })}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={1}>
-                      {new Date(row.updated_at).toLocaleString()}
-                    </Text>
-                  </Table.Td>
+        <Paper withBorder radius="md">
+          <ListPaginationBar
+            page={page}
+            total={total}
+            limit={pageSize}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
+          {activityLoading ? (
+            <Box p="xl" className="flex justify-center">
+              <Loader size="sm" />
+            </Box>
+          ) : activityError ? (
+            <Text size="sm" c="red" p="md">
+              {activityError}
+            </Text>
+          ) : activity.length === 0 ? (
+            <Text size="sm" c="dimmed" p="md">
+              {t('dashboard.activity_empty')}
+            </Text>
+          ) : (
+            <Table highlightOnHover verticalSpacing="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('dashboard.col_exam')}</Table.Th>
+                  <Table.Th>{t('dashboard.col_student')}</Table.Th>
+                  <Table.Th>{t('dashboard.col_status')}</Table.Th>
+                  <Table.Th>{t('dashboard.col_updated')}</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        )}
+              </Table.Thead>
+              <Table.Tbody>
+                {activity.map((row) => (
+                  <Table.Tr key={row.session_id}>
+                    <Table.Td>{row.exam_title}</Table.Td>
+                    <Table.Td>
+                      {row.student_name || row.student_email || '—'}
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge color={row.status === 'submitted' ? 'green' : row.status === 'active' ? 'orange' : 'gray'}>
+                        {t(`dashboard.status_${row.status}`, { defaultValue: row.status })}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" lineClamp={1}>
+                        {new Date(row.updated_at).toLocaleString()}
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+        </Paper>
       </Stack>
     </Box>
   );

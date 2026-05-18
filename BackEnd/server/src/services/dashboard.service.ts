@@ -7,11 +7,15 @@ import {
   getAdminOverview,
   getTeacherOverview,
   getRecentStudents,
-  getTeacherRecentSessions,
   getTeacherRecentStudents,
-  getAdminRecentSessions,
+  countAdminDashboardActivity,
+  countTeacherDashboardActivity,
+  listAdminDashboardActivity,
+  listTeacherDashboardActivity,
+  type DashboardActivityFilters,
 } from "~/models/dashboard.model";
 import { isPastClosesAt } from "~/utils/examStartDeadline";
+import { buildPaginatedList, type PaginationQuery } from "~/utils/pagination";
 import type { UserRole } from "~/models/user.model";
 
 export type TrendDirection = "up" | "down" | "flat";
@@ -85,7 +89,6 @@ export interface StaffDashboardDto {
   viewer: "admin" | "teacher";
   metrics: StaffMetricDto[];
   recent_students: StaffRecentStudentDto[];
-  recent_activity: StaffRecentActivityDto[];
 }
 
 export interface DashboardEnvelope {
@@ -250,7 +253,6 @@ export const buildStaffDashboard = async (
       username: r.username,
       email: r.email,
     }));
-    const recent_activity = await getAdminRecentSessions(12);
     return {
       viewer: "admin",
       metrics: [
@@ -262,12 +264,10 @@ export const buildStaffDashboard = async (
         { key: "classes", label_key: "dashboard.metric.classes", value: o.total_classes },
       ],
       recent_students,
-      recent_activity,
     };
   }
 
   const o = await getTeacherOverview(userId);
-  const recent_activity = await getTeacherRecentSessions(userId, 20);
   const recent_students = (await getTeacherRecentStudents(userId, 10)).map((r) => ({
     id: r.id,
     full_name: r.full_name,
@@ -283,8 +283,32 @@ export const buildStaffDashboard = async (
       { key: "sessions", label_key: "dashboard.metric.my_sessions", value: o.total_sessions },
     ],
     recent_students,
-    recent_activity,
   };
+};
+
+export const listDashboardActivityForUser = async (
+  userId: string,
+  role: "admin" | "teacher",
+  pagination: PaginationQuery,
+  filters: DashboardActivityFilters
+) => {
+  const total =
+    role === "admin"
+      ? await countAdminDashboardActivity(filters)
+      : await countTeacherDashboardActivity(userId, filters);
+  const rows =
+    role === "admin"
+      ? await listAdminDashboardActivity(pagination.limit, pagination.offset, filters)
+      : await listTeacherDashboardActivity(userId, pagination.limit, pagination.offset, filters);
+  const items: StaffRecentActivityDto[] = rows.map((r) => ({
+    session_id: r.session_id,
+    exam_title: r.exam_title,
+    student_name: r.student_name,
+    student_email: r.student_email,
+    status: r.status,
+    updated_at: r.updated_at,
+  }));
+  return buildPaginatedList(items, total, pagination.limit, pagination.offset);
 };
 
 export const getDashboardForUser = async (

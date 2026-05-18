@@ -77,6 +77,7 @@
     "welcome_note_stats": "Theo dữ liệu server: bạn đã có {{taken}} bài thi đã nộp; có {{upcoming}} đề trong các lớp bạn đã ghi danh. Các ô bên dưới đều lấy từ API /v1/dashboard.",
     "view_schedule": "Xem lịch thi",
     "load_error": "Không tải được dữ liệu dashboard. Vui lòng thử lại.",
+    "activity_load_error": "Không tải được danh sách hoạt động. Vui lòng thử lại.",
     "need_login": "Vui lòng đăng nhập.",
     "unsupported_role": "Vai trò không được hỗ trợ trên dashboard.",
     "upcoming_empty": "Chưa có bài thi trong các lớp bạn đăng ký.",

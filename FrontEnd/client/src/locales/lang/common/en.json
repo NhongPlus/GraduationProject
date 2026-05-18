@@ -74,6 +74,7 @@
     "welcome_note_stats": "From the server: {{taken}} submitted exam(s); {{upcoming}} exam(s) in your enrolled classes. All widgets below come from GET /v1/dashboard.",
     "view_schedule": "View schedule",
     "load_error": "Could not load dashboard. Please try again.",
+    "activity_load_error": "Could not load activity list. Please try again.",
     "need_login": "Please sign in.",
     "unsupported_role": "This role is not supported on the dashboard.",
     "upcoming_empty": "No exams in your enrolled classes yet.",

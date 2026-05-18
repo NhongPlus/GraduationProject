@@ -311,30 +311,142 @@ export interface TeacherRecentSessionRow {
   updated_at: string;
 }
 
-export const getTeacherRecentSessions = async (
+export interface DashboardActivityFilters {
+  status?: string;
+  keyword?: string;
+  time?: string;
+}
+
+const ACTIVITY_UPDATED_EXPR = `COALESCE(es.submitted_at, es.started_at, es.created_at)`;
+
+function buildActivityFilterSql(
+  filters: DashboardActivityFilters,
+  startParamIdx: number
+): { sql: string; params: unknown[]; nextIdx: number } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  let idx = startParamIdx;
+
+  const status = filters.status?.trim();
+  if (status && status !== "all") {
+    clauses.push(`es.status = $${idx++}`);
+    params.push(status);
+  }
+
+  const keyword = filters.keyword?.trim();
+  if (keyword) {
+    clauses.push(
+      `(e.title ILIKE $${idx} OR a.full_name ILIKE $${idx} OR a.email ILIKE $${idx})`
+    );
+    params.push(`%${keyword}%`);
+    idx += 1;
+  }
+
+  const time = filters.time?.trim();
+  if (time && time !== "all") {
+    const days = time === "7d" ? 7 : time === "30d" ? 30 : 90;
+    clauses.push(`${ACTIVITY_UPDATED_EXPR} >= NOW() - ($${idx++}::int * INTERVAL '1 day')`);
+    params.push(days);
+  }
+
+  const sql = clauses.length > 0 ? ` AND ${clauses.join(" AND ")}` : "";
+  return { sql, params, nextIdx: idx };
+}
+
+const activitySelectSql = `
+  SELECT
+    es.id::text AS session_id,
+    e.title AS exam_title,
+    a.full_name AS student_name,
+    a.email AS student_email,
+    es.status,
+    ${ACTIVITY_UPDATED_EXPR}::text AS updated_at
+  FROM exam_sessions es
+  JOIN exams e ON e.id = es.exam_id
+  JOIN accounts a ON a.id = es.student_id
+`;
+
+export const countTeacherDashboardActivity = async (
   teacherId: string,
-  limit = 12
-): Promise<TeacherRecentSessionRow[]> => {
-  const r = await pool.query<TeacherRecentSessionRow>(
+  filters: DashboardActivityFilters = {}
+): Promise<number> => {
+  const { sql: filterSql, params: filterParams, nextIdx } = buildActivityFilterSql(filters, 2);
+  const r = await pool.query<{ total: number }>(
     `
-    SELECT
-      es.id::text AS session_id,
-      e.title AS exam_title,
-      a.full_name AS student_name,
-      a.email AS student_email,
-      es.status,
-      COALESCE(es.submitted_at, es.started_at, es.created_at)::text AS updated_at
+    SELECT COUNT(*)::int AS total
     FROM exam_sessions es
     JOIN exams e ON e.id = es.exam_id
     JOIN accounts a ON a.id = es.student_id
-    WHERE ${TEACHER_EXAM_SCOPE_SQL}
-    ORDER BY COALESCE(es.submitted_at, es.started_at, es.created_at) DESC
-    LIMIT $2
+    WHERE ${TEACHER_EXAM_SCOPE_SQL}${filterSql}
     `,
-    [teacherId, limit]
+    [teacherId, ...filterParams]
+  );
+  void nextIdx;
+  return r.rows[0]?.total ?? 0;
+};
+
+export const listTeacherDashboardActivity = async (
+  teacherId: string,
+  limit: number,
+  offset: number,
+  filters: DashboardActivityFilters = {}
+): Promise<TeacherRecentSessionRow[]> => {
+  const { sql: filterSql, params: filterParams, nextIdx } = buildActivityFilterSql(filters, 2);
+  const limitIdx = nextIdx;
+  const offsetIdx = nextIdx + 1;
+  const r = await pool.query<TeacherRecentSessionRow>(
+    `
+    ${activitySelectSql}
+    WHERE ${TEACHER_EXAM_SCOPE_SQL}${filterSql}
+    ORDER BY ${ACTIVITY_UPDATED_EXPR} DESC
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `,
+    [teacherId, ...filterParams, limit, offset]
   );
   return r.rows;
 };
+
+export const countAdminDashboardActivity = async (
+  filters: DashboardActivityFilters = {}
+): Promise<number> => {
+  const { sql: filterSql, params: filterParams } = buildActivityFilterSql(filters, 1);
+  const r = await pool.query<{ total: number }>(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM exam_sessions es
+    JOIN exams e ON e.id = es.exam_id
+    JOIN accounts a ON a.id = es.student_id
+    WHERE 1=1${filterSql}
+    `,
+    filterParams
+  );
+  return r.rows[0]?.total ?? 0;
+};
+
+export const listAdminDashboardActivity = async (
+  limit: number,
+  offset: number,
+  filters: DashboardActivityFilters = {}
+): Promise<TeacherRecentSessionRow[]> => {
+  const { sql: filterSql, params: filterParams, nextIdx } = buildActivityFilterSql(filters, 1);
+  const limitIdx = nextIdx;
+  const offsetIdx = nextIdx + 1;
+  const r = await pool.query<TeacherRecentSessionRow>(
+    `
+    ${activitySelectSql}
+    WHERE 1=1${filterSql}
+    ORDER BY ${ACTIVITY_UPDATED_EXPR} DESC
+    LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `,
+    [...filterParams, limit, offset]
+  );
+  return r.rows;
+};
+
+export const getTeacherRecentSessions = async (
+  teacherId: string,
+  limit = 12
+): Promise<TeacherRecentSessionRow[]> => listTeacherDashboardActivity(teacherId, limit, 0);
 
 export const getTeacherRecentStudents = async (
   teacherId: string,
@@ -361,23 +473,5 @@ export const getTeacherRecentStudents = async (
   return r.rows;
 };
 
-export const getAdminRecentSessions = async (limit = 12): Promise<TeacherRecentSessionRow[]> => {
-  const r = await pool.query<TeacherRecentSessionRow>(
-    `
-    SELECT
-      es.id::text AS session_id,
-      e.title AS exam_title,
-      a.full_name AS student_name,
-      a.email AS student_email,
-      es.status,
-      es.created_at::text AS updated_at
-    FROM exam_sessions es
-    JOIN exams e ON e.id = es.exam_id
-    JOIN accounts a ON a.id = es.student_id
-    ORDER BY COALESCE(es.submitted_at, es.created_at) DESC
-    LIMIT $1
-    `,
-    [limit]
-  );
-  return r.rows;
-};
+export const getAdminRecentSessions = async (limit = 12): Promise<TeacherRecentSessionRow[]> =>
+  listAdminDashboardActivity(limit, 0);

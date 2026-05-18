@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { fetchPaginatedList, type ListQueryParams, type PaginatedList } from './listApi';
 
 export type TrendDirection = 'up' | 'down' | 'flat';
 
@@ -70,8 +71,13 @@ export interface StaffDashboardDto {
   viewer: 'admin' | 'teacher';
   metrics: StaffMetricDto[];
   recent_students: StaffRecentStudentDto[];
-  recent_activity: StaffRecentActivityDto[];
 }
+
+export type DashboardActivityQuery = ListQueryParams & {
+  status?: string;
+  keyword?: string;
+  time?: string;
+};
 
 export interface DashboardEnvelope {
   viewer_role: 'admin' | 'teacher' | 'student';
@@ -84,6 +90,9 @@ const dashboardApi = {
     const res = await apiClient.get<{ success: boolean; data: DashboardEnvelope }>('/dashboard');
     return res.data.data;
   },
+
+  listActivity: async (params: DashboardActivityQuery = {}): Promise<PaginatedList<StaffRecentActivityDto>> =>
+    fetchPaginatedList<StaffRecentActivityDto>('/dashboard/activity', params),
 };
 
 export default dashboardApi;
