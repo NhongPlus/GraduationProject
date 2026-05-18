@@ -166,8 +166,12 @@ const ExamSessions = () => {
                     <Group gap={4}>
                       <ButtonLight
                         size="xs"
-                        label={t('exam_sessions.view_grading')}
-                        disabled={session.grading_status === 'complete'}
+                        label={
+                          session.grading_status === 'complete'
+                            ? t('exam_sessions.view_grading_done')
+                            : t('exam_sessions.view_grading')
+                        }
+                        disabled={false}
                         onClick={() => navigate(`/grading/${session.id}`)}
                       />
                       {session.status === 'active' && (

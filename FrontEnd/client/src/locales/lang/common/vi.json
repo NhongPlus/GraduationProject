@@ -30,6 +30,7 @@
     "error": "Lỗi",
     "view_all": "Xem tất cả",
     "details": "Chi tiết",
+    "back": "Quay lại",
     "back_main": "Quay lại Main",
     "back_exam_list": "Quay lại danh sách bài thi",
     "save": "Lưu",
@@ -389,6 +390,7 @@
     "grading_status": "Trạng thái chấm",
     "submitted_at": "Nộp lúc",
     "view_grading": "Chấm điểm",
+    "view_grading_done": "Xem bài chấm",
     "no_sessions": "Chưa có phiên thi nào.",
     "pending_grading_alert": "Có {{count}} phiên đang chờ chấm tự luận.",
     "pending_manual": "Chờ chấm tay",
@@ -542,7 +544,8 @@
     "avg": "Trung bình",
     "max": "Cao nhất",
     "min": "Thấp nhất",
-    "load_failed": "Không tải được dữ liệu thống kê."
+    "load_failed": "Không tải được dữ liệu thống kê.",
+    "filter_no_match": "Không có dữ liệu với bộ lọc hiện tại. Thử chọn thêm môn/lớp hoặc bỏ bớt lọc."
   },
   "audit_log": {
     "title": "Nhật ký hệ thống",

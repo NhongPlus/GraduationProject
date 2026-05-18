@@ -1,6 +1,7 @@
 import {
   getScoreDistributionByExam,
   getScoreDistributionBySubject,
+  getScoreDistributionByAdminClass,
 } from "~/models/scoreAnalytics.model";
 
 export const getExamScoreDistribution = async (examId: string) => {
@@ -11,4 +12,8 @@ export const getExamScoreDistribution = async (examId: string) => {
 
 export const getAllSubjectsScoreDistribution = async () => {
   return getScoreDistributionBySubject();
+};
+
+export const getAllAdminClassesScoreDistribution = async () => {
+  return getScoreDistributionByAdminClass();
 };

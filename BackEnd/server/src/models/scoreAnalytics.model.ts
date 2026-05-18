@@ -28,6 +28,19 @@ export interface ScoreDistributionBySubject {
   }>;
 }
 
+export interface ScoreDistributionByAdminClass {
+  admin_class_id: string | null;
+  class_label: string;
+  total_students: number;
+  avg_score: number | null;
+  buckets: Array<{
+    range_label: string;
+    min_pct: number;
+    max_pct: number;
+    count: number;
+  }>;
+}
+
 const DEFAULT_BUCKETS = [
   { range_label: "0-20%", min_pct: 0, max_pct: 20 },
   { range_label: "20-40%", min_pct: 20, max_pct: 40 },
@@ -49,14 +62,20 @@ function buildBuckets(rows: Array<{ score_pct: number | null }>) {
     sum += row.score_pct;
     if (max == null || row.score_pct > max) max = row.score_pct;
     if (min == null || row.score_pct < min) min = row.score_pct;
+    let placed = false;
     for (let i = 0; i < DEFAULT_BUCKETS.length; i++) {
       const b = DEFAULT_BUCKETS[i];
-      if (row.score_pct >= b.min_pct && row.score_pct < b.max_pct) {
+      const isLast = i === DEFAULT_BUCKETS.length - 1;
+      if (
+        row.score_pct >= b.min_pct
+        && (isLast ? row.score_pct <= b.max_pct : row.score_pct < b.max_pct)
+      ) {
         counts[i]++;
+        placed = true;
         break;
       }
     }
-    if (row.score_pct >= 100) counts[DEFAULT_BUCKETS.length - 1]++;
+    if (!placed && row.score_pct >= 100) counts[DEFAULT_BUCKETS.length - 1]++;
   }
 
   return {
@@ -113,9 +132,11 @@ export const getScoreDistributionBySubject = async (): Promise<
         END AS score_pct
      FROM exam_sessions es
      JOIN exams e ON e.id = es.exam_id
-     JOIN classes c ON c.id = e.class_id
-     JOIN subjects s ON s.id = c.subject_id
+     LEFT JOIN classes c ON c.id = e.class_id
+     LEFT JOIN subjects s ON s.id = COALESCE(e.subject_id, c.subject_id)
      WHERE es.status = 'submitted'
+       AND es.score IS NOT NULL
+       AND es.max_points > 0
      ORDER BY s.name`
   );
 
@@ -130,24 +151,64 @@ export const getScoreDistributionBySubject = async (): Promise<
   }
 
   return Array.from(bySubject.entries()).map(([subject_id, { name, scores }]) => {
-    const counts = new Array(DEFAULT_BUCKETS.length).fill(0);
-    let sum = 0;
-    for (const s of scores) {
-      sum += s;
-      for (let i = 0; i < DEFAULT_BUCKETS.length; i++) {
-        if (s >= DEFAULT_BUCKETS[i].min_pct && s < DEFAULT_BUCKETS[i].max_pct) {
-          counts[i]++;
-          break;
-        }
-      }
-      if (s >= 100) counts[DEFAULT_BUCKETS.length - 1]++;
-    }
+    const stats = buildBuckets(scores.map((score_pct) => ({ score_pct })));
     return {
       subject_id,
       subject_name: name,
       total_students: scores.length,
-      avg_score: scores.length > 0 ? sum / scores.length : null,
-      buckets: DEFAULT_BUCKETS.map((b, i) => ({ ...b, count: counts[i] })),
+      avg_score: stats.avg_score,
+      buckets: stats.buckets,
+    };
+  });
+};
+
+export const getScoreDistributionByAdminClass = async (): Promise<
+  ScoreDistributionByAdminClass[]
+> => {
+  const rows = await pool.query<{
+    admin_class_id: string | null;
+    class_label: string;
+    score_pct: number | null;
+  }>(
+    `SELECT
+        e.admin_class_id,
+        COALESCE(ac.display_name, 'Chưa gán lớp') AS class_label,
+        CASE WHEN es.max_points > 0 AND es.score IS NOT NULL
+          THEN (es.score / es.max_points) * 100
+          ELSE NULL
+        END AS score_pct
+     FROM exam_sessions es
+     JOIN exams e ON e.id = es.exam_id
+     LEFT JOIN admin_classes ac ON ac.id = e.admin_class_id
+     WHERE es.status = 'submitted'
+       AND es.score IS NOT NULL
+       AND es.max_points > 0
+     ORDER BY class_label`
+  );
+
+  const byClass = new Map<string, { id: string | null; label: string; scores: number[] }>();
+  for (const row of rows.rows) {
+    const key = row.admin_class_id ?? `label:${row.class_label}`;
+    if (!byClass.has(key)) {
+      byClass.set(key, {
+        id: row.admin_class_id,
+        label: row.class_label,
+        scores: [],
+      });
+    }
+    if (row.score_pct != null) {
+      byClass.get(key)!.scores.push(row.score_pct);
+    }
+  }
+
+  return Array.from(byClass.values()).map(({ id, label, scores }) => {
+    const stats = buildBuckets(scores.map((score_pct) => ({ score_pct })));
+    return {
+      admin_class_id: id,
+      class_label: label,
+      total_students: scores.length,
+      avg_score: stats.avg_score,
+      buckets: stats.buckets,
     };
   });
 };

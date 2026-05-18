@@ -4,6 +4,7 @@ import { roleMiddleware } from "~/middlewares/role.middleware";
 import {
   getExamScoreDistributionController,
   getAllSubjectsScoreDistributionController,
+  getAllAdminClassesScoreDistributionController,
 } from "~/controllers/scoreAnalytics.controller";
 
 const scoreAnalyticsRouter = Router();
@@ -20,6 +21,12 @@ scoreAnalyticsRouter.get(
   "/subjects",
   roleMiddleware(["admin", "teacher"]),
   getAllSubjectsScoreDistributionController
+);
+
+scoreAnalyticsRouter.get(
+  "/admin-classes",
+  roleMiddleware(["admin", "teacher"]),
+  getAllAdminClassesScoreDistributionController
 );
 
 export default scoreAnalyticsRouter;
