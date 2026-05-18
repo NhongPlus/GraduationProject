@@ -66,15 +66,15 @@ const ExamList = () => {
   } = useExamListState({ isStaff, t });
 
   const [listPage, setListPage] = useState(1);
-  const LIST_LIMIT = DEFAULT_PAGE_SIZE;
+  const [listPageSize, setListPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     setListPage(1);
   }, [searchText, statusFilter]);
 
   const paginatedExams = useMemo(
-    () => slicePage(filteredExams, listPage, LIST_LIMIT),
-    [filteredExams, listPage]
+    () => slicePage(filteredExams, listPage, listPageSize),
+    [filteredExams, listPage, listPageSize]
   );
 
   const handleDeleteExam = (examId: string, examTitle: string) => {
@@ -184,7 +184,17 @@ const ExamList = () => {
         {filteredExams.length === 0 ? (
           <Alert color="blue" variant="light">{t('exam_list.no_results')}</Alert>
         ) : (
-          <Paper withBorder radius="md" p="sm">
+          <Paper withBorder radius="md">
+            <ListPaginationBar
+              page={listPage}
+              total={filteredExams.length}
+              limit={listPageSize}
+              onPageChange={setListPage}
+              onLimitChange={(next) => {
+                setListPageSize(next);
+                setListPage(1);
+              }}
+            />
             <Table verticalSpacing="sm" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -222,7 +232,7 @@ const ExamList = () => {
                       style={{ cursor: 'pointer' }}
                       onClick={rowNavigate}
                     >
-                      <Table.Td>{(listPage - 1) * LIST_LIMIT + idx + 1}</Table.Td>
+                      <Table.Td>{(listPage - 1) * listPageSize + idx + 1}</Table.Td>
                       <Table.Td>
                         <Text fw={500}>{item.title}</Text>
                       </Table.Td>
@@ -341,12 +351,6 @@ const ExamList = () => {
                 })}
               </Table.Tbody>
             </Table>
-            <ListPaginationBar
-              page={listPage}
-              total={filteredExams.length}
-              limit={LIST_LIMIT}
-              onPageChange={setListPage}
-            />
           </Paper>
         )}
       </Stack>

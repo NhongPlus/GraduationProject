@@ -19,7 +19,6 @@ import questionBankApi, { type QuestionBankItem } from '@/services/questionBankA
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
-const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 const DIFFICULTY_COLORS = { DE: 'green', TRUNGBINH: 'yellow', KHO: 'red' } as const;
 
@@ -54,6 +53,7 @@ export default function ExamQuestionBankPicker({
   const [items, setItems] = useState<QuestionBankItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -69,8 +69,8 @@ export default function ExamQuestionBankPicker({
       const data = await questionBankApi.list({
         subject_id: subjectId,
         search: search || undefined,
-        limit: PAGE_SIZE,
-        offset: pageToOffset(page, PAGE_SIZE),
+        limit: pageSize,
+        offset: pageToOffset(page, pageSize),
       });
       setItems(data.items);
       setTotal(data.total);
@@ -80,7 +80,7 @@ export default function ExamQuestionBankPicker({
     } finally {
       setLoading(false);
     }
-  }, [subjectId, search, page]);
+  }, [subjectId, search, page, pageSize]);
 
   useEffect(() => {
     setPage(1);
@@ -217,9 +217,14 @@ export default function ExamQuestionBankPicker({
               <ListPaginationBar
                 page={page}
                 total={total}
-                limit={PAGE_SIZE}
+                limit={pageSize}
                 onPageChange={handlePageChange}
+                onLimitChange={(next) => {
+                  setPageSize(next);
+                  setPage(1);
+                }}
                 size="xs"
+                bordered
               />
 
               {selectableItems.length === 0 ? (

@@ -722,9 +722,13 @@
     "question_bank_added": "Đã thêm {{count}} câu từ ngân hàng vào {{code}}."
   },
   "pagination": {
-    "showing_range": "Hiển thị {{from}}–{{to}} / {{total}}",
+    "showing_range": "({{from}}–{{to}})",
     "empty": "Không có bản ghi",
-    "select_all_page": "Chọn tất cả trên trang này"
+    "select_all_page": "Chọn tất cả trên trang này",
+    "total_count": "Tổng: {{total}}",
+    "page_size_option": "{{size}}/trang",
+    "go_to": "Đến trang",
+    "page_label": "Trang"
   },
   "notification": {
     "title": "Thông báo",

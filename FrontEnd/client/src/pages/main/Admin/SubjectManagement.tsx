@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Box, Title, Table, Modal, Group, Stack, Text, Loader, Badge,
+  Box, Title, Table, Modal, Group, Stack, Text, Loader, Badge, Paper,
   ActionIcon, TextInput, NumberInput, Select, Switch,
   Button,
 } from '@mantine/core';
@@ -78,7 +78,7 @@ const SubjectManagementPage = () => {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const LIMIT = DEFAULT_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
@@ -144,7 +144,7 @@ const SubjectManagementPage = () => {
     s.code.toLowerCase().includes(search.toLowerCase())
   );
 
-  const paginated = slicePage(filtered, page, LIMIT);
+  const paginated = slicePage(filtered, page, pageSize);
 
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
@@ -173,6 +173,17 @@ const SubjectManagementPage = () => {
           <Loader />
         ) : (
           <>
+            <Paper withBorder radius="md">
+            <ListPaginationBar
+              page={page}
+              total={filtered.length}
+              limit={pageSize}
+              onPageChange={setPage}
+              onLimitChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
+            />
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -227,12 +238,7 @@ const SubjectManagementPage = () => {
                 )}
               </Table.Tbody>
             </Table>
-            <ListPaginationBar
-              page={page}
-              total={filtered.length}
-              limit={LIMIT}
-              onPageChange={setPage}
-            />
+            </Paper>
           </>
         )}
       </Stack>

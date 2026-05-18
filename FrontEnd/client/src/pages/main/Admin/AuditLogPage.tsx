@@ -42,9 +42,9 @@ const AuditLogPage = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState<string | null>(null);
-  const limit = DEFAULT_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const load = async (pageNum: number) => {
+  const load = async (pageNum: number, limit: number) => {
     try {
       setLoading(true);
       const params: Record<string, string | number> = {
@@ -66,8 +66,8 @@ const AuditLogPage = () => {
   };
 
   useEffect(() => {
-    void load(page);
-  }, [page, actionFilter]);
+    void load(page, pageSize);
+  }, [page, pageSize, actionFilter]);
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
@@ -95,7 +95,17 @@ const AuditLogPage = () => {
 
         {error && <Alert color="red" variant="light">{error}</Alert>}
 
-        <Paper withBorder radius="md" p="sm">
+        <Paper withBorder radius="md">
+          <ListPaginationBar
+            page={page}
+            total={total}
+            limit={pageSize}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -110,7 +120,7 @@ const AuditLogPage = () => {
             <Table.Tbody>
               {logs.map((log, idx) => (
                 <Table.Tr key={log.id}>
-                  <Table.Td>{(page - 1) * limit + idx + 1}</Table.Td>
+                  <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                   <Table.Td>
                     <Text size="xs">{new Date(log.created_at).toLocaleString()}</Text>
                   </Table.Td>
@@ -151,8 +161,6 @@ const AuditLogPage = () => {
             </Table.Tbody>
           </Table>
         </Paper>
-
-        <ListPaginationBar page={page} total={total} limit={limit} onPageChange={setPage} />
       </Stack>
     </Box>
   );

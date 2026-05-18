@@ -22,7 +22,7 @@ const GradingIndex = () => {
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('all');
   const [page, setPage] = useState(1);
-  const LIMIT = DEFAULT_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     const load = async () => {
@@ -110,8 +110,8 @@ const GradingIndex = () => {
   }, [keyword, subjectFilter, timeRange]);
 
   const paginatedSessions = useMemo(
-    () => slicePage(filteredSessions, page, LIMIT),
-    [filteredSessions, page]
+    () => slicePage(filteredSessions, page, pageSize),
+    [filteredSessions, page, pageSize]
   );
 
   if (loading) {
@@ -179,7 +179,17 @@ const GradingIndex = () => {
             <Text c="dimmed" ta="center">{t('grading.empty_filtered')}</Text>
           </Paper>
         ) : (
-          <Paper withBorder radius="md" p="sm">
+          <Paper withBorder radius="md">
+            <ListPaginationBar
+              page={page}
+              total={filteredSessions.length}
+              limit={pageSize}
+              onPageChange={setPage}
+              onLimitChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
+            />
             <Table striped>
               <Table.Thead>
                 <Table.Tr>
@@ -195,7 +205,7 @@ const GradingIndex = () => {
               <Table.Tbody>
                 {paginatedSessions.map((session, idx) => (
                   <Table.Tr key={session.id}>
-                    <Table.Td>{(page - 1) * LIMIT + idx + 1}</Table.Td>
+                    <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={500}>{exams[session.exam_id]?.title || session.exam_id}</Text>
                       <Text size="xs" c="dimmed">{exams[session.exam_id]?.subject_name || '—'}</Text>
@@ -234,12 +244,6 @@ const GradingIndex = () => {
                 ))}
               </Table.Tbody>
             </Table>
-            <ListPaginationBar
-              page={page}
-              total={filteredSessions.length}
-              limit={LIMIT}
-              onPageChange={setPage}
-            />
           </Paper>
         )}
       </Stack>

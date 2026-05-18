@@ -19,7 +19,7 @@ const ExamSessions = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
-  const LIMIT = DEFAULT_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     if (!examId) return;
@@ -39,8 +39,8 @@ const ExamSessions = () => {
   }, [examId, t]);
 
   const paginatedSessions = useMemo(
-    () => slicePage(sessions, page, LIMIT),
-    [sessions, page]
+    () => slicePage(sessions, page, pageSize),
+    [sessions, page, pageSize]
   );
 
   if (loading) {
@@ -97,7 +97,17 @@ const ExamSessions = () => {
           </Alert>
         )}
 
-        <Paper withBorder radius="md" p="sm">
+        <Paper withBorder radius="md">
+          <ListPaginationBar
+            page={page}
+            total={sessions.length}
+            limit={pageSize}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
           <Table striped>
             <Table.Thead>
               <Table.Tr>
@@ -114,7 +124,7 @@ const ExamSessions = () => {
             <Table.Tbody>
               {paginatedSessions.map((session, idx) => (
                 <Table.Tr key={session.id}>
-                  <Table.Td>{(page - 1) * LIMIT + idx + 1}</Table.Td>
+                  <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                   <Table.Td>
                     <Text size="sm" fw={500}>
                       {session.student_name || session.full_name || session.student_id}
@@ -177,13 +187,6 @@ const ExamSessions = () => {
             </Table.Tbody>
           </Table>
         </Paper>
-
-        <ListPaginationBar
-          page={page}
-          total={sessions.length}
-          limit={LIMIT}
-          onPageChange={setPage}
-        />
 
         <Group>
           <ButtonLight

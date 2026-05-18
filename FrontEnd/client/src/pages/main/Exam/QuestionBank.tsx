@@ -82,15 +82,15 @@ const QuestionBankPage = () => {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
-  const LIMIT = DEFAULT_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const fetchItems = useCallback(async (f: QBFilter, p: number) => {
+  const fetchItems = useCallback(async (f: QBFilter, p: number, limit: number) => {
     if (!accessToken) return;
     try {
       setLoading(true);
       const data = await questionBankApi.list({
-        limit: LIMIT,
-        offset: pageToOffset(p, LIMIT),
+        limit,
+        offset: pageToOffset(p, limit),
         search: f.search,
         question_type: f.question_type,
         difficulty: f.difficulty,
@@ -100,7 +100,7 @@ const QuestionBankPage = () => {
       setItems(data.items as QBItem[]);
       setTotal(data.total);
       if (data.items.length === 0 && data.total > 0 && p > 1) {
-        setPage(clampPage(p - 1, data.total, LIMIT));
+        setPage(clampPage(p - 1, data.total, limit));
       }
     } catch {
       setError(t('question_bank.error_load_failed'));
@@ -121,8 +121,8 @@ const QuestionBankPage = () => {
   }, [accessToken]);
 
   useEffect(() => {
-    void fetchItems(filter, page);
-  }, [filter, page, fetchItems]);
+    void fetchItems(filter, page, pageSize);
+  }, [filter, page, pageSize, fetchItems]);
 
   useEffect(() => {
     void fetchSubjects();
@@ -140,7 +140,7 @@ const QuestionBankPage = () => {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setNotice(t('question_bank.notice_deleted'));
-      void fetchItems(filter, page);
+      void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_delete_failed'));
     }
@@ -153,7 +153,7 @@ const QuestionBankPage = () => {
       });
       setCreateModalOpen(false);
       setNotice(t('question_bank.notice_created'));
-      void fetchItems(filter, page);
+      void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_create_failed'));
     }
@@ -166,7 +166,7 @@ const QuestionBankPage = () => {
       });
       setEditModalOpen(false);
       setNotice(t('question_bank.notice_updated'));
-      void fetchItems(filter, page);
+      void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_update_failed'));
     }
@@ -230,7 +230,7 @@ const QuestionBankPage = () => {
       setImportPreview(null);
       setImportFile(null);
       setNotice(t('question_bank.notice_bulk_imported', { count: questions.length }));
-      void fetchItems(filter, page);
+      void fetchItems(filter, page, pageSize);
     } catch {
       setError(t('question_bank.error_bulk_import_failed'));
     } finally {
@@ -353,6 +353,16 @@ const QuestionBankPage = () => {
           <Loader />
         ) : (
           <Paper withBorder radius="md">
+            <ListPaginationBar
+              page={page}
+              total={total}
+              limit={pageSize}
+              onPageChange={setPage}
+              onLimitChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
+            />
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -369,7 +379,7 @@ const QuestionBankPage = () => {
               <Table.Tbody>
                 {items.map((item, idx) => (
                   <Table.Tr key={item.id}>
-                    <Table.Td>{(page - 1) * LIMIT + idx + 1}</Table.Td>
+                    <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                     <Table.Td style={{ maxWidth: 400 }}>
                       <Text size="sm" lineClamp={2}>{item.content}</Text>
                     </Table.Td>
@@ -436,12 +446,6 @@ const QuestionBankPage = () => {
           </Paper>
         )}
 
-        <ListPaginationBar
-          page={page}
-          total={total}
-          limit={LIMIT}
-          onPageChange={setPage}
-        />
       </Stack>
 
       {/* Create Modal */}
