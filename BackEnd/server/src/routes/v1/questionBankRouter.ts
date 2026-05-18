@@ -95,7 +95,11 @@ router.delete("/:id", async (req, res, next) => {
 // POST /v1/question-bank/:id/import/:examId — import to exam
 router.post("/:id/import/:examId", async (req, res, next) => {
   try {
-    const result = await importToExam(req.params.id, req.params.examId);
+    const versionIndex =
+      req.body?.version_index != null ? Number(req.body.version_index) : undefined;
+    const result = await importToExam(req.params.id, req.params.examId, {
+      versionIndex,
+    });
     res.status(201).json({ success: true, data: result });
   } catch (err: any) {
     if (err.message === "Question bank item not found") {

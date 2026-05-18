@@ -708,7 +708,18 @@
     "error_save_failed": "Không tạo được bài thi. Vui lòng kiểm tra dữ liệu và thử lại.",
     "error_select_file": "Vui lòng chọn file .docx.",
     "error_read_file": "Không đọc được file Word. Vui lòng kiểm tra đúng template .docx.",
-    "error_media_upload": "Không tải được media."
+    "error_media_upload": "Không tải được media.",
+    "question_bank_title": "Ngân hàng câu hỏi",
+    "question_bank_hint": "Chọn câu từ kho môn học để thêm vào mã đề {{code}} (có thể kết hợp với import Word).",
+    "question_bank_empty": "Chưa có câu nào trong ngân hàng môn này.",
+    "question_bank_go_manage": "Mở trang Ngân hàng câu hỏi",
+    "question_bank_search": "Tìm trong ngân hàng...",
+    "question_bank_select_all": "Chọn tất cả",
+    "question_bank_selected": "Đã chọn: {{count}}",
+    "question_bank_add_btn": "Thêm {{count}} câu vào {{code}}",
+    "question_bank_all_added": "Các câu trong danh sách đã có trong mã đề này.",
+    "question_bank_in_exam": "Đã thêm",
+    "question_bank_added": "Đã thêm {{count}} câu từ ngân hàng vào {{code}}."
   },
   "notification": {
     "title": "Thông báo",

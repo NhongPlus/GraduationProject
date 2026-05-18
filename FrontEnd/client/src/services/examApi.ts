@@ -41,6 +41,7 @@ export interface Question {
   media_url?: string | null;
   explanation?: string | null;
   version_index?: number;
+  question_bank_id?: string | null;
 }
 
 export interface ExamSession {
@@ -178,6 +179,7 @@ export interface ImportedQuestionDraft {
   needs_review?: boolean;
   review_reason?: string | null;
   version_index?: number;
+  question_bank_id?: string;
 }
 
 export interface ExamImportPreview {
@@ -294,6 +296,7 @@ const examApi = {
       correct_answer?: string | string[];
       media_url?: string | null;
       version_index?: number;
+      question_bank_id?: string;
     }
   ): Promise<Question> => {
     const res = await apiClient.post<{ success: boolean; data: Question }>(

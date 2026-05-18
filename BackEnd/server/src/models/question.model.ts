@@ -13,6 +13,7 @@ export interface Question {
   points: number;
   display_order: number;
   version_index: number;
+  question_bank_id?: string | null;
   created_at: string;
   explanation: string | null;
 }
@@ -51,6 +52,7 @@ function mapQuestionRow(row: any): Question {
     points: Number(row.points),
     display_order: Number(row.display_order ?? 0),
     version_index: Number(row.version_index ?? 0),
+    question_bank_id: row.question_bank_id ?? null,
     created_at: row.created_at,
     explanation: row.explanation ?? null,
   };
@@ -92,7 +94,8 @@ export const createQuestion = async (
   correctAnswer?: string | string[] | null,
   mediaUrl?: string | null,
   displayOrder?: number,
-  versionIndex?: number
+  versionIndex?: number,
+  questionBankId?: string | null
 ): Promise<Question> => {
   const opts =
     questionType === "essay" ? null : options != null ? JSON.stringify(options) : JSON.stringify({});
@@ -104,7 +107,7 @@ export const createQuestion = async (
         : null;
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index)
+    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index, question_bank_id)
      VALUES (
        $1,
        $2,
@@ -114,11 +117,29 @@ export const createQuestion = async (
        $6,
        $7,
        COALESCE($8, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1 AND version_index = COALESCE($9, 0))),
-       COALESCE($9, 0)
+       COALESCE($9, 0),
+       $10
      )
      RETURNING *`,
-    [examId, content, questionType, opts, correct, mediaUrl ?? null, points, displayOrder ?? null, versionIndex ?? 0]
+    [
+      examId,
+      content,
+      questionType,
+      opts,
+      correct,
+      mediaUrl ?? null,
+      points,
+      displayOrder ?? null,
+      versionIndex ?? 0,
+      questionBankId ?? null,
+    ]
   );
+  if (questionBankId) {
+    await pool.query(
+      `UPDATE question_bank SET usage_count = usage_count + 1 WHERE id = $1`,
+      [questionBankId]
+    );
+  }
   return mapQuestionRow(result.rows[0]);
 };
 

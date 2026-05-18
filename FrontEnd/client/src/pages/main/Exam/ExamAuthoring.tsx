@@ -42,6 +42,8 @@ import subjectApi, { type SubjectDto } from '@/services/subjectApi';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
+import { formatSubjectLabel } from '@/components/Input/SubjectCategoryPicker/subjectGrouping';
+import ExamQuestionBankPicker, { type BankPickTarget } from '@/pages/main/Exam/ExamQuestionBankPicker';
 
 const MAX_EXAM_VERSIONS = 4;
 
@@ -51,6 +53,7 @@ function versionCodeForIndex(index: number): string {
 
 type AuthoringQuestion = ImportedQuestionDraft & {
   id?: string;
+  question_bank_id?: string;
   version_index: number;
   media?: { type: 'image' | 'audio' | 'video'; filename: string; url?: string };
   media_url?: string | null;
@@ -161,6 +164,7 @@ export default function ExamAuthoring() {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [mediaUploadLoading, setMediaUploadLoading] = useState(false);
   const [mediaUploadError, setMediaUploadError] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -186,6 +190,7 @@ export default function ExamAuthoring() {
             prev.adminClassId ?? existingExam?.admin_class_id ?? mineClass?.id ?? null;
           const subjectIdNext =
             prev.subjectId ?? existingExam?.subject_id ?? subjectList[0]?.id ?? null;
+          setSelectedSubjectId(subjectIdNext);
           if (!existingExam) {
             return { ...prev, adminClassId: adminClassIdNext, subjectId: subjectIdNext };
           }
@@ -218,6 +223,7 @@ export default function ExamAuthoring() {
                 correct_answer: question.correct_answer ?? null,
                 display_order: question.display_order ?? index + 1,
                 version_index: question.version_index ?? 0,
+                question_bank_id: question.question_bank_id ?? undefined,
                 media_url: url,
                 media: url
                   ? {
@@ -289,6 +295,45 @@ export default function ExamAuthoring() {
       })),
     [versionCodes, versionCounts]
   );
+
+  const subjectLabel = useMemo(() => {
+    if (!selectedSubjectId) return '';
+    const subject = subjects.find((s) => s.id === selectedSubjectId);
+    return subject ? formatSubjectLabel(subject) : '';
+  }, [selectedSubjectId, subjects]);
+
+  const bankLinkedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const q of questions) {
+      if (q.question_bank_id && (q.version_index ?? 0) === activeVersion) {
+        ids.add(q.question_bank_id);
+      }
+    }
+    return ids;
+  }, [questions, activeVersion]);
+
+  const handleAddFromBank = (picked: BankPickTarget[]) => {
+    if (!picked.length) return;
+    const mapped: AuthoringQuestion[] = picked.map((p) => ({
+      content: p.content,
+      question_type: p.question_type,
+      points: p.points,
+      options: p.options,
+      correct_answer: p.correct_answer,
+      display_order: 0,
+      version_index: activeVersion,
+      question_bank_id: p.question_bank_id,
+      difficulty: p.difficulty,
+    }));
+    setQuestions((prev) => normalizeQuestions([...prev, ...mapped]));
+    setNotice(
+      t('exam_authoring.question_bank_added', {
+        count: mapped.length,
+        code: versionCodeForIndex(activeVersion),
+      })
+    );
+    setError('');
+  };
 
   const setVersionFile = (versionIdx: number, next: File | null) => {
     setVersionFiles((prev) => {
@@ -538,6 +583,7 @@ export default function ExamAuthoring() {
             correct_answer: question.correct_answer ?? undefined,
             media_url: question.media_url ?? question.media?.url ?? null,
             version_index: question.version_index ?? 0,
+            question_bank_id: question.question_bank_id,
           });
         }
         setNotice(
@@ -559,6 +605,7 @@ export default function ExamAuthoring() {
           ...q,
           version_index: q.version_index ?? 0,
           media_url: q.media_url ?? q.media?.url ?? null,
+          question_bank_id: q.question_bank_id,
         })),
       });
       setNotice(t('exam_authoring.notice_created', { title: created.exam.title, count: created.questions.length }));
@@ -641,7 +688,10 @@ export default function ExamAuthoring() {
                   }
                   disabled={isEditMode || !adminClass || loading}
                   value={examForm.getValues().subjectId}
-                  onChange={(id) => examForm.setFieldValue('subjectId', id)}
+                  onChange={(id) => {
+                    examForm.setFieldValue('subjectId', id);
+                    setSelectedSubjectId(id);
+                  }}
                   error={examForm.errors.subjectId as string | undefined}
                 />
                 <Group grow>
@@ -685,6 +735,14 @@ export default function ExamAuthoring() {
               </Stack>
             </Collapse>
           </Paper>
+
+          <ExamQuestionBankPicker
+            subjectId={selectedSubjectId}
+            subjectLabel={subjectLabel}
+            versionCode={versionCodeForIndex(activeVersion)}
+            alreadyLinkedBankIds={bankLinkedIds}
+            onAddQuestions={handleAddFromBank}
+          />
 
           {/* Import từ Word */}
           <Paper radius="md" withBorder style={{ overflow: 'hidden' }}>

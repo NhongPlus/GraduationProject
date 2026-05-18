@@ -243,7 +243,16 @@ export const getQuestionsController = async (req: Request, res: Response, next: 
 
 export const addQuestionController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { content, options, correct_answer, points, question_type, media_url, version_index } = req.body;
+    const {
+      content,
+      options,
+      correct_answer,
+      points,
+      question_type,
+      media_url,
+      version_index,
+      question_bank_id,
+    } = req.body;
     if (!content || points === undefined || points === null) {
       return res.status(400).json({ success: false, message: "content và points là bắt buộc" });
     }
@@ -260,7 +269,8 @@ export const addQuestionController = async (req: Request, res: Response, next: N
       correct_answer ?? null,
       media_url ?? null,
       undefined,
-      version_index != null ? Number(version_index) : 0
+      version_index != null ? Number(version_index) : 0,
+      typeof question_bank_id === "string" ? question_bank_id : null
     );
     res.status(201).json({ success: true, data: q });
   } catch (err) {

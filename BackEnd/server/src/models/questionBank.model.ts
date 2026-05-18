@@ -50,7 +50,11 @@ export interface QuestionBankFilter {
 function parseJson<T>(v: unknown, fallback: T): T {
   if (v == null) return fallback;
   if (typeof v === "string") {
-    try { return JSON.parse(v) as T; } catch { return fallback; }
+    try {
+      return JSON.parse(v) as T;
+    } catch {
+      return v as unknown as T;
+    }
   }
   return v as T;
 }
@@ -216,23 +220,38 @@ export const deleteQuestionBankItem = async (id: string): Promise<boolean> => {
 export const importToExam = async (
   questionBankId: string,
   examId: string,
-  displayOrder?: number
+  opts?: { displayOrder?: number; versionIndex?: number }
 ): Promise<{ question_id: string }> => {
   const qb = await getQuestionBankById(questionBankId);
   if (!qb) throw new Error("Question bank item not found");
 
-  const opts = qb.question_type === "essay"
+  const optionsJson = qb.question_type === "essay"
     ? null
     : qb.options != null ? JSON.stringify(qb.options) : null;
-  const correct = qb.question_type === "essay"
+  const correctJson = qb.question_type === "essay"
     ? null
     : qb.correct_answer != null ? JSON.stringify(qb.correct_answer) : null;
+  const versionIndex = Math.max(0, Math.min(3, Number(opts?.versionIndex ?? 0)));
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order, question_bank_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order, question_bank_id, version_index)
+     VALUES (
+       $1, $2, $3, $4, $5, $6,
+       COALESCE($7, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1 AND version_index = $8)),
+       $9, $8
+     )
      RETURNING id`,
-    [examId, qb.content, qb.question_type, opts, correct, qb.points, displayOrder ?? null, questionBankId]
+    [
+      examId,
+      qb.content,
+      qb.question_type,
+      optionsJson,
+      correctJson,
+      qb.points,
+      opts?.displayOrder ?? null,
+      versionIndex,
+      questionBankId,
+    ]
   );
 
   // Increment usage_count

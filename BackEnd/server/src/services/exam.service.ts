@@ -197,7 +197,8 @@ export const addQuestion = async (
   correctAnswer?: string | string[] | null,
   mediaUrl?: string | null,
   displayOrder?: number,
-  versionIndex?: number
+  versionIndex?: number,
+  questionBankId?: string | null
 ): Promise<Question> => {
   if (questionType === "mcq") {
     if (!options || Object.keys(options).length === 0) {
@@ -216,7 +217,8 @@ export const addQuestion = async (
     correctAnswer ?? null,
     mediaUrl ?? null,
     displayOrder,
-    versionIndex ?? 0
+    versionIndex ?? 0,
+    questionBankId ?? null
   );
 };
 
@@ -357,9 +359,13 @@ export const createExamWithQuestionsService = async (
           : null) ??
         null;
       const versionIndex = Math.max(0, Math.min(3, Number(q.version_index ?? 0)));
+      const bankId =
+        "question_bank_id" in q && typeof (q as { question_bank_id?: unknown }).question_bank_id === "string"
+          ? (q as { question_bank_id: string }).question_bank_id
+          : null;
       const questionResult = await client.query(
-        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index, question_bank_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
           exam.id,
           q.content.trim(),
@@ -370,8 +376,15 @@ export const createExamWithQuestionsService = async (
           q.points,
           q.display_order || i + 1,
           versionIndex,
+          bankId,
         ]
       );
+      if (bankId) {
+        await client.query(
+          `UPDATE question_bank SET usage_count = usage_count + 1 WHERE id = $1`,
+          [bankId]
+        );
+      }
       const row = questionResult.rows[0];
       insertedQuestions.push({
         id: row.id,
