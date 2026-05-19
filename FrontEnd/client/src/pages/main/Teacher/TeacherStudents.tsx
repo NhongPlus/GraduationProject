@@ -4,7 +4,7 @@ import {
   Tabs, Tooltip, ActionIcon, Select, Checkbox,
 } from '@mantine/core';
 import {
-  IconDownload, IconEye, IconEyeOff, IconMail, IconPencil, IconPlus,
+  IconDownload, IconEye, IconEyeOff, IconMail, IconPencil,
   IconReportAnalytics, IconTrash,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import InputText from '@/components/Input/InputText/InputText';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 import PageHeader from '@/components/PageHeader/PageHeader';
+import { formatScoreScale10Pair, scoreToPointPercent } from '@/utils/formatExamScore';
 
 const TeacherStudents = () => {
   const { t } = useTranslation();
@@ -28,10 +29,6 @@ const TeacherStudents = () => {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ full_name: '', username: '', email: '', password: 'Test@123' });
-  const [addErr, setAddErr] = useState('');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -100,22 +97,6 @@ const TeacherStudents = () => {
   }, [page, pageSize, searchDebounced, t]);
 
   useEffect(() => { void loadStudents(); }, [loadStudents]);
-
-  const handleAdd = async () => {
-    setAddErr('');
-    if (!addForm.username || !addForm.email || !addForm.password) {
-      setAddErr(t('teacher_students.add_validation'));
-      return;
-    }
-    try {
-      await teacherStudentsApi.add(addForm);
-      setAddOpen(false);
-      setAddForm({ full_name: '', username: '', email: '', password: 'Test@123' });
-      void loadStudents();
-    } catch (e: any) {
-      setAddErr(e?.response?.data?.message || t('errors.user_add_failed'));
-    }
-  };
 
   const togglePasswordVisible = (id: string) => {
     setVisiblePasswordIds((prev) => {
@@ -361,14 +342,6 @@ const TeacherStudents = () => {
                     leftSection={<IconMail size={16} />}
                   />
                 )}
-                <ButtonFilled
-                  label={t('teacher_students.add_student')}
-                  disabled={false}
-                  onClick={() => setAddOpen(true)}
-                  color="teal"
-                  size="sm"
-                  leftSection={<IconPlus size={16} />}
-                />
               </Group>
             </Group>
             {emailResult && (
@@ -564,17 +537,15 @@ const TeacherStudents = () => {
                       <Table.Th>{t('teacher_students.col_name')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_version')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_score')}</Table.Th>
-                      <Table.Th>%</Table.Th>
+                      <Table.Th>{t('teacher_students.col_score_percent')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_date')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_grading')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {gradeRows.map((r) => {
-                      const pct =
-                        r.score != null && r.max_points && r.max_points > 0
-                          ? ((r.score / r.max_points) * 100).toFixed(1)
-                          : '—';
+                      const pctVal = scoreToPointPercent(r.score, r.max_points);
+                      const pct = pctVal != null ? pctVal.toFixed(1) : '—';
                       const hasSession = Boolean(r.session_id);
                       return (
                         <Table.Tr key={r.student_id} style={hasSession ? undefined : { opacity: 0.65 }}>
@@ -582,7 +553,7 @@ const TeacherStudents = () => {
                           <Table.Td>{r.full_name || '—'}</Table.Td>
                           <Table.Td>{r.version_code || '—'}</Table.Td>
                           <Table.Td>
-                            {hasSession ? `${r.score} / ${r.max_points}` : '—'}
+                            {hasSession ? formatScoreScale10Pair(r.score, r.max_points) : '—'}
                           </Table.Td>
                           <Table.Td>{hasSession ? pct : '—'}</Table.Td>
                           <Table.Td>
@@ -688,33 +659,6 @@ const TeacherStudents = () => {
         </Stack>
       </Modal>
 
-      {/* Modal thêm SV */}
-      <Modal opened={addOpen} onClose={() => setAddOpen(false)} title={t('teacher_students.add_modal_title')}>
-        <Stack gap="sm">
-          <InputText
-            label={t('teacher_students.col_name')}
-            value={addForm.full_name}
-            onChange={(e) => setAddForm((p) => ({ ...p, full_name: e.currentTarget.value }))}
-          />
-          <InputText
-            label={t('teacher_students.col_code')}
-            value={addForm.username}
-            onChange={(e) => setAddForm((p) => ({ ...p, username: e.currentTarget.value }))}
-          />
-          <InputText
-            label="Email"
-            value={addForm.email}
-            onChange={(e) => setAddForm((p) => ({ ...p, email: e.currentTarget.value }))}
-          />
-          <InputText
-            label={t('common.password')}
-            value={addForm.password}
-            onChange={(e) => setAddForm((p) => ({ ...p, password: e.currentTarget.value }))}
-          />
-          {addErr && <Text c="red" size="sm">{addErr}</Text>}
-          <ButtonFilled label={t('common.save')} disabled={false} onClick={handleAdd} color="teal" />
-        </Stack>
-      </Modal>
     </Box>
   );
 };

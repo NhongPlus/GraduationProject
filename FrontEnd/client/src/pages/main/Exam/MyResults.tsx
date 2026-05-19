@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { Exam, ExamSession } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import { formatScoreScale10Pair } from '@/utils/formatExamScore';
 
 const MyResults = () => {
   const { t, i18n } = useTranslation();
@@ -104,7 +105,7 @@ const MyResults = () => {
                     <Table.Td>{examNameMap[item.exam_id] || item.exam_id}</Table.Td>
                     <Table.Td>
                       {item.score != null && item.max_points != null
-                        ? `${item.score}/${item.max_points}`
+                        ? formatScoreScale10Pair(item.score, item.max_points)
                         : '—'}
                     </Table.Td>
                     <Table.Td>{new Date(item.started_at).toLocaleString(locale)}</Table.Td>

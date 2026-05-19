@@ -3,15 +3,7 @@ import { upsertPredictionCache } from "~/models/studentPredictionCache.model";
 import { getAllUsers } from "~/models/user.model";
 import { getStudentSessions } from "~/services/exam.service";
 import { predictScore, type PredictionRequest } from "~/services/prediction.service";
-
-function gradeFromPct(pct: number): string {
-  if (pct >= 90) return "A+";
-  if (pct >= 80) return "A";
-  if (pct >= 70) return "B";
-  if (pct >= 60) return "C";
-  if (pct >= 50) return "D+";
-  return "F";
-}
+import { grade10ToLetter, scoreToGrade10 } from "~/utils/gradeScale";
 
 export type RecomputeSummary = {
   total_students: number;
@@ -41,11 +33,13 @@ async function buildRequestForStudent(
   const rows: { subject: string; score: number; grade: string }[] = [];
   for (const s of chronological) {
     const exam = await getExamById(s.exam_id);
-    const pct = Math.round(((s.score ?? 0) / (s.max_points ?? 1)) * 100);
-    const grade = gradeFromPct(pct);
+    const grade10 = scoreToGrade10(s.score, s.max_points);
+    if (grade10 == null) continue;
+    const grade = grade10ToLetter(grade10);
     const subject = exam?.subject_name || exam?.title || s.exam_id;
-    rows.push({ subject, score: pct, grade });
+    rows.push({ subject, score: grade10, grade });
   }
+  if (rows.length === 0) return null;
 
   const latest = rows[rows.length - 1];
   return {
@@ -53,10 +47,10 @@ async function buildRequestForStudent(
     student_name: fullName ?? undefined,
     just_completed: {
       subject: latest.subject,
-      score: latest.score / 10,
+      score: latest.score,
       grade: latest.grade,
     },
-    history: rows.map((r) => ({ subject: r.subject, score: r.score / 10, grade: r.grade })),
+    history: rows.slice(0, -1).map((r) => ({ subject: r.subject, score: r.score, grade: r.grade })),
   };
 }
 

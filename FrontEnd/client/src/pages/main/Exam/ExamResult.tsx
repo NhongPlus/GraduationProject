@@ -20,6 +20,7 @@ import {
   sumEssayScore,
   sumMcqScore,
 } from './examResultDisplay';
+import { formatScoreScale10Pair, scoreToPointPercent } from '@/utils/formatExamScore';
 
 const ExamResult = () => {
   const { t } = useTranslation();
@@ -104,6 +105,12 @@ const ExamResult = () => {
   const { earned: mcqScore, max: mcqMax } = sumMcqScore(questions);
   const essayScore = sumEssayScore(questions);
   const fullyCorrectPct = getFullyCorrectPercent(questions);
+  const pointPercent =
+    review.score != null && review.max_points != null
+      ? scoreToPointPercent(review.score, review.max_points)
+      : hasPendingEssay && mcqMax > 0
+        ? scoreToPointPercent(mcqScore, mcqMax)
+        : null;
   const summaryTone = getSummaryResultTone(questions);
   const partialEssay = hasPartialCreditEssay(questions);
   const scoreColor =
@@ -174,27 +181,39 @@ const ExamResult = () => {
             <Text size="sm" c="dimmed">{t('exam_result.score_label')}</Text>
             <Text fw={700} size="xl">
               {review.score != null && review.max_points != null
-                ? `${review.score}/${review.max_points}`
-                : hasPendingEssay
-                  ? `${mcqScore}/${mcqMax}`
+                ? formatScoreScale10Pair(review.score, review.max_points)
+                : hasPendingEssay && mcqMax > 0
+                  ? formatScoreScale10Pair(mcqScore, mcqMax)
                   : t('exam_result.pending_score')}
             </Text>
-            {hasPendingEssay && (
+            {review.score != null && review.max_points != null && (
+              <Text size="xs" c="dimmed" mt={4}>
+                {t('exam_result.raw_score_hint', {
+                  raw: `${review.score}/${review.max_points}`,
+                })}
+              </Text>
+            )}
+            {hasPendingEssay && review.score == null && (
               <Text size="xs" c="dimmed" mt={4}>
                 {t('exam_result.total_score_after_essay')}
               </Text>
             )}
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">{t('exam_result.percentage_label')}</Text>
+            <Text size="sm" c="dimmed">{t('exam_result.point_percent_label')}</Text>
             <Group gap="xs" align="center">
               <Text fw={700} size="xl" c={scoreColor}>
-                {fullyCorrectPct != null ? `${fullyCorrectPct}%` : '—'}
+                {pointPercent != null ? `${pointPercent}%` : '—'}
               </Text>
-              {fullyCorrectPct != null && (
-                <Progress value={fullyCorrectPct} color={scoreColor} size="sm" w={80} />
+              {pointPercent != null && (
+                <Progress value={pointPercent} color={scoreColor} size="sm" w={80} />
               )}
             </Group>
+            {fullyCorrectPct != null && (
+              <Text size="xs" c="dimmed" mt={4}>
+                {t('exam_result.question_correct_percent', { pct: fullyCorrectPct })}
+              </Text>
+            )}
             {hasEssay && !hasPendingEssay && essayScore.earned != null && (
               <Text size="xs" c="dimmed" mt={4}>
                 {t('exam_result.essay_score_summary', {

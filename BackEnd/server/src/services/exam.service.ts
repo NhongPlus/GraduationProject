@@ -80,6 +80,7 @@ import {
   isPastClosesAt,
   normalizeClosesAtInput,
 } from "~/utils/examStartDeadline";
+import { formatScoreScale10Pair } from "~/utils/gradeScale";
 import type { ImportedQuestionDraft } from "~/services/examImport.service";
 
 export function httpError(status: number, message: string): Error & { status: number } {
@@ -1142,7 +1143,7 @@ export const submitSessionService = async (
     void createNotification(
       updated.student_id,
       "[Kết quả] Điểm đã có",
-      `Bài thi "${examTitle}" — Điểm: ${score}/${totalPoints} — Đã nộp lúc ${submittedAt}`,
+      `Bài thi "${examTitle}" — Điểm: ${formatScoreScale10Pair(score, totalPoints)} — Đã nộp lúc ${submittedAt}`,
       "success"
     ).catch(() => { /* non-critical */ });
   } else if (gradingStatus === "pending_manual" && updated.student_id) {
@@ -1589,7 +1590,7 @@ export const gradeEssaySessionService = async (
     void createNotification(
       updated.student_id,
       "[Kết quả] Đã chấm tự luận xong",
-      `Bài thi "${meta.exam_title}" đã được giảng viên chấm xong. Điểm: ${score}/${maxPts}. Vào xem kết quả chi tiết.`,
+      `Bài thi "${meta.exam_title}" đã được giảng viên chấm xong. Điểm: ${formatScoreScale10Pair(score, maxPts)}. Vào xem kết quả chi tiết.`,
       "success",
       `/result/${meta.exam_id}`
     ).catch(() => { /* non-critical */ });

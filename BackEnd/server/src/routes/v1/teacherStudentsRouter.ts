@@ -3,7 +3,6 @@ import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 import {
   listStudentsController,
-  addStudentController,
   updateStudentController,
   deleteStudentController,
   getGradeReportExamsController,
@@ -20,7 +19,6 @@ teacherStudentsRouter.use(authMiddleware);
 teacherStudentsRouter.use(roleMiddleware(["teacher"]));
 
 teacherStudentsRouter.get("/", listStudentsController);
-teacherStudentsRouter.post("/", addStudentController);
 
 teacherStudentsRouter.get("/:id/transcript/export", exportStudentTranscriptController);
 teacherStudentsRouter.get("/:id/transcript", getStudentTranscriptController);

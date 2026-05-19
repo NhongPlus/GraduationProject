@@ -4,6 +4,7 @@ import { Badge, Box, Button, Divider, Group, Menu, Text, Tooltip } from '@mantin
 import { useTranslation } from 'react-i18next';
 import { Bell, Check, CheckCheck, ExternalLink } from 'lucide-react';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, type UserNotificationItem } from '@/services/notificationApi';
+import { sanitizeScoreInText } from '@/utils/formatExamScore';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -149,7 +150,7 @@ export default function NotificationBell() {
                       </Tooltip>
                     )}
                   </Group>
-                  <Text size="xs" c="dimmed" mt={2} lineClamp={2}>{n.message}</Text>
+                  <Text size="xs" c="dimmed" mt={2} lineClamp={2}>{sanitizeScoreInText(n.message)}</Text>
                   <Group justify="space-between" mt={4}>
                     <Text size="xs" c="dimmed">{timeAgo(n.created_at)}</Text>
                     {n.link && (

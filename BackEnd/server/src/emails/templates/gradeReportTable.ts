@@ -1,5 +1,6 @@
 import { escapeHtml } from "../layout";
 import type { EmailContent } from "../types";
+import { formatScoreScale10Pair, scoreToPointPercent } from "~/utils/gradeScale";
 
 export type GradeReportRow = {
   exam_title: string;
@@ -31,13 +32,11 @@ export function buildGradeReportTableEmail(params: GradeReportTableParams): Emai
 
   const tableRows = params.rows
     .map((g) => {
-      const pct =
-        g.max_points && g.max_points > 0
-          ? `${(((g.score ?? 0) / g.max_points) * 100).toFixed(1)}%`
-          : "—";
+      const pctVal = scoreToPointPercent(g.score, g.max_points);
+      const pct = pctVal != null ? `${pctVal}%` : "—";
       return `<tr>
         <td>${escapeHtml(g.exam_title)}</td>
-        <td>${g.score ?? "—"} / ${g.max_points ?? "—"}</td>
+        <td>${formatScoreScale10Pair(g.score, g.max_points)}</td>
         <td>${pct}</td>
         <td>${formatSubmittedDate(g.submitted_at)}</td>
       </tr>`;
@@ -64,7 +63,7 @@ export function buildGradeReportTableEmail(params: GradeReportTableParams): Emai
     <p>Dưới đây là bảng điểm các bài thi đã nộp của bạn:</p>
     <table>
       <thead>
-        <tr><th>Bài thi</th><th>Điểm</th><th>%</th><th>Ngày nộp</th></tr>
+        <tr><th>Bài thi</th><th>Điểm (thang 10)</th><th>% điểm</th><th>Ngày nộp</th></tr>
       </thead>
       <tbody>${tableRows}</tbody>
     </table>
@@ -74,11 +73,9 @@ export function buildGradeReportTableEmail(params: GradeReportTableParams): Emai
 </html>`;
 
   const textLines = params.rows.map((g) => {
-    const pct =
-      g.max_points && g.max_points > 0
-        ? `${(((g.score ?? 0) / g.max_points) * 100).toFixed(1)}%`
-        : "—";
-    return `- ${g.exam_title}: ${g.score ?? "—"}/${g.max_points ?? "—"} (${pct}), nộp ${formatSubmittedDate(g.submitted_at)}`;
+    const pctVal = scoreToPointPercent(g.score, g.max_points);
+    const pct = pctVal != null ? `${pctVal}%` : "—";
+    return `- ${g.exam_title}: ${formatScoreScale10Pair(g.score, g.max_points)} (${pct}), nộp ${formatSubmittedDate(g.submitted_at)}`;
   });
 
   const text =

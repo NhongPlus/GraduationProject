@@ -1,9 +1,49 @@
 /** Quy đổi điểm thang 10 → thang 4 và điểm chữ (theo quy chế phổ biến VN). */
 
+/** Hiển thị điểm (tránh 36.39999999999999 → 36.4). */
+export function formatExamScore(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const rounded = Math.round(Number(value) * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+export function formatExamScorePair(
+  score: number | null | undefined,
+  maxPoints: number | null | undefined
+): string {
+  return `${formatExamScore(score)}/${formatExamScore(maxPoints)}`;
+}
+
+/** Quy điểm thô (tổng điểm câu tùy GV) → thang 10. */
 export function scoreToGrade10(score: number | null, maxPoints: number | null): number | null {
   if (score == null || maxPoints == null || maxPoints <= 0) return null;
   const g = (Number(score) / Number(maxPoints)) * 10;
   return Math.round(g * 10) / 10;
+}
+
+export function formatScoreScale10(
+  score: number | null | undefined,
+  maxPoints: number | null | undefined
+): string {
+  const g10 = scoreToGrade10(score ?? null, maxPoints ?? null);
+  return g10 == null ? "—" : formatExamScore(g10);
+}
+
+export function formatScoreScale10Pair(
+  score: number | null | undefined,
+  maxPoints: number | null | undefined
+): string {
+  const label = formatScoreScale10(score, maxPoints);
+  return label === "—" ? "—" : `${label}/10`;
+}
+
+/** % điểm đạt được theo tổng điểm bài (không theo số câu). */
+export function scoreToPointPercent(
+  score: number | null | undefined,
+  maxPoints: number | null | undefined
+): number | null {
+  if (score == null || maxPoints == null || Number(maxPoints) <= 0) return null;
+  return Math.round((Number(score) / Number(maxPoints)) * 1000) / 10;
 }
 
 export function grade10ToGrade4(grade10: number): number {
