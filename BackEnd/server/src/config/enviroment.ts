@@ -40,6 +40,8 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER?.trim() || "",
   SMTP_PASS: process.env.SMTP_PASS?.trim() || "",
   MAIL_FROM: process.env.MAIL_FROM?.trim() || "",
+  /** Resend HTTPS API — dùng trên Render Free (SMTP port bị chặn). */
+  RESEND_API_KEY: process.env.RESEND_API_KEY?.trim() || "",
   /** Chu kỳ quét nhắc hạn thi (ms), mặc định 10 phút */
   EXAM_REMINDER_INTERVAL_MS: parseIntEnv(process.env.EXAM_REMINDER_INTERVAL_MS, 600_000),
   /** MiniMax API — AI dự đoán điểm học phần */

@@ -2,44 +2,93 @@ import nodemailer from "nodemailer";
 import { env } from "~/config/enviroment";
 
 // ---------------------------------------------------------------------------
-// Transporter
+// Transporter (SMTP)
 // ---------------------------------------------------------------------------
 
 let _transporter: nodemailer.Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter | null {
+function getSmtpTransporter(): nodemailer.Transporter | null {
   if (!env.SMTP_HOST || !env.MAIL_FROM) return null;
   if (!_transporter) {
+    const useTlsOn587 = env.SMTP_PORT === 587 && !env.SMTP_SECURE;
     _transporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
+      requireTLS: useTlsOn587,
       auth:
         env.SMTP_USER && env.SMTP_PASS
           ? { user: env.SMTP_USER, pass: env.SMTP_PASS }
           : undefined,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
     });
   }
   return _transporter;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function mustGetTransporter(): nodemailer.Transporter {
-  const t = getTransporter();
-  if (!t) throw new Error("SMTP chưa cấu hình — đặt SMTP_HOST và MAIL_FROM trong .env");
-  return t;
+function usesResendApi(): boolean {
+  return Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 }
 
-async function send(opts: {
+async function sendViaResend(opts: {
   to: string;
   subject: string;
   html?: string;
   text?: string;
+  bcc?: string[];
 }): Promise<void> {
-  const t = mustGetTransporter();
+  const body: Record<string, unknown> = {
+    from: env.MAIL_FROM,
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text ?? opts.html?.replace(/<[^>]*>/g, ""),
+  };
+  if (opts.bcc?.length) {
+    body.bcc = opts.bcc;
+    body.to = env.MAIL_FROM;
+  } else {
+    body.to = [opts.to];
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Resend API lỗi (${res.status}): ${detail.slice(0, 200)}`);
+  }
+}
+
+async function sendViaSmtp(opts: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  bcc?: string[];
+}): Promise<void> {
+  const t = getSmtpTransporter();
+  if (!t) throw new Error("SMTP chưa cấu hình — đặt SMTP_HOST và MAIL_FROM trong .env");
+
+  if (opts.bcc?.length) {
+    await t.sendMail({
+      from: env.MAIL_FROM,
+      to: env.MAIL_FROM,
+      bcc: opts.bcc.filter(Boolean),
+      subject: opts.subject,
+      text: opts.text ?? opts.html?.replace(/<[^>]*>/g, ""),
+      html: opts.html,
+    });
+    return;
+  }
+
   await t.sendMail({
     from: env.MAIL_FROM,
     to: opts.to,
@@ -49,32 +98,37 @@ async function send(opts: {
   });
 }
 
+async function dispatchEmail(opts: {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  bcc?: string[];
+}): Promise<void> {
+  if (usesResendApi()) {
+    await sendViaResend(opts);
+    return;
+  }
+  await sendViaSmtp(opts);
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export function isEmailConfigured(): boolean {
-  return Boolean(getTransporter());
+  return usesResendApi() || Boolean(getSmtpTransporter());
 }
 
-/**
- * Gửi email đơn giản (html hoặc text).
- */
 export async function sendEmail(
   to: string,
   subject: string,
   html: string,
   text?: string
 ): Promise<void> {
-  await send({ to, subject, html, text });
+  await dispatchEmail({ to, subject, html, text });
 }
 
-/**
- * Gửi email đặt lại mật khẩu kèm mật khẩu tạm thời.
- * @param to   Địa chỉ email người nhận
- * @param tempPassword Mật khẩu tạm do hệ thống tạo
- * @param fullName Tên hiển thị của người dùng (tùy chọn)
- */
 export async function sendPasswordReset(
   to: string,
   tempPassword: string,
@@ -112,12 +166,9 @@ export async function sendPasswordReset(
     `Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n` +
     `Trân trọng,\nBan quản trị hệ thống thi trực tuyến.`;
 
-  await send({ to, subject, html, text });
+  await dispatchEmail({ to, subject, html, text });
 }
 
-/**
- * Gửi thông báo liên quan đến bài thi (nhắc hạn, thay đổi, kết quả…).
- */
 export async function sendExamNotification(
   to: string,
   examTitle: string,
@@ -156,12 +207,9 @@ export async function sendExamNotification(
 </html>`;
   const text = `${examTitle}\n\n${message}`;
 
-  await send({ to, subject, html, text });
+  await dispatchEmail({ to, subject, html, text });
 }
 
-/**
- * Gửi email cho nhiều người cùng lúc qua BCC (cho reminder job).
- */
 export async function sendBatchEmail(
   bcc: string[],
   subject: string,
@@ -169,20 +217,15 @@ export async function sendBatchEmail(
   text?: string
 ): Promise<void> {
   if (!bcc.length) return;
-  const t = mustGetTransporter();
-  await t.sendMail({
-    from: env.MAIL_FROM,
+  await dispatchEmail({
     to: env.MAIL_FROM,
-    bcc: bcc.filter(Boolean),
+    bcc,
     subject,
-    text: text ?? html.replace(/<[^>]*>/g, ""),
     html,
+    text: text ?? html.replace(/<[^>]*>/g, ""),
   });
 }
 
-/**
- * Gửi thông báo điểm thi cho sinh viên.
- */
 export async function sendGradeNotification(
   to: string,
   examTitle: string,
@@ -220,5 +263,5 @@ export async function sendGradeNotification(
 </html>`;
   const text = `Kết quả bài thi: ${examTitle}\nĐiểm: ${score}/${maxScore} (${percentage}%)\nNgày nộp: ${submittedAt}`;
 
-  await send({ to, subject, html, text });
+  await dispatchEmail({ to, subject, html, text });
 }

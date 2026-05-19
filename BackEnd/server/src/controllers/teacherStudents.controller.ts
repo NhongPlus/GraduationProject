@@ -594,7 +594,10 @@ export const sendGradeReportEmailController = async (
 ) => {
   try {
     if (!isEmailConfigured()) {
-      return res.status(503).json({ success: false, message: "SMTP chưa cấu hình" });
+      return res.status(503).json({
+        success: false,
+        message: "Email chưa cấu hình (cần MAIL_FROM + SMTP hoặc RESEND_API_KEY)",
+      });
     }
 
     const user = (req as any).user;
@@ -627,25 +630,48 @@ export const sendGradeReportEmailController = async (
     );
     const className = classR.rows[0]?.display_name ?? "";
 
-    let sentCount = 0;
-    for (const stu of stuR.rows) {
+    const studentIds = stuR.rows.map((s) => s.id);
+    const gradesByStudent = new Map<
+      string,
+      { exam_title: string; score: number | null; max_points: number | null; submitted_at: string | null }[]
+    >();
+
+    if (studentIds.length > 0) {
       const gradesR = await pool.query<{
+        student_id: string;
         exam_title: string;
         score: number | null;
         max_points: number | null;
         submitted_at: string | null;
       }>(
-        `SELECT e.title AS exam_title, es.score, es.max_points, es.submitted_at::text
+        `SELECT es.student_id, e.title AS exam_title, es.score, es.max_points, es.submitted_at::text
          FROM exam_sessions es
          JOIN exams e ON e.id = es.exam_id
-         WHERE es.student_id = $1 AND es.status = 'submitted'
+         WHERE es.student_id = ANY($1::uuid[]) AND es.status = 'submitted'
          ORDER BY es.submitted_at DESC`,
-        [stu.id]
+        [studentIds]
       );
+      for (const g of gradesR.rows) {
+        const list = gradesByStudent.get(g.student_id) ?? [];
+        list.push({
+          exam_title: g.exam_title,
+          score: g.score,
+          max_points: g.max_points,
+          submitted_at: g.submitted_at,
+        });
+        gradesByStudent.set(g.student_id, list);
+      }
+    }
 
-      if (gradesR.rows.length === 0) continue;
+    let sentCount = 0;
+    let failedCount = 0;
+    let lastError = "";
 
-      const tableRows = gradesR.rows
+    for (const stu of stuR.rows) {
+      const gradeRows = gradesByStudent.get(stu.id) ?? [];
+      if (gradeRows.length === 0) continue;
+
+      const tableRows = gradeRows
         .map((g) => {
           const pct = g.max_points && g.max_points > 0
             ? `${((g.score ?? 0) / g.max_points * 100).toFixed(1)}%`
@@ -672,12 +698,35 @@ th{background:#2563eb;color:#fff}
 <p class="footer">Email được gửi tự động từ hệ thống thi trực tuyến.</p>
 </div></body></html>`;
 
-      await sendEmail(stu.email, `[Bảng điểm] ${className}`, html);
-      sentCount++;
+      try {
+        await sendEmail(stu.email, `[Bảng điểm] ${className}`, html);
+        sentCount++;
+      } catch (err) {
+        failedCount++;
+        lastError = err instanceof Error ? err.message : String(err);
+        console.error(`[grade-email] Failed for ${stu.email}:`, lastError);
+      }
     }
 
-    res.json({ success: true, data: { sent: sentCount, total: stuR.rows.length } });
-  } catch (err) { next(err); }
+    if (sentCount === 0 && failedCount > 0) {
+      return res.status(502).json({
+        success: false,
+        message: lastError || "Không gửi được email",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        sent: sentCount,
+        total: stuR.rows.length,
+        failed: failedCount,
+        skipped: stuR.rows.length - sentCount - failedCount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 async function loadStudentTranscriptPayload(studentId: string, adminClassId: string) {
