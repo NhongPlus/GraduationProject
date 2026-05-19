@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box, Table, Title, Paper, Text, Stack, Group, Badge, Modal, Loader, Alert,
-  Tabs, Tooltip, ActionIcon, Select,
+  Tabs, Tooltip, ActionIcon, Select, Checkbox,
 } from '@mantine/core';
 import {
   IconDownload, IconEye, IconEyeOff, IconMail, IconPencil, IconPlus,
@@ -60,6 +60,8 @@ const TeacherStudents = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailResult, setEmailResult] = useState('');
+  const [emailResultError, setEmailResultError] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
 
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
@@ -229,19 +231,66 @@ const TeacherStudents = () => {
     }
   };
 
-  const handleSendEmail = async () => {
-    if (!window.confirm(t('teacher_students.confirm_send_email'))) return;
+  const pageStudentIds = useMemo(() => students.map((s) => s.id), [students]);
+  const allPageSelected =
+    pageStudentIds.length > 0 && pageStudentIds.every((id) => selectedStudentIds.has(id));
+  const somePageSelected = pageStudentIds.some((id) => selectedStudentIds.has(id));
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageStudentIds.forEach((id) => next.delete(id));
+      } else {
+        pageStudentIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleStudentSelected = (id: string) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const sendTranscriptEmails = async (studentIds?: string[]) => {
+    const count = studentIds?.length ?? 0;
+    const confirmKey = studentIds?.length
+      ? 'teacher_students.confirm_send_email_selected'
+      : 'teacher_students.confirm_send_email';
+    if (!window.confirm(t(confirmKey, { count }))) return;
     try {
       setEmailSending(true);
       setEmailResult('');
-      const r = await teacherStudentsApi.sendGradeEmail();
+      setEmailResultError(false);
+      const r = await teacherStudentsApi.sendGradeEmail(studentIds);
       setEmailResult(t('teacher_students.email_sent_result', { sent: r.sent, total: r.total }));
+      setEmailResultError(false);
+      if (studentIds?.length) {
+        setSelectedStudentIds((prev) => {
+          const next = new Set(prev);
+          studentIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
     } catch (e: unknown) {
       const apiMsg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setEmailResult(apiMsg || t('teacher_students.email_send_error'));
+      setEmailResultError(true);
     } finally {
       setEmailSending(false);
     }
+  };
+
+  const handleSendEmail = () => void sendTranscriptEmails();
+  const handleSendSelectedEmail = () => {
+    const ids = Array.from(selectedStudentIds);
+    if (!ids.length) return;
+    void sendTranscriptEmails(ids);
   };
 
   const openTranscript = async (studentId: string) => {
@@ -294,22 +343,39 @@ const TeacherStudents = () => {
         {/* Tab: Danh sách */}
         <Tabs.Panel value="list">
           <Stack gap="md">
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap">
               <InputText
                 placeholder={t('teacher_students.search_placeholder')}
                 value={search}
                 onChange={(e) => setSearch(e.currentTarget.value)}
                 style={{ maxWidth: 320 }}
               />
-              <ButtonFilled
-                label={t('teacher_students.add_student')}
-                disabled={false}
-                onClick={() => setAddOpen(true)}
-                color="teal"
-                size="sm"
-                leftSection={<IconPlus size={16} />}
-              />
+              <Group gap="xs">
+                {selectedStudentIds.size > 0 && (
+                  <ButtonFilled
+                    label={t('teacher_students.send_grades_btn', { count: selectedStudentIds.size })}
+                    disabled={emailSending}
+                    onClick={handleSendSelectedEmail}
+                    color="teal"
+                    size="sm"
+                    leftSection={<IconMail size={16} />}
+                  />
+                )}
+                <ButtonFilled
+                  label={t('teacher_students.add_student')}
+                  disabled={false}
+                  onClick={() => setAddOpen(true)}
+                  color="teal"
+                  size="sm"
+                  leftSection={<IconPlus size={16} />}
+                />
+              </Group>
             </Group>
+            {emailResult && (
+              <Text size="sm" c={emailResultError ? 'red' : 'teal'}>
+                {emailResult}
+              </Text>
+            )}
 
             {error && <Alert color="red" variant="light">{error}</Alert>}
 
@@ -327,6 +393,14 @@ const TeacherStudents = () => {
                 <Table highlightOnHover verticalSpacing="sm">
                   <Table.Thead>
                     <Table.Tr>
+                      <Table.Th w={40}>
+                        <Checkbox
+                          checked={allPageSelected}
+                          indeterminate={!allPageSelected && somePageSelected}
+                          onChange={toggleSelectAllOnPage}
+                          aria-label={t('teacher_students.select_all_page')}
+                        />
+                      </Table.Th>
                       <Table.Th>#</Table.Th>
                       <Table.Th>{t('teacher_students.col_code')}</Table.Th>
                       <Table.Th>{t('teacher_students.col_name')}</Table.Th>
@@ -338,7 +412,14 @@ const TeacherStudents = () => {
                   </Table.Thead>
                   <Table.Tbody>
                     {students.map((s, idx) => (
-                      <Table.Tr key={s.id}>
+                      <Table.Tr key={s.id} bg={selectedStudentIds.has(s.id) ? 'teal.0' : undefined}>
+                        <Table.Td>
+                          <Checkbox
+                            checked={selectedStudentIds.has(s.id)}
+                            onChange={() => toggleStudentSelected(s.id)}
+                            aria-label={t('teacher_students.select_student', { name: s.full_name || s.username })}
+                          />
+                        </Table.Td>
                         <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                         <Table.Td><Text size="sm" ff="monospace">{s.username}</Text></Table.Td>
                         <Table.Td>{s.full_name || '—'}</Table.Td>
@@ -395,7 +476,7 @@ const TeacherStudents = () => {
                     ))}
                     {!loading && students.length === 0 && (
                       <Table.Tr>
-                        <Table.Td colSpan={7}>
+                        <Table.Td colSpan={8}>
                           <Text c="dimmed" ta="center" py="md">{t('teacher_students.empty')}</Text>
                         </Table.Td>
                       </Table.Tr>
@@ -555,8 +636,14 @@ const TeacherStudents = () => {
         loading={transcriptLoading}
         data={transcriptData}
         exportLoading={transcriptExportLoading}
+        emailSending={emailSending}
         onExportHtml={() => void handleTranscriptExport('html')}
         onExportCsv={() => void handleTranscriptExport('csv')}
+        onSendEmail={
+          transcriptStudentId
+            ? () => void sendTranscriptEmails([transcriptStudentId])
+            : undefined
+        }
       />
 
       <Modal

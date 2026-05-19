@@ -230,7 +230,13 @@
     "contact_admin_hint": "Nếu thông tin cá nhân chưa chính xác, vui lòng liên hệ quản trị viên để cập nhật.",
     "password_hint": "Bạn nên đặt mật khẩu tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số.",
     "password_changed": "Đổi mật khẩu thành công.",
-    "password_min_length": "Mật khẩu mới phải có ít nhất 8 ký tự."
+    "password_min_length": "Mật khẩu mới phải có ít nhất 8 ký tự.",
+    "reset_request_title": "Yêu cầu đặt lại mật khẩu",
+    "reset_request_desc": "Yêu cầu sẽ được gửi lên quản trị viên. Sau khi duyệt, mật khẩu tạm sẽ gửi qua email đăng ký của bạn.",
+    "reset_request_hint": "Mỗi tài khoản chỉ có một yêu cầu đang chờ tại một thời điểm.",
+    "reset_request_submit": "Gửi yêu cầu đặt lại mật khẩu",
+    "reset_request_confirm": "Gửi yêu cầu đặt lại mật khẩu lên quản trị viên?",
+    "reset_request_error": "Không gửi được yêu cầu. Vui lòng thử lại sau."
   },
   "admin": {
     "dashboard_title": "Trang quản trị",
@@ -804,7 +810,12 @@
     "grading_pending": "Chờ chấm TL",
     "not_submitted": "Chưa thi",
     "send_email": "Gửi email bảng điểm",
-    "confirm_send_email": "Gửi email bảng điểm cho tất cả sinh viên có điểm?",
+    "send_grades_btn": "Gửi điểm ({{count}})",
+    "send_grade_email": "Gửi điểm qua email",
+    "confirm_send_email": "Gửi bảng kết quả học tập qua email cho toàn bộ sinh viên trong lớp?",
+    "confirm_send_email_selected": "Gửi bảng kết quả học tập qua email cho {{count}} sinh viên đã chọn?",
+    "select_all_page": "Chọn tất cả trang này",
+    "select_student": "Chọn {{name}}",
     "email_sent_result": "Đã gửi {{sent}}/{{total}} email",
     "email_send_error": "Gửi email thất bại",
     "transcript_btn": "Bảng điểm cá nhân",

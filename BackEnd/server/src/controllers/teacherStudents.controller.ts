@@ -3,7 +3,7 @@ import pool from "~/config/db";
 import bcrypt from "bcrypt";
 import { getAdminClassByManager } from "~/models/adminClass.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
-import { isEmailConfigured, sendGradeReportTable } from "~/services/email.service";
+import { isEmailConfigured, sendEmail } from "~/services/email.service";
 import { buildTranscriptCourses, calcCumulativeGpa } from "~/utils/gradeScale";
 
 interface StudentRow {
@@ -630,53 +630,34 @@ export const sendGradeReportEmailController = async (
     );
     const className = classR.rows[0]?.display_name ?? "";
 
-    const studentIds = stuR.rows.map((s) => s.id);
-    const gradesByStudent = new Map<
-      string,
-      { exam_title: string; score: number | null; max_points: number | null; submitted_at: string | null }[]
-    >();
-
-    if (studentIds.length > 0) {
-      const gradesR = await pool.query<{
-        student_id: string;
-        exam_title: string;
-        score: number | null;
-        max_points: number | null;
-        submitted_at: string | null;
-      }>(
-        `SELECT es.student_id, e.title AS exam_title, es.score, es.max_points, es.submitted_at::text
-         FROM exam_sessions es
-         JOIN exams e ON e.id = es.exam_id
-         WHERE es.student_id = ANY($1::uuid[]) AND es.status = 'submitted'
-         ORDER BY es.submitted_at DESC`,
-        [studentIds]
-      );
-      for (const g of gradesR.rows) {
-        const list = gradesByStudent.get(g.student_id) ?? [];
-        list.push({
-          exam_title: g.exam_title,
-          score: g.score,
-          max_points: g.max_points,
-          submitted_at: g.submitted_at,
-        });
-        gradesByStudent.set(g.student_id, list);
-      }
-    }
-
     let sentCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
     let lastError = "";
 
     for (const stu of stuR.rows) {
-      const gradeRows = gradesByStudent.get(stu.id) ?? [];
-      if (gradeRows.length === 0) continue;
-
       try {
-        await sendGradeReportTable(stu.email, {
-          className,
-          studentName: stu.full_name ?? stu.email,
-          rows: gradeRows,
-        });
+        const payload = await loadStudentTranscriptPayload(stu.id, adminClassId);
+        if (!payload) {
+          skippedCount++;
+          continue;
+        }
+
+        const html = buildTranscriptHtml(payload);
+        const studentName = payload.student.full_name;
+        const subject = `[Bảng kết quả học tập] ${studentName} — ${className}`;
+        const textLines = payload.courses.map(
+          (c, i) =>
+            `${i + 1}. ${c.subject_name}: ${c.grade10.toFixed(1)} (10), ${c.grade4.toFixed(1)} (4), ${c.letter}`
+        );
+        const text =
+          `Bảng kết quả học tập — ${studentName}\n` +
+          `Lớp: ${payload.student.class_name}\n\n` +
+          (textLines.length ? `${textLines.join("\n")}\n\n` : "Chưa có học phần đã hoàn thành.\n\n") +
+          `GPA (4): ${payload.summary.gpa4.toFixed(2)} | GPA (10): ${payload.summary.gpa10.toFixed(2)} | TC: ${payload.summary.totalCredits}\n` +
+          `Xếp loại: ${payload.summary.classification}`;
+
+        await sendEmail(stu.email, subject, html, text);
         sentCount++;
       } catch (err) {
         failedCount++;
@@ -691,7 +672,7 @@ export const sendGradeReportEmailController = async (
       return res.status(needsDomain ? 403 : 502).json({
         success: false,
         message: lastError || "Không gửi được email",
-        data: { sent: 0, total: stuR.rows.length, failed: failedCount },
+        data: { sent: 0, total: stuR.rows.length, failed: failedCount, skipped: skippedCount },
       });
     }
 
@@ -701,7 +682,7 @@ export const sendGradeReportEmailController = async (
         sent: sentCount,
         total: stuR.rows.length,
         failed: failedCount,
-        skipped: stuR.rows.length - sentCount - failedCount,
+        skipped: skippedCount,
       },
     });
   } catch (err) {

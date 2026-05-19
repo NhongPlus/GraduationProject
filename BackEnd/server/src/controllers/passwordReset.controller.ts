@@ -92,3 +92,22 @@ export const getMyResetRequestsController = async (
     next(err);
   }
 };
+
+/** Đã đăng nhập: gửi yêu cầu đặt lại MK cho chính mình → admin duyệt. */
+export const submitMyResetRequestController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const result = await requestPasswordReset(user.userId, user.userId);
+    res.json({
+      success: true,
+      message: "Yêu cầu đã được gửi lên quản trị viên. Vui lòng chờ xử lý.",
+      data: result,
+    });
+  } catch (err: any) {
+    next(err);
+  }
+};

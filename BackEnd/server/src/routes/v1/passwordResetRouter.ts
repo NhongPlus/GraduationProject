@@ -7,6 +7,7 @@ import {
   approveResetRequestController,
   rejectResetRequestController,
   getMyResetRequestsController,
+  submitMyResetRequestController,
 } from "~/controllers/passwordReset.controller";
 import { requestPasswordReset } from "~/services/passwordReset.service";
 import pool from "~/config/db";
@@ -68,6 +69,12 @@ authedRouter.get(
   "/me",
   roleMiddleware(["admin", "teacher", "student"]),
   getMyResetRequestsController
+);
+
+authedRouter.post(
+  "/me",
+  roleMiddleware(["admin", "teacher", "student"]),
+  submitMyResetRequestController
 );
 
 // Mount: /password-reset/self → public, /password-reset/* → authed

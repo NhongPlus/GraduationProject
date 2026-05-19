@@ -107,6 +107,19 @@ export const getMyPasswordResetRequests = async (): Promise<PasswordResetRequest
   return res.data.data;
 };
 
+/** Đã đăng nhập: gửi yêu cầu đặt lại MK lên admin (tab Cài đặt tài khoản). */
+export const submitMyPasswordResetRequest = async (): Promise<{ requestId: string; message: string }> => {
+  const res = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: { requestId: string };
+  }>("/password-reset/me");
+  return {
+    requestId: res.data.data.requestId,
+    message: res.data.message || "Yêu cầu đã được gửi lên quản trị viên. Vui lòng chờ xử lý.",
+  };
+};
+
 export const requestSelfPasswordReset = async (email: string): Promise<{ requestId: string }> => {
   const res = await apiClient.post<{ success: boolean; data: { requestId: string } }>(
     "/password-reset/self",

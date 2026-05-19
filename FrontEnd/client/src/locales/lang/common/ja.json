@@ -226,7 +226,13 @@
     "email": "メール",
     "subtitle": "個人情報とアカウントのセキュリティを管理します。",
     "contact_admin_hint": "情報が正しくない場合は管理者に連絡してください。",
-    "password_hint": "8文字以上で、大文字・小文字・数字を含めることを推奨します。"
+    "password_hint": "8文字以上で、大文字・小文字・数字を含めることを推奨します。",
+    "reset_request_title": "パスワードリセットを依頼",
+    "reset_request_desc": "依頼は管理者に送信されます。承認後、仮パスワードが登録メールに送られます。",
+    "reset_request_hint": "処理待ちの依頼は同時に1件までです。",
+    "reset_request_submit": "リセット依頼を送信",
+    "reset_request_confirm": "管理者にパスワードリセットを依頼しますか？",
+    "reset_request_error": "依頼を送信できませんでした。しばらくしてから再度お試しください。"
   },
   "admin": {
     "dashboard_title": "管理ダッシュボード",

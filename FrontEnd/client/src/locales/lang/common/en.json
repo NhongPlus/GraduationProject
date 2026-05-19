@@ -226,7 +226,13 @@
     "email": "Email",
     "subtitle": "Manage your personal profile and account security.",
     "contact_admin_hint": "If your personal information is not accurate, please contact your administrator.",
-    "password_hint": "Use at least 8 characters including uppercase, lowercase, and numbers."
+    "password_hint": "Use at least 8 characters including uppercase, lowercase, and numbers.",
+    "reset_request_title": "Request password reset",
+    "reset_request_desc": "Your request will be sent to an administrator. After approval, a temporary password will be emailed to you.",
+    "reset_request_hint": "Only one pending request is allowed at a time.",
+    "reset_request_submit": "Submit password reset request",
+    "reset_request_confirm": "Send a password reset request to the administrator?",
+    "reset_request_error": "Could not submit the request. Please try again later."
   },
   "admin": {
     "dashboard_title": "Admin dashboard",
@@ -422,7 +428,12 @@
     "grading_pending": "Essay pending",
     "not_submitted": "Not taken",
     "send_email": "Email grade reports",
-    "confirm_send_email": "Send grade report email to all students with grades?",
+    "send_grades_btn": "Send grades ({{count}})",
+    "send_grade_email": "Email transcript",
+    "confirm_send_email": "Email academic transcripts to all students in the class?",
+    "confirm_send_email_selected": "Email academic transcripts to {{count}} selected students?",
+    "select_all_page": "Select all on this page",
+    "select_student": "Select {{name}}",
     "email_sent_result": "Sent {{sent}}/{{total}} emails",
     "email_send_error": "Failed to send emails",
     "transcript_btn": "Personal transcript",

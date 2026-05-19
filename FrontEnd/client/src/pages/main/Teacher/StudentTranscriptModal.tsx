@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { StudentTranscript } from '@/services/teacherStudentsApi';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import { IconDownload, IconPrinter } from '@tabler/icons-react';
+import { IconDownload, IconMail, IconPrinter } from '@tabler/icons-react';
 
 interface Props {
   opened: boolean;
@@ -16,6 +16,8 @@ interface Props {
   onExportHtml: () => void;
   onExportCsv: () => void;
   exportLoading: boolean;
+  emailSending?: boolean;
+  onSendEmail?: () => void;
 }
 
 function CourseTable({
@@ -63,6 +65,8 @@ const StudentTranscriptModal = ({
   onExportHtml,
   onExportCsv,
   exportLoading,
+  emailSending = false,
+  onSendEmail,
 }: Props) => {
   const { t } = useTranslation();
   const printRef = useRef<HTMLDivElement>(null);
@@ -120,6 +124,16 @@ const StudentTranscriptModal = ({
       ) : !data ? null : (
         <Stack gap="md">
           <Group justify="flex-end" gap="xs">
+            {onSendEmail && (
+              <ButtonFilled
+                label={t('teacher_students.send_grade_email')}
+                onClick={onSendEmail}
+                color="teal"
+                size="xs"
+                leftSection={<IconMail size={14} />}
+                disabled={emailSending}
+              />
+            )}
             <ButtonLight
               label={t('teacher_students.transcript_export_csv')}
               onClick={onExportCsv}
