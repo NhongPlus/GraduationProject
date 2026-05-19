@@ -35,6 +35,7 @@ import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { isPastExamStartDeadline } from '@/utils/examDeadline';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
+import { enterExamRoom } from '@/utils/enterExamRoom';
 
 const ExamList = () => {
   const { t } = useTranslation();
@@ -225,7 +226,13 @@ const ExamList = () => {
                       : t('exam_list.deadline_none');
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
-                    : () => navigate(studentSubmitted ? `/result/${item.id}` : `/exam/${item.id}`);
+                    : () => {
+                        if (studentSubmitted) {
+                          navigate(`/result/${item.id}`);
+                          return;
+                        }
+                        void enterExamRoom(navigate, item.id);
+                      };
                   return (
                     <Table.Tr
                       key={item.id}
@@ -320,16 +327,7 @@ const ExamList = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (done) return;
-                                void (async () => {
-                                  try {
-                                    if (document.documentElement.requestFullscreen) {
-                                      await document.documentElement.requestFullscreen();
-                                    }
-                                  } catch {
-                                    /* ExamTake sẽ hiện lại nút bật fullscreen */
-                                  }
-                                  navigate(`/exam/${item.id}`);
-                                })();
+                                void enterExamRoom(navigate, item.id);
                               }}
                             />
                             <ButtonFilled
