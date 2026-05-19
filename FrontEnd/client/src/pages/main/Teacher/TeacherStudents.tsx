@@ -236,8 +236,9 @@ const TeacherStudents = () => {
       setEmailResult('');
       const r = await teacherStudentsApi.sendGradeEmail();
       setEmailResult(t('teacher_students.email_sent_result', { sent: r.sent, total: r.total }));
-    } catch {
-      setEmailResult(t('teacher_students.email_send_error'));
+    } catch (e: unknown) {
+      const apiMsg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setEmailResult(apiMsg || t('teacher_students.email_send_error'));
     } finally {
       setEmailSending(false);
     }

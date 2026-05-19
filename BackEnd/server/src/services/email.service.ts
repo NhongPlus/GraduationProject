@@ -75,8 +75,29 @@ async function sendViaResend(opts: {
 
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`Resend API lỗi (${res.status}): ${detail.slice(0, 200)}`);
+    let parsedMessage = detail;
+    try {
+      const json = JSON.parse(detail) as { message?: string };
+      if (json.message) parsedMessage = json.message;
+    } catch {
+      /* raw text */
+    }
+    const err = new Error(formatResendError(res.status, parsedMessage)) as Error & {
+      statusCode?: number;
+    };
+    err.statusCode = res.status;
+    throw err;
   }
+}
+
+function formatResendError(status: number, message: string): string {
+  if (status === 403 && /verify a domain|only send testing emails/i.test(message)) {
+    return (
+      "Resend: chưa verify domain — chỉ gửi thử được tới email đăng ký tài khoản Resend. " +
+      "Vào resend.com → Domains → thêm nhongplus.id.vn, cập nhật DNS, rồi đặt MAIL_FROM dạng noreply@nhongplus.id.vn"
+    );
+  }
+  return `Resend API lỗi (${status}): ${message.slice(0, 280)}`;
 }
 
 async function sendViaSmtp(opts: {

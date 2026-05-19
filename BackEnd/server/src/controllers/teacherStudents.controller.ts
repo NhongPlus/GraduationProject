@@ -686,9 +686,12 @@ export const sendGradeReportEmailController = async (
     }
 
     if (sentCount === 0 && failedCount > 0) {
-      return res.status(502).json({
+      const needsDomain =
+        /verify domain|chưa verify domain|only send testing emails/i.test(lastError);
+      return res.status(needsDomain ? 403 : 502).json({
         success: false,
         message: lastError || "Không gửi được email",
+        data: { sent: 0, total: stuR.rows.length, failed: failedCount },
       });
     }
 
