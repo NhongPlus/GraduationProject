@@ -11,6 +11,33 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 0 24px;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.rootCentered {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.centerStage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+  min-height: min(100dvh, 100vh);
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.centerCard {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
 }
 
 .shell {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Box, Button, Paper, Stack, Text } from '@mantine/core';
 import { modals } from '@mantine/modals';
@@ -176,6 +176,16 @@ function clearViolationStorage(examId: string): void {
   } catch {
     // Ignore
   }
+}
+
+function ExamTakeGateCard({ children }: { children: ReactNode }) {
+  return (
+    <Box className={classes.centerStage}>
+      <Paper withBorder radius="md" p="xl" className={classes.centerCard}>
+        {children}
+      </Paper>
+    </Box>
+  );
 }
 
 const ExamTake = () => {
@@ -458,11 +468,11 @@ const ExamTake = () => {
       } else if (payload.status === 'not_started') {
         setTeacherRuntimeLive(false);
         setExamStarted(false);
-        setRealtimeMessage('Giang vien chua bat dau bai thi. Vui long cho...');
+        setRealtimeMessage(t('exam_take.waiting_teacher_desc'));
       } else if (payload.status === 'ended') {
         setTeacherRuntimeLive(false);
         setExamStarted(false);
-        setRealtimeMessage('Bai thi da ket thuc.');
+        setRealtimeMessage(t('exam_take.msg_exam_ended'));
         void forceAutoSubmit();
       }
     },
@@ -473,16 +483,16 @@ const ExamTake = () => {
       setSubmitFailed(false);
       setViolationLocked(false);
       violationTriggeredRef.current = false;
-      setRealtimeMessage('Bai thi da bat dau. Chuc ban lam bai tot.');
+      setRealtimeMessage(t('exam_take.msg_exam_started'));
       markTeacherRuntimeLive();
       void ensureSessionStarted();
     },
     onFinal15: (payload) => {
-      const msg = payload?.message?.trim() || 'Con 15 phut cuoi. Vui long kiem tra va nop bai.';
+      const msg = payload?.message?.trim() || t('exam_take.msg_final_15');
       setRealtimeMessage(msg);
       modals.open({
         centered: true,
-        title: 'Thong bao tu he thong',
+        title: t('exam_take.modal_system_notice'),
         children: <Text size="sm">{msg}</Text>,
       });
     },
@@ -490,11 +500,11 @@ const ExamTake = () => {
       applyServerForceSubmit(payload);
     },
     onAlert: (payload) => {
-      const msg = payload?.message?.trim() || 'Thong bao tu giam thi';
+      const msg = payload?.message?.trim() || t('exam_take.msg_proctor_alert');
       setRealtimeMessage(msg);
     },
     onError: (message) => {
-      setRealtimeMessage(`Realtime loi: ${message}`);
+      setRealtimeMessage(t('exam_take.msg_realtime_error', { message }));
     },
     onDisconnect: () => {
       setConnectionStatus('disconnected');
@@ -600,7 +610,7 @@ const ExamTake = () => {
 
     const bootstrap = async () => {
       if (!examId) {
-        setBootError('Khong tim thay ma bai thi.');
+        setBootError(t('exam_take.boot_error_exam_id'));
         setBootLoading(false);
         return;
       }
@@ -623,7 +633,7 @@ const ExamTake = () => {
         setTeacherRuntimeLive(false);
       } catch {
         if (canceled) return;
-        setBootError('Khong the tai du lieu bai thi hoac khoi tao phien thi.');
+        setBootError(t('exam_take.boot_error_load'));
       } finally {
         if (!canceled) setBootLoading(false);
       }
@@ -1011,28 +1021,28 @@ const ExamTake = () => {
 
   if (bootLoading) {
     return (
-      <Box className={classes.root}>
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+      <Box className={`${classes.root} ${classes.rootCentered}`}>
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" mb={8}>
-            Dang tai du lieu bai thi
+            {t('exam_take.boot_loading_title')}
           </Text>
           <Text c="dimmed" size="sm">
-            He thong dang khoi tao phien thi va dong bo du lieu.
+            {t('exam_take.boot_loading_desc')}
           </Text>
-        </Paper>
+        </ExamTakeGateCard>
       </Box>
     );
   }
 
   if (bootError) {
     return (
-      <Box className={classes.root}>
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+      <Box className={`${classes.root} ${classes.rootCentered}`}>
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" c="red" mb={8}>
-            Khong the vao phong thi
+            {t('exam_take.boot_error_title')}
           </Text>
           <Text size="sm">{bootError}</Text>
-        </Paper>
+        </ExamTakeGateCard>
       </Box>
     );
   }
@@ -1049,10 +1059,28 @@ const ExamTake = () => {
   const canShowExamShell =
     examStarted && total > 0 && (integrityDisabled || inBrowserFullscreen);
 
+  const showWaitingGate =
+    !autoSubmitted &&
+    !violationLocked &&
+    !showFullscreenRequired &&
+    !teacherRuntimeLive &&
+    !examStarted &&
+    !sessionLoading;
+
+  const isCenteredGateView =
+    showWaitingGate ||
+    showFullscreenRequired ||
+    sessionLoading ||
+    autoSubmitted ||
+    violationLocked;
+
   return (
-    <Box className={classes.root} ref={rootRef}>
+    <Box
+      className={`${classes.root}${isCenteredGateView ? ` ${classes.rootCentered}` : ''}`}
+      ref={rootRef}
+    >
       {autoSubmitted && (
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" mb={8}>
             {submitFailed ? t('exam_take.submit_failed_title') : t('exam_take.submit_success_title')}
           </Text>
@@ -1112,31 +1140,25 @@ const ExamTake = () => {
               {serverForceSummaryText}
             </Text>
           )}
-        </Paper>
+        </ExamTakeGateCard>
       )}
 
       {!autoSubmitted && violationLocked && (
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" c="red" mb={8}>
-            Bài thi đã bị khóa do vi phạm
+            {t('exam_take.violation_locked_title')}
           </Text>
           <Text size="sm" mb={8}>
             {lockReason}
           </Text>
           <Text c="dimmed" size="sm">
-            Tự động nộp sau {autoSubmitCountdown} giây...
+            {t('exam_take.violation_auto_submit', { seconds: autoSubmitCountdown })}
           </Text>
-        </Paper>
+        </ExamTakeGateCard>
       )}
 
       {showFullscreenRequired && (
-        <Paper
-          withBorder
-          radius="md"
-          p="xl"
-          mb="md"
-          style={{ maxWidth: 560, margin: '0 auto', textAlign: 'center' }}
-        >
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" mb={8} c="teal">
             {t('exam_take.exam_started_title')}
           </Text>
@@ -1156,20 +1178,20 @@ const ExamTake = () => {
           >
             {t('exam_take.exam_started_fullscreen_button')}
           </Button>
-        </Paper>
+        </ExamTakeGateCard>
       )}
       {!autoSubmitted && !violationLocked && !showFullscreenRequired && sessionLoading && (
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+        <ExamTakeGateCard>
           <Text fw={700} size="lg" mb={8}>
-            Dang tai de thi
+            {t('exam_take.loading_exam_title')}
           </Text>
           <Text c="dimmed" size="sm">
-            He thong dang phan ma de va sap xep cau hoi...
+            {t('exam_take.loading_exam_desc')}
           </Text>
-        </Paper>
+        </ExamTakeGateCard>
       )}
-      {!autoSubmitted && !violationLocked && !showFullscreenRequired && !teacherRuntimeLive && !examStarted && !sessionLoading && (
-        <Paper withBorder radius="md" p="xl" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+      {showWaitingGate && (
+        <ExamTakeGateCard>
           {!integrityDisabled && !inBrowserFullscreen && (
             <Stack gap="sm" mb="lg">
               <Text fw={700} size="lg">
@@ -1196,7 +1218,7 @@ const ExamTake = () => {
             {t('exam_take.waiting_teacher_title')}
           </Text>
           <Text c="dimmed" size="sm" mb="md">
-            {realtimeMessage || t('exam_take.waiting_teacher_desc')}
+            {t('exam_take.waiting_teacher_desc')}
           </Text>
           <Button
             variant="subtle"
@@ -1211,7 +1233,7 @@ const ExamTake = () => {
           >
             {t('exam_take.exit_room')}
           </Button>
-        </Paper>
+        </ExamTakeGateCard>
       )}
       {!autoSubmitted && !violationLocked && canShowExamShell && !showFullscreenRequired && (
         <div className={classes.shell}>
@@ -1278,7 +1300,7 @@ const ExamTake = () => {
           {t('exam_take.leave_count', { count: focusLeaveCount })}
         </Text>
       )}
-      {!autoSubmitted && realtimeMessage && isFullscreen && (
+      {!autoSubmitted && realtimeMessage && examStarted && canShowExamShell && (
         <Text size="xs" c="dimmed" ta="center" mt="xs">
           {realtimeMessage}
         </Text>
