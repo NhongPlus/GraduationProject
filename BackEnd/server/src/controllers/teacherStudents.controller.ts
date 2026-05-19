@@ -3,7 +3,7 @@ import pool from "~/config/db";
 import bcrypt from "bcrypt";
 import { getAdminClassByManager } from "~/models/adminClass.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
-import { sendEmail, isEmailConfigured } from "~/services/email.service";
+import { isEmailConfigured, sendGradeReportTable } from "~/services/email.service";
 import { buildTranscriptCourses, calcCumulativeGpa } from "~/utils/gradeScale";
 
 interface StudentRow {
@@ -671,35 +671,12 @@ export const sendGradeReportEmailController = async (
       const gradeRows = gradesByStudent.get(stu.id) ?? [];
       if (gradeRows.length === 0) continue;
 
-      const tableRows = gradeRows
-        .map((g) => {
-          const pct = g.max_points && g.max_points > 0
-            ? `${((g.score ?? 0) / g.max_points * 100).toFixed(1)}%`
-            : "—";
-          return `<tr><td>${g.exam_title}</td><td>${g.score ?? "—"} / ${g.max_points ?? "—"}</td><td>${pct}</td><td>${g.submitted_at ? new Date(g.submitted_at).toLocaleDateString("vi-VN") : "—"}</td></tr>`;
-        })
-        .join("");
-
-      const html = `
-<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"/>
-<style>
-body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
-.c{background:#fff;border-radius:8px;padding:30px;max-width:700px;margin:auto}
-table{width:100%;border-collapse:collapse;margin-top:16px}
-th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:14px}
-th{background:#2563eb;color:#fff}
-.footer{margin-top:24px;font-size:12px;color:#888}
-</style></head><body><div class="c">
-<h2>Bảng điểm — ${className}</h2>
-<p>Xin chào <b>${stu.full_name ?? stu.email}</b>,</p>
-<p>Dưới đây là bảng điểm các bài thi đã nộp của bạn:</p>
-<table><thead><tr><th>Bài thi</th><th>Điểm</th><th>%</th><th>Ngày nộp</th></tr></thead>
-<tbody>${tableRows}</tbody></table>
-<p class="footer">Email được gửi tự động từ hệ thống thi trực tuyến.</p>
-</div></body></html>`;
-
       try {
-        await sendEmail(stu.email, `[Bảng điểm] ${className}`, html);
+        await sendGradeReportTable(stu.email, {
+          className,
+          studentName: stu.full_name ?? stu.email,
+          rows: gradeRows,
+        });
         sentCount++;
       } catch (err) {
         failedCount++;

@@ -6,7 +6,7 @@ import {
   markExamReminderSent,
   type ExamDeadlineReminderKind,
 } from "~/models/examDeadlineNotification.model";
-import { isEmailConfigured, sendBatchEmail } from "~/services/email.service";
+import { isEmailConfigured, sendExamDeadlineReminderBatch } from "~/services/email.service";
 
 interface ExamReminderRow {
   id: string;
@@ -71,10 +71,6 @@ async function processOneKind(kind: ExamDeadlineReminderKind): Promise<void> {
         ] as string[];
       }
 
-      const subject =
-        kind === "24h"
-          ? `[Nhắc nhở] Bài thi sắp đến hạn bắt đầu: ${ex.title}`
-          : `[Nhắc nhở] Bài thi còn 1 giờ để bắt đầu: ${ex.title}`;
       const text = buildEmailBody(ex.title, ex.closes_at, kind);
 
       if (!isEmailConfigured()) {
@@ -89,29 +85,11 @@ async function processOneKind(kind: ExamDeadlineReminderKind): Promise<void> {
         continue;
       }
 
-      const html = `
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <style>
-    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-    .container { background: #ffffff; border-radius: 8px; padding: 30px; max-width: 600px; margin: auto; }
-    .exam-title { font-size: 18px; font-weight: bold; color: #1f2937; margin-bottom: 16px; }
-    .message { font-size: 15px; color: #374151; line-height: 1.6; }
-    .footer { margin-top: 24px; font-size: 12px; color: #888; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="exam-title">📝 ${ex.title}</div>
-    <div class="message">${text}</div>
-    <div class="footer">Email này được gửi tự động từ hệ thống thi trực tuyến.</div>
-  </div>
-</body>
-</html>`;
-
-      await sendBatchEmail(emails, subject, html, text);
+      await sendExamDeadlineReminderBatch(emails, {
+        examTitle: ex.title,
+        message: text,
+        kind,
+      });
       await markExamReminderSent(ex.id, kind);
     } catch (e) {
       console.error(`[exam-reminder] Lỗi exam=${ex.id} kind=${kind}`, e);
