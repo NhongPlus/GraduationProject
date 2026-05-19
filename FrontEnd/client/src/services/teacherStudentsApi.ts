@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { fetchPaginatedList, type ListQueryParams, type PaginatedList } from './listApi';
+import { unwrapPaginatedData } from '@/utils/pagination';
 
 export interface StudentItem {
   id: string;
@@ -36,7 +37,14 @@ export interface GradeExamOption {
 export interface GradeReport {
   class_name: string;
   exam_id: string | null;
-  rows: GradeRow[];
+  submitted_count: number;
+  class_student_total: number;
+  items: GradeRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  page: number;
+  total_pages: number;
 }
 
 export interface TranscriptCourse {
@@ -119,12 +127,23 @@ const teacherStudentsApi = {
     return res.data.data;
   },
 
-  getGradeReport: async (examId?: string): Promise<GradeReport> => {
-    const res = await apiClient.get<{ success: boolean; data: GradeReport }>(
+  getGradeReport: async (
+    examId: string,
+    params: ListQueryParams = {}
+  ): Promise<GradeReport> => {
+    const res = await apiClient.get<{ success: boolean; data: Record<string, unknown> }>(
       '/teacher-students/grade-report',
-      { params: examId ? { exam_id: examId } : {} }
+      { params: { exam_id: examId, ...params } }
     );
-    return res.data.data;
+    const body = res.data.data;
+    const paginated = unwrapPaginatedData<GradeRow>(body);
+    return {
+      class_name: String(body.class_name ?? ''),
+      exam_id: (body.exam_id as string | null) ?? null,
+      submitted_count: Number(body.submitted_count ?? 0),
+      class_student_total: Number(body.class_student_total ?? 0),
+      ...paginated,
+    };
   },
 
   downloadGradeExport: async (examId: string): Promise<void> => {

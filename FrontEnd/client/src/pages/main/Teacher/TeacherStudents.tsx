@@ -46,6 +46,13 @@ const TeacherStudents = () => {
   const [visiblePasswordIds, setVisiblePasswordIds] = useState<Set<string>>(new Set());
 
   const [gradeRows, setGradeRows] = useState<GradeRow[]>([]);
+  const [gradeTotal, setGradeTotal] = useState(0);
+  const [gradeSubmittedCount, setGradeSubmittedCount] = useState(0);
+  const [gradeClassTotal, setGradeClassTotal] = useState(0);
+  const [gradePage, setGradePage] = useState(1);
+  const [gradePageSize, setGradePageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [gradeSearch, setGradeSearch] = useState('');
+  const [gradeSearchDebounced, setGradeSearchDebounced] = useState('');
   const [gradeExams, setGradeExams] = useState<GradeExamOption[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [className, setClassName] = useState('');
@@ -64,6 +71,14 @@ const TeacherStudents = () => {
     const t = window.setTimeout(() => { setSearchDebounced(search.trim()); setPage(1); }, 350);
     return () => window.clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setGradeSearchDebounced(gradeSearch.trim());
+      setGradePage(1);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [gradeSearch]);
 
   const loadStudents = useCallback(async () => {
     try {
@@ -168,23 +183,39 @@ const TeacherStudents = () => {
   const loadGradeReport = useCallback(async (examId: string | null) => {
     if (!examId) {
       setGradeRows([]);
+      setGradeTotal(0);
+      setGradeSubmittedCount(0);
+      setGradeClassTotal(0);
       return;
     }
     try {
       setGradeLoading(true);
-      const r = await teacherStudentsApi.getGradeReport(examId);
-      setGradeRows(r.rows);
+      const r = await teacherStudentsApi.getGradeReport(examId, {
+        limit: gradePageSize,
+        offset: pageToOffset(gradePage, gradePageSize),
+        search: gradeSearchDebounced || undefined,
+      });
+      setGradeRows(r.items);
+      setGradeTotal(r.total);
+      setGradeSubmittedCount(r.submitted_count);
+      setGradeClassTotal(r.class_student_total);
       setClassName(r.class_name);
     } catch {
       setError(t('teacher_students.grade_load_error'));
     } finally {
       setGradeLoading(false);
     }
-  }, [t]);
+  }, [gradePage, gradePageSize, gradeSearchDebounced, t]);
 
   useEffect(() => {
     if (selectedExamId) void loadGradeReport(selectedExamId);
   }, [selectedExamId, loadGradeReport]);
+
+  useEffect(() => {
+    setGradePage(1);
+    setGradeSearch('');
+    setGradeSearchDebounced('');
+  }, [selectedExamId]);
 
   const handleExportCsv = async () => {
     if (!selectedExamId) return;
@@ -211,11 +242,6 @@ const TeacherStudents = () => {
       setEmailSending(false);
     }
   };
-
-  const submittedCount = useMemo(
-    () => gradeRows.filter((r) => r.session_id).length,
-    [gradeRows]
-  );
 
   const openTranscript = async (studentId: string) => {
     setTranscriptStudentId(studentId);
@@ -414,7 +440,7 @@ const TeacherStudents = () => {
                   color="teal"
                   size="sm"
                   leftSection={<IconMail size={16} />}
-                  disabled={emailSending || submittedCount === 0}
+                  disabled={emailSending || gradeSubmittedCount === 0}
                 />
               </Group>
             </Group>
@@ -423,16 +449,32 @@ const TeacherStudents = () => {
 
             {!selectedExamId ? (
               <Text c="dimmed">{t('teacher_students.select_exam_hint')}</Text>
-            ) : gradeLoading ? (
-              <Box p="xl" className="flex justify-center"><Loader size="sm" /></Box>
             ) : (
               <Paper withBorder radius="md" p="sm">
-                <Text size="sm" c="dimmed" mb="sm">
-                  {t('teacher_students.grade_summary', {
-                    submitted: submittedCount,
-                    total: gradeRows.length,
-                  })}
-                </Text>
+                <Group justify="space-between" mb="sm" wrap="wrap">
+                  <Text size="sm" c="dimmed">
+                    {t('teacher_students.grade_summary', {
+                      submitted: gradeSubmittedCount,
+                      total: gradeClassTotal,
+                    })}
+                  </Text>
+                  <InputText
+                    placeholder={t('teacher_students.grade_search_placeholder')}
+                    value={gradeSearch}
+                    onChange={(e) => setGradeSearch(e.currentTarget.value)}
+                    style={{ maxWidth: 320 }}
+                  />
+                </Group>
+                <ListPaginationBar
+                  page={gradePage}
+                  total={gradeTotal}
+                  limit={gradePageSize}
+                  onPageChange={setGradePage}
+                  onLimitChange={(n) => { setGradePageSize(n); setGradePage(1); }}
+                />
+                {gradeLoading ? (
+                  <Box p="xl" className="flex justify-center"><Loader size="sm" /></Box>
+                ) : (
                 <Table highlightOnHover verticalSpacing="sm" striped>
                   <Table.Thead>
                     <Table.Tr>
@@ -486,8 +528,20 @@ const TeacherStudents = () => {
                         </Table.Tr>
                       );
                     })}
+                    {!gradeLoading && gradeRows.length === 0 && (
+                      <Table.Tr>
+                        <Table.Td colSpan={7}>
+                          <Text c="dimmed" ta="center" py="md">
+                            {gradeSearchDebounced
+                              ? t('teacher_students.grade_search_empty')
+                              : t('teacher_students.empty')}
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
                   </Table.Tbody>
                 </Table>
+                )}
               </Paper>
             )}
           </Stack>

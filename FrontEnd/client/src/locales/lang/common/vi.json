@@ -796,6 +796,8 @@
     "select_exam_hint": "Chọn một bài thi ở trên để xem bảng điểm lớp.",
     "submitted_short": "đã nộp",
     "grade_summary": "Đã nộp: {{submitted}} / {{total}} sinh viên",
+    "grade_search_placeholder": "Tìm theo tên, mã SV, email…",
+    "grade_search_empty": "Không tìm thấy sinh viên phù hợp.",
     "col_version": "Mã đề",
     "col_grading": "Chấm bài",
     "grading_done": "Đã chấm",

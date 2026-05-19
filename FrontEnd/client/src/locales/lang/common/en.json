@@ -414,6 +414,8 @@
     "select_exam_hint": "Select an exam above to view the class grade sheet.",
     "submitted_short": "submitted",
     "grade_summary": "Submitted: {{submitted}} / {{total}} students",
+    "grade_search_placeholder": "Search by name, student ID, email…",
+    "grade_search_empty": "No matching students found.",
     "col_version": "Version",
     "col_grading": "Grading",
     "grading_done": "Graded",

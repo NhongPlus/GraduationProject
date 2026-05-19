@@ -275,8 +275,10 @@ export const getGradeReportController = async (req: Request, res: Response, next
     }
 
     const examId = (req.query.exam_id as string | undefined)?.trim();
+    const search = (req.query.search as string | undefined)?.trim();
+    const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
+    const class_name = await getClassName(adminClassId);
 
-    let rows: GradeRow[];
     if (examId) {
       const examCheck = await pool.query(
         `SELECT id, title FROM exams WHERE id = $1 AND admin_class_id = $2`,
@@ -286,7 +288,44 @@ export const getGradeReportController = async (req: Request, res: Response, next
         return res.status(404).json({ success: false, message: "Không tìm thấy bài thi" });
       }
 
-      const r = await pool.query<GradeRow>(
+      let studentWhere = `a.admin_class_id = $1 AND a.role = 'student'`;
+      const filterParams: unknown[] = [adminClassId];
+      let paramIdx = 2;
+      if (search) {
+        studentWhere += ` AND (a.full_name ILIKE $${paramIdx} OR a.email ILIKE $${paramIdx} OR a.username ILIKE $${paramIdx})`;
+        filterParams.push(`%${search}%`);
+        paramIdx++;
+      }
+      const examParamIdx = paramIdx;
+      filterParams.push(examId);
+      paramIdx++;
+      const limitParamIdx = paramIdx;
+      filterParams.push(limit);
+      paramIdx++;
+      const offsetParamIdx = paramIdx;
+      filterParams.push(offset);
+
+      const statsR = await pool.query<{ class_total: number; submitted: number }>(
+        `
+        SELECT
+          COUNT(*)::int AS class_total,
+          COUNT(es.id)::int AS submitted
+        FROM accounts a
+        LEFT JOIN exam_sessions es
+          ON es.student_id = a.id AND es.exam_id = $2 AND es.status = 'submitted'
+        WHERE a.admin_class_id = $1 AND a.role = 'student'
+        `,
+        [adminClassId, examId]
+      );
+      const stats = statsR.rows[0] ?? { class_total: 0, submitted: 0 };
+
+      const countR = await pool.query<{ total: number }>(
+        `SELECT COUNT(*)::int AS total FROM accounts a WHERE ${studentWhere}`,
+        filterParams.slice(0, search ? 2 : 1)
+      );
+      const total = countR.rows[0]?.total ?? 0;
+
+      const dataR = await pool.query<GradeRow>(
         `
         SELECT
           a.id AS student_id,
@@ -304,51 +343,82 @@ export const getGradeReportController = async (req: Request, res: Response, next
           es.grading_status
         FROM accounts a
         LEFT JOIN exam_sessions es
-          ON es.student_id = a.id AND es.exam_id = $2 AND es.status = 'submitted'
-        LEFT JOIN exams e ON e.id = $2
-        WHERE a.admin_class_id = $1 AND a.role = 'student'
+          ON es.student_id = a.id AND es.exam_id = $${examParamIdx} AND es.status = 'submitted'
+        LEFT JOIN exams e ON e.id = $${examParamIdx}
+        WHERE ${studentWhere}
         ORDER BY a.full_name NULLS LAST, a.username
+        LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}
         `,
-        [adminClassId, examId]
+        filterParams
       );
-      rows = r.rows;
-    } else {
-      const r = await pool.query<GradeRow>(
-        `
-        SELECT
-          a.id AS student_id,
-          a.full_name,
-          a.username,
-          a.email,
-          e.id AS exam_id,
-          e.title AS exam_title,
-          es.id::text AS session_id,
-          es.version_code,
-          es.score,
-          es.max_points,
-          es.submitted_at::text,
-          es.status,
-          es.grading_status
-        FROM exam_sessions es
-        JOIN accounts a ON a.id = es.student_id
-        JOIN exams e ON e.id = es.exam_id
-        WHERE a.admin_class_id = $1
-          AND a.role = 'student'
-          AND es.status = 'submitted'
-          AND e.admin_class_id = $1
-        ORDER BY e.title, a.full_name NULLS LAST, a.username
-        `,
-        [adminClassId]
-      );
-      rows = r.rows;
+
+      return res.json({
+        success: true,
+        data: {
+          class_name,
+          exam_id: examId,
+          submitted_count: stats.submitted,
+          class_student_total: stats.class_total,
+          ...buildPaginatedList(dataR.rows, total, limit, offset),
+        },
+      });
     }
+
+    let sessionWhere = `a.admin_class_id = $1 AND a.role = 'student' AND es.status = 'submitted' AND e.admin_class_id = $1`;
+    const sessionParams: unknown[] = [adminClassId];
+    if (search) {
+      sessionWhere += ` AND (a.full_name ILIKE $2 OR a.email ILIKE $2 OR a.username ILIKE $2)`;
+      sessionParams.push(`%${search}%`);
+    }
+
+    const countR = await pool.query<{ total: number }>(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM exam_sessions es
+      JOIN accounts a ON a.id = es.student_id
+      JOIN exams e ON e.id = es.exam_id
+      WHERE ${sessionWhere}
+      `,
+      sessionParams
+    );
+    const total = countR.rows[0]?.total ?? 0;
+
+    const limitIdx = sessionParams.length + 1;
+    const offsetIdx = sessionParams.length + 2;
+    const dataR = await pool.query<GradeRow>(
+      `
+      SELECT
+        a.id AS student_id,
+        a.full_name,
+        a.username,
+        a.email,
+        e.id AS exam_id,
+        e.title AS exam_title,
+        es.id::text AS session_id,
+        es.version_code,
+        es.score,
+        es.max_points,
+        es.submitted_at::text,
+        es.status,
+        es.grading_status
+      FROM exam_sessions es
+      JOIN accounts a ON a.id = es.student_id
+      JOIN exams e ON e.id = es.exam_id
+      WHERE ${sessionWhere}
+      ORDER BY e.title, a.full_name NULLS LAST, a.username
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `,
+      [...sessionParams, limit, offset]
+    );
 
     res.json({
       success: true,
       data: {
-        class_name: await getClassName(adminClassId),
-        exam_id: examId ?? null,
-        rows,
+        class_name,
+        exam_id: null,
+        submitted_count: total,
+        class_student_total: total,
+        ...buildPaginatedList(dataR.rows, total, limit, offset),
       },
     });
   } catch (err) {
