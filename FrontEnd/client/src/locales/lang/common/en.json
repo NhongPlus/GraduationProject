@@ -387,6 +387,8 @@
     "score_analytics": "Score analytics",
     "prediction": "Prediction",
     "student_management": "Student management",
+    "subject_management": "Subject management",
+    "proctoring": "Proctoring",
     "student_list": "Student list",
     "admin_tools": "Admin tools",
     "audit_logs": "Audit logs",

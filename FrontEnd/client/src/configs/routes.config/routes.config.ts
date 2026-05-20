@@ -8,6 +8,7 @@ import {
   IconLock,
   IconNotes,
   IconPencilCheck,
+  IconSchool,
 } from '@tabler/icons-react';
 import authRoute from './authRoute';
 import type { NavGroup, Routes } from '@/@types/routes';
@@ -72,7 +73,7 @@ export const protectedRoutes: Routes = [
     key: 'exam-list',
     path: '/exams',
     component: lazy(() => import('@/pages/main/Exam/ExamList')),
-    authority: ['user', 'admin', 'teacher'],
+    authority: ['user', 'teacher'],
     nav: {
       labelKey: 'nav.exam_list',
       position: 'sub',
@@ -84,7 +85,7 @@ export const protectedRoutes: Routes = [
     key: 'exam-authoring',
     path: '/exams/new',
     component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
-    authority: ['admin', 'teacher'],
+    authority: ['teacher'],
     nav: {
       labelKey: 'nav.exam_create',
       position: 'sub',
@@ -96,7 +97,7 @@ export const protectedRoutes: Routes = [
     key: 'exam-authoring-edit',
     path: '/exams/:examId/edit',
     component: lazy(() => import('@/pages/main/Exam/ExamAuthoring')),
-    authority: ['admin', 'teacher'],
+    authority: ['teacher'],
   },
   {
     key: 'exam-take',
@@ -213,6 +214,12 @@ export const protectedRoutes: Routes = [
     path: '/admin/subjects',
     component: lazy(() => import('@/pages/main/Admin/SubjectManagement')),
     authority: ['admin'],
+    nav: {
+      labelKey: 'nav.subject_management',
+      position: 'main',
+      icon: IconSchool,
+      order: 3,
+    },
   },
   {
     key: 'exam-sessions-detail',
