@@ -9,6 +9,7 @@ import {
   IconNotes,
   IconPencilCheck,
   IconSchool,
+  IconFolders,
 } from '@tabler/icons-react';
 import authRoute from './authRoute';
 import type { NavGroup, Routes } from '@/@types/routes';
@@ -35,6 +36,12 @@ export const navGroups: NavGroup[] = [
     labelKey: 'nav.student_management',
     icon: IconCalendarStats,
     order: 7,
+  },
+  {
+    key: 'user_management',
+    labelKey: 'nav.user_management',
+    icon: IconCalendarStats,
+    order: 6,
   },
   {
     key: 'admin_tools',
@@ -153,9 +160,9 @@ export const protectedRoutes: Routes = [
     component: lazy(() => import('@/pages/main/Admin/StudentManagement')),
     authority: ['admin'],
     nav: {
-      labelKey: 'nav.student_list',
+      labelKey: 'nav.user_list',
       position: 'sub',
-      groupKey: 'student_management',
+      groupKey: 'user_management',
       order: 1,
     },
   },
@@ -210,16 +217,34 @@ export const protectedRoutes: Routes = [
     },
   },
   {
-    key: 'subject-management',
-    path: '/admin/subjects',
-    component: lazy(() => import('@/pages/main/Admin/SubjectManagement')),
+    key: 'program-management',
+    path: '/admin/programs',
+    component: lazy(() => import('@/pages/main/Admin/ProgramManagement')),
     authority: ['admin'],
     nav: {
-      labelKey: 'nav.subject_management',
+      labelKey: 'nav.program_management',
       position: 'main',
       icon: IconSchool,
       order: 3,
     },
+  },
+  {
+    key: 'subject-catalog',
+    path: '/admin/subject-catalog',
+    component: lazy(() => import('@/pages/main/Admin/SubjectCatalogManagement')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.subject_catalog',
+      position: 'main',
+      icon: IconFolders,
+      order: 4,
+    },
+  },
+  {
+    key: 'subject-management-legacy',
+    path: '/admin/subjects',
+    component: lazy(() => import('@/pages/main/Admin/SubjectCatalogManagement')),
+    authority: ['admin'],
   },
   {
     key: 'exam-sessions-detail',

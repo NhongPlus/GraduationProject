@@ -7,6 +7,8 @@ import {
   getAllPrograms,
   getProgramById,
   updateProgram,
+  getProgramTeachers,
+  setProgramTeachers,
   type CreateProgramInput,
   type UpdateProgramInput,
 } from "~/models/program.model";
@@ -21,6 +23,28 @@ router.get("/", async (_req, res, next) => {
   try {
     const data = await getAllPrograms();
     res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/:id/teachers", async (req, res, next) => {
+  try {
+    const teachers = await getProgramTeachers(req.params.id);
+    res.json({ success: true, data: teachers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/:id/teachers", async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.teacher_ids)
+      ? (req.body.teacher_ids as string[]).filter((x) => typeof x === "string" && x.trim())
+      : [];
+    await setProgramTeachers(req.params.id, ids);
+    const teachers = await getProgramTeachers(req.params.id);
+    res.json({ success: true, data: teachers });
   } catch (err) {
     next(err);
   }

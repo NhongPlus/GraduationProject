@@ -15,6 +15,7 @@ export interface SubjectDto {
   semester: number;
   category: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   program_id?: string | null;
   prerequisites?: SubjectPrerequisiteRef[];
   prerequisite_ids?: string[];
@@ -29,6 +30,7 @@ export type CreateSubjectPayload = {
   semester?: number;
   category?: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   prerequisite_ids?: string[];
   program_id?: string | null;
 };
@@ -49,7 +51,11 @@ export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
 
 const subjectApi = {
   listSubjects: async (
-    params: ListQueryParams & { program_id?: string } = {}
+    params: ListQueryParams & {
+      program_id?: string;
+      sub_category?: string;
+      subject_group_id?: string;
+    } = {}
   ): Promise<PaginatedList<SubjectDto>> =>
     fetchPaginatedList<SubjectDto>('/subjects', params),
 

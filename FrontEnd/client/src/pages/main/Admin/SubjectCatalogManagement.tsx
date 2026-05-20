@@ -22,14 +22,14 @@ import {
   ScrollArea,
   Divider,
   Checkbox,
-  CloseButton,
-  ThemeIcon,
+  Tabs,
 } from '@mantine/core';
-import { IconPlus, IconTrash, IconEdit, IconSearch, IconSchool, IconInfoCircle } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconEdit, IconSearch, IconFolders } from '@tabler/icons-react';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 import subjectApi from '@/services/subjectApi';
 import programApi, { type ProgramDto } from '@/services/programApi';
+import subjectGroupApi, { type SubjectGroupDto } from '@/services/subjectGroupApi';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
@@ -41,6 +41,7 @@ interface Subject {
   semester: number;
   category: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   program_id?: string | null;
   prerequisites?: { id: string; name: string; code: string }[];
   is_active: boolean;
@@ -54,6 +55,7 @@ interface SubjectFormData {
   semester: number;
   category: string;
   sub_category: string | null;
+  subject_group_id: string;
   program_id: string;
   prerequisite_ids: string[];
   is_active: boolean;
@@ -94,28 +96,27 @@ const fullScreenModalProps = {
   padding: 0,
 };
 
-const SubCategoryBadge = ({ subCategory }: { subCategory: string | null | undefined }) => {
-  if (!subCategory) {
+const GroupNameBadge = ({
+  groupId,
+  groups,
+  fallback,
+}: {
+  groupId?: string | null;
+  groups: SubjectGroupDto[];
+  fallback?: string | null;
+}) => {
+  const g = groupId ? groups.find((x) => x.id === groupId) : null;
+  const label = g?.name ?? (fallback ? subCategoryLabel(fallback) : null);
+  if (!label) {
     return (
       <Badge size="sm" variant="light" color="gray">
         Chưa phân nhóm
       </Badge>
     );
   }
-  const colors: Record<string, string> = {
-    math: 'violet',
-    english: 'green',
-    programming: 'blue',
-    software_eng: 'teal',
-    ai: 'red',
-    network: 'orange',
-    soft_skills: 'cyan',
-    national_defense: 'gray',
-    internship: 'grape',
-  };
   return (
-    <Badge size="sm" variant="light" color={colors[subCategory] || 'gray'}>
-      {subCategoryLabel(subCategory)}
+    <Badge size="sm" variant="light" color="teal">
+      {label}
     </Badge>
   );
 };
@@ -146,7 +147,7 @@ const CategoryBadge = ({ category }: { category: string }) => {
   );
 };
 
-const SubjectManagementPage = () => {
+const SubjectCatalogManagementPage = () => {
   const { accessToken } = useAuth();
   const [programs, setPrograms] = useState<ProgramDto[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
@@ -157,7 +158,14 @@ const SubjectManagementPage = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [programCreateOpen, setProgramCreateOpen] = useState(false);
+  const [groups, setGroups] = useState<SubjectGroupDto[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupFormOpen, setGroupFormOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<SubjectGroupDto | null>(null);
+  const [groupCode, setGroupCode] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupDesc, setGroupDesc] = useState('');
+  const [activeTab, setActiveTab] = useState<string | null>('groups');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
@@ -190,6 +198,30 @@ const SubjectManagementPage = () => {
     if (accessToken) void loadPrograms();
   }, [accessToken, loadPrograms]);
 
+  const loadGroups = useCallback(async () => {
+    if (!selectedProgramId) {
+      setGroups([]);
+      return;
+    }
+    try {
+      setGroupsLoading(true);
+      const list = await subjectGroupApi.listByProgram(selectedProgramId);
+      setGroups(list);
+      setSelectedGroupId((prev) => {
+        if (prev && list.some((g) => g.id === prev)) return prev;
+        return null;
+      });
+    } catch {
+      setError('Không tải được nhóm môn.');
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [selectedProgramId]);
+
+  useEffect(() => {
+    void loadGroups();
+  }, [loadGroups]);
+
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
     try {
@@ -199,7 +231,7 @@ const SubjectManagementPage = () => {
         offset: pageToOffset(page, pageSize),
         search: debouncedSearch || undefined,
         program_id: selectedProgramId ?? undefined,
-        sub_category: selectedGroupId ?? undefined,
+        subject_group_id: selectedGroupId ?? undefined,
       });
       setSubjects(data.items as Subject[]);
       setTotal(data.total);
@@ -319,6 +351,7 @@ const SubjectManagementPage = () => {
         semester: data.semester,
         category: data.category,
         sub_category: data.sub_category,
+        subject_group_id: data.subject_group_id,
         program_id: data.program_id,
         prerequisite_ids: data.prerequisite_ids,
       });
@@ -340,6 +373,7 @@ const SubjectManagementPage = () => {
         semester: data.semester,
         category: data.category,
         sub_category: data.sub_category,
+        subject_group_id: data.subject_group_id,
         program_id: data.program_id,
         prerequisite_ids: data.prerequisite_ids,
         is_active: data.is_active,
@@ -352,26 +386,59 @@ const SubjectManagementPage = () => {
     }
   };
 
-  const handleCreateProgram = async (code: string, name: string, description: string) => {
+  const openGroupCreate = () => {
+    setEditingGroup(null);
+    setGroupCode('');
+    setGroupName('');
+    setGroupDesc('');
+    setGroupFormOpen(true);
+  };
+
+  const openGroupEdit = (g: SubjectGroupDto) => {
+    setEditingGroup(g);
+    setGroupCode(g.code);
+    setGroupName(g.name);
+    setGroupDesc(g.description ?? '');
+    setGroupFormOpen(true);
+  };
+
+  const handleSaveGroup = async () => {
+    if (!selectedProgramId || !groupCode.trim() || !groupName.trim()) return;
     try {
-      const created = await programApi.createProgram({
-        code,
-        name,
-        description: description || null,
-      });
-      setProgramCreateOpen(false);
-      setNotice(`Đã tạo chuyên ngành ${created.name}.`);
-      await loadPrograms();
-      setSelectedProgramId(created.id);
+      if (editingGroup) {
+        await subjectGroupApi.update(editingGroup.id, {
+          code: groupCode.trim(),
+          name: groupName.trim(),
+          description: groupDesc.trim() || null,
+        });
+        setNotice('Đã cập nhật nhóm môn.');
+      } else {
+        await subjectGroupApi.create({
+          program_id: selectedProgramId,
+          code: groupCode.trim(),
+          name: groupName.trim(),
+          description: groupDesc.trim() || null,
+        });
+        setNotice('Đã tạo nhóm môn.');
+      }
+      setGroupFormOpen(false);
+      void loadGroups();
     } catch (e: unknown) {
-      const msg =
-        typeof e === 'object' &&
-        e !== null &&
-        'response' in e &&
-        typeof (e as { response?: { data?: { error?: string } } }).response?.data?.error === 'string'
-          ? (e as { response: { data: { error: string } } }).response.data.error
-          : 'Không tạo được chuyên ngành.';
-      setError(msg);
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Lưu nhóm môn thất bại.');
+    }
+  };
+
+  const handleDeleteGroup = async (g: SubjectGroupDto) => {
+    if (!confirm(`Xóa nhóm «${g.name}»?`)) return;
+    try {
+      await subjectGroupApi.delete(g.id);
+      if (selectedGroupId === g.id) setSelectedGroupId(null);
+      setNotice('Đã xóa nhóm môn.');
+      void loadGroups();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Không xóa được nhóm môn.');
     }
   };
 
@@ -385,17 +452,16 @@ const SubjectManagementPage = () => {
     : [];
 
   const subjectsInGroup = selectedGroupId
-    ? subjectsInProgram.filter((s) => s.sub_category === selectedGroupId)
+    ? subjectsInProgram.filter((s) => s.subject_group_id === selectedGroupId)
     : subjectsInProgram;
 
-  const groupOptions = selectedProgramId
-    ? SUB_CATEGORIES.map((g) => {
-        const n = subjectsInProgram.filter((s) => s.sub_category === g.value).length;
-        return { value: g.value, label: `${g.label} (${n} môn)` };
-      })
-    : [];
+  const groupOptions = groups.map((g) => ({
+    value: g.id,
+    label: `${g.name} (${g.subject_count ?? 0} môn)`,
+  }));
 
   const selectedProgram = programs.find((p) => p.id === selectedProgramId);
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId);
   const canManageSubjects = Boolean(selectedProgramId && selectedGroupId);
 
   return (
@@ -403,26 +469,24 @@ const SubjectManagementPage = () => {
       <Stack gap="md" maw={1400} mx="auto">
         <Group justify="space-between" align="flex-start" wrap="wrap">
           <Box>
-            <Title order={2}>Quản lý môn học</Title>
+            <Title order={2}>Quản lý nhóm môn & môn học</Title>
             <Text c="dimmed" size="sm" mt={4}>
-              Thứ tự: Chuyên ngành → Nhóm môn → Môn học. Chọn đủ 2 bước đầu để thêm hoặc lọc môn.
+              Chọn chuyên ngành, quản lý nhóm môn (CRUD), sau đó thêm môn trong từng nhóm. Quản lý chuyên ngành ở menu riêng.
             </Text>
           </Box>
-          <Group gap="sm">
-            <Button
-              variant="light"
-              leftSection={<IconSchool size={16} />}
-              onClick={() => setProgramCreateOpen(true)}
-            >
-              Thêm chuyên ngành
-            </Button>
+          {activeTab === 'subjects' && (
             <ButtonFilled
               label="Thêm môn học"
               leftSection={<IconPlus size={16} />}
               disabled={!canManageSubjects}
               onClick={() => setCreateOpen(true)}
             />
-          </Group>
+          )}
+          {activeTab === 'groups' && selectedProgramId && (
+            <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
+              Thêm nhóm môn
+            </Button>
+          )}
         </Group>
 
         {error && (
@@ -437,35 +501,9 @@ const SubjectManagementPage = () => {
         )}
 
         <Paper withBorder radius="md" p="md">
-          <Group gap="xs" mb="md" wrap="wrap">
-            <Badge variant={selectedProgramId ? 'filled' : 'outline'} color="teal" size="lg">
-              1. Chuyên ngành
-            </Badge>
-            <Text c="dimmed" size="sm">
-              ›
-            </Text>
-            <Badge
-              variant={selectedGroupId ? 'filled' : 'outline'}
-              color={selectedProgramId ? 'teal' : 'gray'}
-              size="lg"
-            >
-              2. Nhóm môn
-            </Badge>
-            <Text c="dimmed" size="sm">
-              ›
-            </Text>
-            <Badge
-              variant={canManageSubjects ? 'filled' : 'outline'}
-              color={canManageSubjects ? 'teal' : 'gray'}
-              size="lg"
-            >
-              3. Môn học
-            </Badge>
-          </Group>
-
           <Group align="flex-end" wrap="wrap" grow>
             <Select
-              label="1. Chuyên ngành"
+              label="Chuyên ngành"
               placeholder="Chọn ngành"
               data={programOptions}
               value={selectedProgramId}
@@ -477,40 +515,129 @@ const SubjectManagementPage = () => {
               searchable
               style={{ minWidth: 220, flex: 1 }}
             />
-            <Select
-              label="2. Nhóm môn"
-              placeholder={selectedProgramId ? 'Chọn nhóm môn' : 'Chọn ngành trước'}
-              data={groupOptions}
-              value={selectedGroupId}
-              onChange={(v) => {
-                setSelectedGroupId(v);
-                setPage(1);
-              }}
-              disabled={!selectedProgramId}
-              searchable
-              style={{ minWidth: 220, flex: 1 }}
-            />
-            <TextInput
-              label="3. Tìm môn"
-              placeholder="Tên hoặc mã môn..."
-              leftSection={<IconSearch size={14} />}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.currentTarget.value);
-                setPage(1);
-              }}
-              disabled={!selectedProgramId}
-              style={{ minWidth: 200, flex: 1 }}
-            />
           </Group>
-
-          {selectedProgram && selectedGroupId && (
+          {selectedProgram && (
             <Text size="sm" c="dimmed" mt="sm">
-              Đang xem: <strong>{selectedProgram.name}</strong> ›{' '}
-              <strong>{subCategoryLabel(selectedGroupId)}</strong>
+              Chuyên ngành: <strong>{selectedProgram.name}</strong>
+              {selectedGroup && (
+                <>
+                  {' '}
+                  › <strong>{selectedGroup.name}</strong>
+                </>
+              )}
             </Text>
           )}
         </Paper>
+
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="groups" leftSection={<IconFolders size={16} />}>
+              Nhóm môn
+            </Tabs.Tab>
+            <Tabs.Tab value="subjects" leftSection={<IconPlus size={16} />}>
+              Môn học
+            </Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="groups" pt="md">
+            {!selectedProgramId ? (
+              <Paper withBorder p="xl">
+                <Text c="dimmed" ta="center">
+                  Chọn chuyên ngành ở trên để quản lý nhóm môn.
+                </Text>
+              </Paper>
+            ) : groupsLoading ? (
+              <Loader />
+            ) : (
+              <Paper withBorder radius="md">
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Mã nhóm</Table.Th>
+                      <Table.Th>Tên nhóm môn</Table.Th>
+                      <Table.Th>Số môn</Table.Th>
+                      <Table.Th>Thao tác</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {groups.map((g) => (
+                      <Table.Tr key={g.id}>
+                        <Table.Td>
+                          <Text ff="monospace" fw={600}>
+                            {g.code}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>{g.name}</Table.Td>
+                        <Table.Td>{g.subject_count ?? 0}</Table.Td>
+                        <Table.Td>
+                          <Group gap={4}>
+                            <ActionIcon variant="light" color="blue" onClick={() => openGroupEdit(g)}>
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="teal"
+                              onClick={() => {
+                                setSelectedGroupId(g.id);
+                                setActiveTab('subjects');
+                              }}
+                            >
+                              <IconPlus size={16} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              onClick={() => void handleDeleteGroup(g)}
+                            >
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                    {groups.length === 0 && (
+                      <Table.Tr>
+                        <Table.Td colSpan={4}>
+                          <Text c="dimmed" ta="center" py="md">
+                            Chưa có nhóm môn. Bấm «Thêm nhóm môn».
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
+            )}
+          </Tabs.Panel>
+
+          <Tabs.Panel value="subjects" pt="md">
+            {selectedProgramId && (
+              <Group align="flex-end" mb="md" wrap="wrap">
+                <Select
+                  label="Nhóm môn"
+                  placeholder="Chọn nhóm để xem môn"
+                  data={groupOptions}
+                  value={selectedGroupId}
+                  onChange={(v) => {
+                    setSelectedGroupId(v);
+                    setPage(1);
+                  }}
+                  searchable
+                  style={{ minWidth: 280 }}
+                />
+                <TextInput
+                  label="Tìm môn"
+                  placeholder="Tên hoặc mã môn..."
+                  leftSection={<IconSearch size={14} />}
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.currentTarget.value);
+                    setPage(1);
+                  }}
+                  style={{ minWidth: 260 }}
+                />
+              </Group>
+            )}
 
         {selectedIds.size > 0 && (
           <Group>
@@ -609,7 +736,11 @@ const SubjectManagementPage = () => {
                       <Text size="sm">{subject.semester}</Text>
                     </Table.Td>
                     <Table.Td>
-                      <SubCategoryBadge subCategory={subject.sub_category} />
+                      <GroupNameBadge
+                        groupId={subject.subject_group_id}
+                        groups={groups}
+                        fallback={subject.sub_category}
+                      />
                     </Table.Td>
                     <Table.Td>
                       <CategoryBadge category={subject.category} />
@@ -642,7 +773,7 @@ const SubjectManagementPage = () => {
                   <Table.Tr>
                     <Table.Td colSpan={10}>
                       <Text c="dimmed" ta="center" py="lg">
-                        Chưa có môn trong nhóm «{subCategoryLabel(selectedGroupId)}». Bấm «Thêm môn học».
+                        Chưa có môn trong nhóm «{selectedGroup?.name ?? 'đã chọn'}». Bấm «Thêm môn học».
                       </Text>
                     </Table.Td>
                   </Table.Tr>
@@ -651,6 +782,8 @@ const SubjectManagementPage = () => {
             </Table>
           </Paper>
         )}
+          </Tabs.Panel>
+        </Tabs>
       </Stack>
 
       <Modal
@@ -681,7 +814,7 @@ const SubjectManagementPage = () => {
                 initial={editingSubject}
                 programs={programs}
                 defaultProgramId={editingSubject.program_id ?? selectedProgramId}
-                defaultGroupId={editingSubject.sub_category ?? selectedGroupId}
+                defaultGroupId={editingSubject.subject_group_id ?? selectedGroupId}
                 allSubjects={subjectsInProgram}
                 onSubmit={(data) => void handleUpdate(editingSubject.id, data)}
                 onCancel={() => setEditOpen(false)}
@@ -692,19 +825,46 @@ const SubjectManagementPage = () => {
       </Modal>
 
       <Modal
-        opened={programCreateOpen}
-        onClose={() => setProgramCreateOpen(false)}
-        size="lg"
-        radius="md"
-        padding={0}
+        opened={groupFormOpen}
+        onClose={() => setGroupFormOpen(false)}
+        title={editingGroup ? 'Sửa nhóm môn' : 'Thêm nhóm môn'}
+        size="md"
         centered
-        withCloseButton={false}
-        overlayProps={{ backgroundOpacity: 0.45, blur: 4 }}
       >
-        <ProgramForm
-          onSubmit={(code, name, desc) => void handleCreateProgram(code, name, desc)}
-          onCancel={() => setProgramCreateOpen(false)}
-        />
+        <Stack gap="md">
+          <TextInput
+            label="Mã nhóm"
+            required
+            value={groupCode}
+            onChange={(e) => setGroupCode(e.currentTarget.value.toUpperCase().replace(/\s/g, ''))}
+            placeholder="VD: programming, math"
+          />
+          <TextInput
+            label="Tên nhóm môn"
+            required
+            value={groupName}
+            onChange={(e) => setGroupName(e.currentTarget.value)}
+            placeholder="VD: Lập trình"
+          />
+          <Textarea
+            label="Mô tả"
+            value={groupDesc}
+            onChange={(e) => setGroupDesc(e.currentTarget.value)}
+            minRows={2}
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setGroupFormOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              color="teal"
+              onClick={() => void handleSaveGroup()}
+              disabled={!groupCode.trim() || !groupName.trim()}
+            >
+              Lưu
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );
@@ -734,32 +894,47 @@ function SubjectForm({
   const [credits, setCredits] = useState<number>(initial?.credits ?? 0);
   const [semester, setSemester] = useState<number>(initial?.semester ?? 0);
   const [category, setCategory] = useState(initial?.category ?? 'general');
-  const [subCategory, setSubCategory] = useState<string | null>(
-    initial?.sub_category ?? defaultGroupId ?? null
+  const [subjectGroupId, setSubjectGroupId] = useState<string | null>(
+    initial?.subject_group_id ?? defaultGroupId ?? null
   );
   const [programId, setProgramId] = useState(initial?.program_id ?? defaultProgramId ?? '');
+  const [formGroups, setFormGroups] = useState<SubjectGroupDto[]>([]);
   const [prerequisiteIds, setPrerequisiteIds] = useState<string[]>(
     initial?.prerequisites?.map((p) => p.id) ?? []
   );
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
 
+  useEffect(() => {
+    if (!programId) {
+      setFormGroups([]);
+      return;
+    }
+    void subjectGroupApi
+      .listByProgram(programId)
+      .then(setFormGroups)
+      .catch(() => setFormGroups([]));
+  }, [programId]);
+
+  const selectedFormGroup = formGroups.find((g) => g.id === subjectGroupId);
+
   const prereqOptions = allSubjects
     .filter((s) => s.id !== initial?.id && s.program_id === programId)
-    .filter((s) => !subCategory || s.sub_category === subCategory)
+    .filter((s) => !subjectGroupId || s.subject_group_id === subjectGroupId)
     .map((s) => ({
       value: s.id,
       label: s.code ? `${s.code} — ${s.name}` : s.name,
     }));
 
   const handleSubmit = () => {
-    if (!name.trim() || !programId || !subCategory) return;
+    if (!name.trim() || !programId || !subjectGroupId) return;
     onSubmit({
       name: name.trim(),
       code: code.trim(),
       credits,
       semester,
       category,
-      sub_category: subCategory,
+      sub_category: selectedFormGroup?.code ?? initial?.sub_category ?? null,
+      subject_group_id: subjectGroupId,
       program_id: programId,
       prerequisite_ids: prerequisiteIds,
       is_active: isActive,
@@ -781,7 +956,7 @@ function SubjectForm({
         value={programId || null}
         onChange={(v) => {
           setProgramId(v ?? '');
-          if (!initial) setSubCategory(null);
+          if (!initial) setSubjectGroupId(null);
         }}
         searchable
       />
@@ -789,12 +964,12 @@ function SubjectForm({
         label="2. Nhóm môn"
         description="Nhóm học phần trong chuyên ngành"
         required
-        data={SUB_CATEGORIES}
-        value={subCategory}
-        onChange={setSubCategory}
+        data={formGroups.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` }))}
+        value={subjectGroupId}
+        onChange={setSubjectGroupId}
         searchable
-        placeholder="Chọn nhóm môn"
-        disabled={!programId}
+        placeholder={programId ? 'Chọn nhóm môn' : 'Chọn chuyên ngành trước'}
+        disabled={!programId || formGroups.length === 0}
       />
       <Divider label="3. Thông tin môn" labelPosition="left" />
       <TextInput
@@ -847,7 +1022,12 @@ function SubjectForm({
         <Button variant="default" size="md" onClick={onCancel}>
           Hủy
         </Button>
-        <Button color="teal" size="md" onClick={handleSubmit} disabled={!programId || !subCategory || !name.trim()}>
+        <Button
+          color="teal"
+          size="md"
+          onClick={handleSubmit}
+          disabled={!programId || !subjectGroupId || !name.trim()}
+        >
           Lưu
         </Button>
       </Group>
@@ -855,156 +1035,4 @@ function SubjectForm({
   );
 }
 
-const PROGRAM_EXAMPLES = [
-  { code: 'CNTT', name: 'Công nghệ thông tin', color: 'teal' as const },
-  { code: 'DL', name: 'Du lịch', color: 'cyan' as const },
-  { code: 'KT', name: 'Kế toán', color: 'violet' as const },
-];
-
-function ProgramForm({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (code: string, name: string, description: string) => void;
-  onCancel: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const canSubmit = code.trim().length > 0 && name.trim().length > 0;
-
-  const applyExample = (exampleCode: string, exampleName: string) => {
-    setCode(exampleCode);
-    setName(exampleName);
-  };
-
-  return (
-    <Stack gap={0}>
-      <Box
-        px="lg"
-        py="md"
-        style={{
-          background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
-          borderRadius: 'var(--mantine-radius-md) var(--mantine-radius-md) 0 0',
-        }}
-      >
-        <Group justify="space-between" align="flex-start" wrap="nowrap">
-          <Group gap="sm" align="flex-start" wrap="nowrap">
-            <ThemeIcon size={44} radius="md" variant="white" color="teal">
-              <IconSchool size={24} stroke={1.5} />
-            </ThemeIcon>
-            <Stack gap={4}>
-              <Title order={3} c="white" fw={700}>
-                Thêm chuyên ngành mới
-              </Title>
-              <Text size="sm" c="white" style={{ opacity: 0.9 }}>
-                Tạo ngành đào tạo, sau đó thêm môn học và đề thi cho ngành đó.
-              </Text>
-            </Stack>
-          </Group>
-          <CloseButton
-            size="md"
-            variant="transparent"
-            c="white"
-            onClick={onCancel}
-            aria-label="Đóng"
-          />
-        </Group>
-      </Box>
-
-      <Box px="lg" py="md">
-        <Paper withBorder radius="md" p="md" bg="var(--mantine-color-gray-0)">
-          <Group gap="xs" mb="xs" wrap="nowrap">
-            <IconInfoCircle size={18} style={{ color: 'var(--mantine-color-teal-6)', flexShrink: 0 }} />
-            <Text size="sm" fw={600}>
-              Gợi ý mã ngành (bấm để điền nhanh)
-            </Text>
-          </Group>
-          <Group gap="xs">
-            {PROGRAM_EXAMPLES.map((ex) => (
-              <Badge
-                key={ex.code}
-                size="lg"
-                variant="light"
-                color={ex.color}
-                style={{ cursor: 'pointer' }}
-                onClick={() => applyExample(ex.code, ex.name)}
-              >
-                {ex.code} — {ex.name}
-              </Badge>
-            ))}
-          </Group>
-          <Text size="xs" c="dimmed" mt="sm">
-            CNTT đã có sẵn trong hệ thống. Mã ngành viết hoa, không trùng ngành khác.
-          </Text>
-        </Paper>
-
-        <Stack gap="md" mt="lg">
-          <TextInput
-            label="Mã ngành"
-            description="2–10 ký tự, dùng trong danh sách và báo cáo"
-            required
-            size="md"
-            placeholder="VD: DL, KT, QTKD"
-            value={code}
-            onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/\s/g, ''))}
-            maxLength={10}
-            styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontWeight: 600 } }}
-          />
-          <TextInput
-            label="Tên chuyên ngành"
-            description="Tên đầy đủ hiển thị cho admin và giảng viên"
-            required
-            size="md"
-            placeholder="VD: Quản trị du lịch"
-            value={name}
-            onChange={(e) => setName(e.currentTarget.value)}
-          />
-          <Textarea
-            label="Mô tả"
-            description="Tuỳ chọn — ghi chú nội bộ"
-            size="md"
-            placeholder="Ghi chú cho quản trị viên…"
-            value={description}
-            onChange={(e) => setDescription(e.currentTarget.value)}
-            minRows={3}
-            autosize
-            maxRows={5}
-          />
-        </Stack>
-      </Box>
-
-      <Box
-        px="lg"
-        py="md"
-        style={{
-          borderTop: '1px solid var(--mantine-color-gray-3)',
-          background: 'var(--mantine-color-gray-0)',
-          borderRadius: '0 0 var(--mantine-radius-md) var(--mantine-radius-md)',
-        }}
-      >
-        <Group justify="space-between" wrap="wrap">
-          <Text size="xs" c="dimmed">
-            {canSubmit ? 'Sẵn sàng tạo chuyên ngành' : 'Nhập mã và tên chuyên ngành để tiếp tục'}
-          </Text>
-          <Group gap="sm">
-            <Button variant="default" size="md" onClick={onCancel}>
-              Hủy
-            </Button>
-            <Button
-              color="teal"
-              size="md"
-              leftSection={<IconPlus size={18} />}
-              onClick={() => onSubmit(code.trim(), name.trim(), description.trim())}
-              disabled={!canSubmit}
-            >
-              Tạo chuyên ngành
-            </Button>
-          </Group>
-        </Group>
-      </Box>
-    </Stack>
-  );
-}
-
-export default SubjectManagementPage;
+export default SubjectCatalogManagementPage;

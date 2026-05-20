@@ -8,6 +8,7 @@ export interface Subject {
   semester: number;
   category: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   program_id?: string | null;
   prerequisites?: string[] | null;
   is_active: boolean;
@@ -28,6 +29,7 @@ function mapSubjectRow(row: Record<string, unknown>): Subject {
     semester: Number(row.semester) || 0,
     category: (row.category as string) ?? "general",
     sub_category: (row.sub_category as string) ?? null,
+    subject_group_id: (row.subject_group_id as string) ?? null,
     program_id: (row.program_id as string) ?? null,
     prerequisites,
     is_active: Boolean(row.is_active),
@@ -44,7 +46,9 @@ export const querySubjectsPaginated = async (
   limit: number,
   offset: number,
   search?: string,
-  programId?: string
+  programId?: string,
+  subCategory?: string,
+  subjectGroupId?: string
 ): Promise<{ items: Subject[]; total: number }> => {
   const conditions: string[] = [];
   const values: unknown[] = [];
@@ -53,6 +57,16 @@ export const querySubjectsPaginated = async (
   if (programId) {
     conditions.push(`program_id = $${idx++}`);
     values.push(programId);
+  }
+
+  if (subCategory?.trim()) {
+    conditions.push(`sub_category = $${idx++}`);
+    values.push(subCategory.trim());
+  }
+
+  if (subjectGroupId?.trim()) {
+    conditions.push(`subject_group_id = $${idx++}`);
+    values.push(subjectGroupId.trim());
   }
 
   if (search?.trim()) {
@@ -102,6 +116,7 @@ export interface CreateSubjectInput {
   semester?: number;
   category?: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   program_id?: string | null;
   prerequisite_ids?: string[];
 }
@@ -109,8 +124,8 @@ export interface CreateSubjectInput {
 export const createSubject = async (input: CreateSubjectInput): Promise<Subject> => {
   const prereq = input.prerequisite_ids?.length ? input.prerequisite_ids : null;
   const result = await pool.query(
-    `INSERT INTO subjects (name, code, credits, semester, category, sub_category, program_id, prerequisites)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO subjects (name, code, credits, semester, category, sub_category, subject_group_id, program_id, prerequisites)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING *`,
     [
       input.name,
@@ -119,6 +134,7 @@ export const createSubject = async (input: CreateSubjectInput): Promise<Subject>
       input.semester ?? 0,
       input.category ?? "general",
       input.sub_category ?? null,
+      input.subject_group_id ?? null,
       input.program_id ?? null,
       prereq,
     ]
@@ -133,6 +149,7 @@ export interface UpdateSubjectInput {
   semester?: number;
   category?: string;
   sub_category?: string | null;
+  subject_group_id?: string | null;
   program_id?: string | null;
   prerequisite_ids?: string[];
   is_active?: boolean;
@@ -169,6 +186,10 @@ export const updateSubject = async (
   if (input.sub_category !== undefined) {
     fields.push(`sub_category = $${idx++}`);
     values.push(input.sub_category);
+  }
+  if (input.subject_group_id !== undefined) {
+    fields.push(`subject_group_id = $${idx++}`);
+    values.push(input.subject_group_id);
   }
   if (input.program_id !== undefined) {
     fields.push(`program_id = $${idx++}`);

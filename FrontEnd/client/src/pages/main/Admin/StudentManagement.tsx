@@ -267,8 +267,8 @@ const StudentManagement = () => {
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
       <PageHeader
-        title={t('teacher_students.title')}
-        subtitle="Quản lý tài khoản sinh viên toàn hệ thống"
+        title={t('admin.student_management_title')}
+        subtitle={t('admin.user_list_subtitle')}
         accent="teal"
       />
 

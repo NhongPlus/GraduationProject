@@ -23,7 +23,16 @@ router.get("/", async (req, res, next) => {
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
     const search = req.query.search as string | undefined;
     const programId = req.query.program_id as string | undefined;
-    const result = await querySubjectsPaginated(limit, offset, search, programId);
+    const subCategory = req.query.sub_category as string | undefined;
+    const subjectGroupId = req.query.subject_group_id as string | undefined;
+    const result = await querySubjectsPaginated(
+      limit,
+      offset,
+      search,
+      programId,
+      subCategory,
+      subjectGroupId
+    );
     res.json({
       success: true,
       data: buildPaginatedList(result.items, result.total, limit, offset),

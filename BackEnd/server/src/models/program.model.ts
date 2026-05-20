@@ -8,19 +8,31 @@ export interface Program {
   is_active: boolean;
   created_at: string;
   subject_count?: number;
+  teacher_count?: number;
+}
+
+export interface ProgramTeacherRef {
+  id: string;
+  full_name: string | null;
+  email: string;
+  username: string;
 }
 
 export async function getAllPrograms(): Promise<Program[]> {
-  const r = await pool.query<Program & { subject_count: string }>(
-    `SELECT p.*, COUNT(s.id)::int AS subject_count
+  const r = await pool.query<Program & { subject_count: string; teacher_count: string }>(
+    `SELECT p.*,
+            COUNT(DISTINCT s.id)::int AS subject_count,
+            COUNT(DISTINCT pt.teacher_id)::int AS teacher_count
      FROM programs p
      LEFT JOIN subjects s ON s.program_id = p.id
+     LEFT JOIN program_teachers pt ON pt.program_id = p.id
      GROUP BY p.id
      ORDER BY p.name ASC`
   );
   return r.rows.map((row) => ({
     ...row,
     subject_count: Number(row.subject_count) || 0,
+    teacher_count: Number(row.teacher_count) || 0,
   }));
 }
 
@@ -94,4 +106,41 @@ export async function updateProgram(
 export async function deleteProgram(id: string): Promise<boolean> {
   const r = await pool.query("DELETE FROM programs WHERE id = $1", [id]);
   return (r.rowCount ?? 0) > 0;
+}
+
+export async function getProgramTeachers(programId: string): Promise<ProgramTeacherRef[]> {
+  const r = await pool.query<ProgramTeacherRef>(
+    `SELECT a.id, a.full_name, a.email, a.username
+     FROM program_teachers pt
+     JOIN accounts a ON a.id = pt.teacher_id
+     WHERE pt.program_id = $1 AND a.role = 'teacher'
+     ORDER BY a.full_name NULLS LAST, a.email`,
+    [programId]
+  );
+  return r.rows;
+}
+
+export async function setProgramTeachers(
+  programId: string,
+  teacherIds: string[]
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM program_teachers WHERE program_id = $1", [programId]);
+    for (const teacherId of teacherIds) {
+      await client.query(
+        `INSERT INTO program_teachers (program_id, teacher_id)
+         SELECT $1, $2
+         WHERE EXISTS (SELECT 1 FROM accounts WHERE id = $2 AND role = 'teacher')`,
+        [programId, teacherId]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }

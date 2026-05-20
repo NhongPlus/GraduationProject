@@ -8,6 +8,14 @@ export interface ProgramDto {
   is_active: boolean;
   created_at: string;
   subject_count?: number;
+  teacher_count?: number;
+}
+
+export interface ProgramTeacherDto {
+  id: string;
+  full_name: string | null;
+  email: string;
+  username: string;
 }
 
 export type CreateProgramPayload = {
@@ -40,6 +48,21 @@ const programApi = {
 
   deleteProgram: async (id: string): Promise<void> => {
     await apiClient.delete(`/programs/${id}`);
+  },
+
+  getTeachers: async (programId: string): Promise<ProgramTeacherDto[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ProgramTeacherDto[] }>(
+      `/programs/${programId}/teachers`
+    );
+    return res.data.data;
+  },
+
+  setTeachers: async (programId: string, teacherIds: string[]): Promise<ProgramTeacherDto[]> => {
+    const res = await apiClient.put<{ success: boolean; data: ProgramTeacherDto[] }>(
+      `/programs/${programId}/teachers`,
+      { teacher_ids: teacherIds }
+    );
+    return res.data.data;
   },
 };
 
