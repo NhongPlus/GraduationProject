@@ -1,7 +1,7 @@
 import type { SubjectDto } from '@/services/subjectApi';
 import type { SubjectCategoryGroup } from './subjectGrouping';
 
-/** @deprecated Import từ subjectPickerApi — giữ alias type */
+/** Alias type — nguồn dữ liệu: subjectApi.getSubjectPickerCatalog */
 export type PredictionCatalogGroupDto = SubjectPickerCatalogGroupDto;
 
 export type SubjectPickerCatalogGroupDto = {

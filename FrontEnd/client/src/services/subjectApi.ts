@@ -35,6 +35,43 @@ export type CreateSubjectPayload = {
   program_id?: string | null;
 };
 
+/** Nhóm môn + danh sách môn — GET /subjects/picker-catalog */
+export type SubjectPickerCatalogGroup = {
+  id: string;
+  label: string;
+  subjects: Array<{
+    id: string;
+    name: string;
+    code: string;
+    credits: number;
+    model_subject_id: string | null;
+    prerequisite_ids?: string[];
+    prerequisite_names?: string[];
+  }>;
+};
+
+let pickerCatalogPromise: Promise<SubjectPickerCatalogGroup[]> | null = null;
+
+export function resetSubjectPickerCatalogCache(): void {
+  pickerCatalogPromise = null;
+}
+
+export async function getSubjectPickerCatalog(
+  options?: { refresh?: boolean }
+): Promise<SubjectPickerCatalogGroup[]> {
+  if (options?.refresh) pickerCatalogPromise = null;
+  if (!pickerCatalogPromise) {
+    pickerCatalogPromise = apiClient
+      .get<{ success: boolean; data: SubjectPickerCatalogGroup[] }>('/subjects/picker-catalog')
+      .then((res) => res.data.data)
+      .catch((err) => {
+        pickerCatalogPromise = null;
+        throw err;
+      });
+  }
+  return pickerCatalogPromise;
+}
+
 export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
   foundation: 'Khối nền tảng',
   ai_ml: 'Khối AI/ML',
@@ -97,6 +134,9 @@ const subjectApi = {
     }>('/subjects/bulk-delete', { ids });
     return res.data.data;
   },
+
+  getPickerCatalog: getSubjectPickerCatalog,
+  resetPickerCatalogCache: resetSubjectPickerCatalogCache,
 };
 
 export default subjectApi;

@@ -18,7 +18,7 @@ const router = Router();
 
 router.use(authMiddleware);
 
-/** GET /v1/subjects/picker-catalog — nhóm môn thống nhất (subject_groups.json) cho mọi picker */
+/** GET /v1/subjects/picker-catalog — nhóm môn + danh sách môn (picker, dự đoán, admin) */
 router.get(
   "/picker-catalog",
   roleMiddleware(["admin", "teacher", "student"]),
@@ -44,12 +44,18 @@ router.get("/", async (req, res, next) => {
     const subjectGroupId = req.query.subject_group_id as string | undefined;
     const catalogGroupId = req.query.catalog_group as string | undefined;
     let catalogGroup: { code: string; subjectIds: string[] } | undefined;
+    let groupIdFilter = subjectGroupId;
     if (catalogGroupId?.trim()) {
-      const code = catalogGroupId.trim();
-      catalogGroup = {
-        code,
-        subjectIds: await getSubjectIdsForCatalogGroup(code),
-      };
+      const key = catalogGroupId.trim();
+      const isUuid = /^[0-9a-f-]{36}$/i.test(key);
+      if (isUuid) {
+        groupIdFilter = key;
+      } else {
+        catalogGroup = {
+          code: key,
+          subjectIds: await getSubjectIdsForCatalogGroup(key),
+        };
+      }
     }
     const result = await querySubjectsPaginated(
       limit,
@@ -57,7 +63,7 @@ router.get("/", async (req, res, next) => {
       search,
       programId,
       subCategory,
-      subjectGroupId,
+      groupIdFilter,
       catalogGroup
     );
     res.json({

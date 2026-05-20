@@ -250,20 +250,6 @@ export interface PredictionEligibility {
   message: string;
 }
 
-export interface PredictionCatalogGroup {
-  id: string;
-  label: string;
-  subjects: Array<{
-    id: string;
-    name: string;
-    code: string;
-    credits: number;
-    model_subject_id: string | null;
-    prerequisite_ids?: string[];
-    prerequisite_names?: string[];
-  }>;
-}
-
 export interface PredictionResult {
   target_subject?: string;
   target_subject_id?: string;
@@ -625,12 +611,6 @@ const examApi = {
       '/prediction/me'
     );
     return res.data.data;
-  },
-
-  /** @deprecated Dùng subjectPickerApi.getCatalog — alias giữ tương thích */
-  getPredictionSubjectCatalog: async (): Promise<PredictionCatalogGroup[]> => {
-    const { getSubjectPickerCatalog } = await import('@/services/subjectPickerApi');
-    return getSubjectPickerCatalog();
   },
 
   getPredictionEligibility: async (targetSubjectId: string): Promise<PredictionEligibility> => {

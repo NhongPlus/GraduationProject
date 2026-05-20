@@ -3,7 +3,6 @@ import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 import { getCachedPredictionByUserId } from "~/models/studentPredictionCache.model";
 import { recomputePredictionsForAllStudents } from "~/services/predictionBatch.service";
-import { getSubjectPickerCatalog } from "~/services/predictionCatalog.service";
 import {
   generatePredictionForStudent,
   getStudentEligibility,
@@ -14,21 +13,6 @@ import {
 } from "~/utils/predictionAiQueue";
 
 const router = Router();
-
-/** Khối môn theo subject_groups.json — dùng cho picker dự đoán. */
-router.get(
-  "/subject-catalog",
-  authMiddleware,
-  roleMiddleware(["student", "admin"]),
-  async (_req, res, next) => {
-    try {
-      const data = await getSubjectPickerCatalog();
-      return res.json({ success: true, data });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 
 /** Kiểm tra đủ dữ kiện dự đoán một môn (query: target_subject = tên môn). */
 router.get(

@@ -5,7 +5,7 @@ import {
 } from '@/components/Input/SubjectCategoryPicker/predictionSubjectGrouping';
 import type { SubjectCategoryGroup } from '@/components/Input/SubjectCategoryPicker/subjectGrouping';
 import type { SubjectDto } from '@/services/subjectApi';
-import { getSubjectPickerCatalog } from '@/services/subjectPickerApi';
+import { getSubjectPickerCatalog } from '@/services/subjectApi';
 
 export function useSubjectPickerCatalog() {
   const [catalog, setCatalog] = useState<SubjectPickerCatalogGroupDto[]>([]);
