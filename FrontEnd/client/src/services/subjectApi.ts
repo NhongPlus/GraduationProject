@@ -15,6 +15,7 @@ export interface SubjectDto {
   semester: number;
   category: string;
   sub_category?: string | null;
+  program_id?: string | null;
   prerequisites?: SubjectPrerequisiteRef[];
   prerequisite_ids?: string[];
   is_active: boolean;
@@ -29,6 +30,7 @@ export type CreateSubjectPayload = {
   category?: string;
   sub_category?: string | null;
   prerequisite_ids?: string[];
+  program_id?: string | null;
 };
 
 export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
@@ -46,7 +48,9 @@ export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
 };
 
 const subjectApi = {
-  listSubjects: async (params: ListQueryParams = {}): Promise<PaginatedList<SubjectDto>> =>
+  listSubjects: async (
+    params: ListQueryParams & { program_id?: string } = {}
+  ): Promise<PaginatedList<SubjectDto>> =>
     fetchPaginatedList<SubjectDto>('/subjects', params),
 
   getSubjects: async (): Promise<SubjectDto[]> => fetchAllListItems<SubjectDto>('/subjects'),
@@ -74,6 +78,16 @@ const subjectApi = {
   },
   deleteSubject: async (id: string): Promise<void> => {
     await apiClient.delete(`/subjects/${id}`);
+  },
+
+  bulkDeleteSubjects: async (
+    ids: string[]
+  ): Promise<{ deleted: number; failed: Array<{ id: string; reason: string }> }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { deleted: number; failed: Array<{ id: string; reason: string }> };
+    }>('/subjects/bulk-delete', { ids });
+    return res.data.data;
   },
 };
 

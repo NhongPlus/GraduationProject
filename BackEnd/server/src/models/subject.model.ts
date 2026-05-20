@@ -8,6 +8,7 @@ export interface Subject {
   semester: number;
   category: string;
   sub_category?: string | null;
+  program_id?: string | null;
   prerequisites?: string[] | null;
   is_active: boolean;
   created_at: string;
@@ -27,6 +28,7 @@ function mapSubjectRow(row: Record<string, unknown>): Subject {
     semester: Number(row.semester) || 0,
     category: (row.category as string) ?? "general",
     sub_category: (row.sub_category as string) ?? null,
+    program_id: (row.program_id as string) ?? null,
     prerequisites,
     is_active: Boolean(row.is_active),
     created_at: row.created_at as string,
@@ -41,11 +43,17 @@ export const getAllSubjects = async (): Promise<Subject[]> => {
 export const querySubjectsPaginated = async (
   limit: number,
   offset: number,
-  search?: string
+  search?: string,
+  programId?: string
 ): Promise<{ items: Subject[]; total: number }> => {
   const conditions: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
+
+  if (programId) {
+    conditions.push(`program_id = $${idx++}`);
+    values.push(programId);
+  }
 
   if (search?.trim()) {
     conditions.push(
@@ -94,14 +102,15 @@ export interface CreateSubjectInput {
   semester?: number;
   category?: string;
   sub_category?: string | null;
+  program_id?: string | null;
   prerequisite_ids?: string[];
 }
 
 export const createSubject = async (input: CreateSubjectInput): Promise<Subject> => {
   const prereq = input.prerequisite_ids?.length ? input.prerequisite_ids : null;
   const result = await pool.query(
-    `INSERT INTO subjects (name, code, credits, semester, category, sub_category, prerequisites)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO subjects (name, code, credits, semester, category, sub_category, program_id, prerequisites)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       input.name,
@@ -110,6 +119,7 @@ export const createSubject = async (input: CreateSubjectInput): Promise<Subject>
       input.semester ?? 0,
       input.category ?? "general",
       input.sub_category ?? null,
+      input.program_id ?? null,
       prereq,
     ]
   );
@@ -123,6 +133,7 @@ export interface UpdateSubjectInput {
   semester?: number;
   category?: string;
   sub_category?: string | null;
+  program_id?: string | null;
   prerequisite_ids?: string[];
   is_active?: boolean;
 }
@@ -158,6 +169,10 @@ export const updateSubject = async (
   if (input.sub_category !== undefined) {
     fields.push(`sub_category = $${idx++}`);
     values.push(input.sub_category);
+  }
+  if (input.program_id !== undefined) {
+    fields.push(`program_id = $${idx++}`);
+    values.push(input.program_id);
   }
   if (input.prerequisite_ids !== undefined) {
     fields.push(`prerequisites = $${idx++}`);
@@ -196,3 +211,34 @@ export const deleteSubject = async (id: string): Promise<boolean> => {
   const result = await pool.query("DELETE FROM subjects WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
 };
+
+export type BulkDeleteSubjectsResult = {
+  deleted: number;
+  failed: Array<{ id: string; reason: string }>;
+};
+
+export async function deleteSubjectsByIds(ids: string[]): Promise<BulkDeleteSubjectsResult> {
+  const unique = [...new Set(ids.filter((id) => typeof id === "string" && id.trim()))];
+  const failed: BulkDeleteSubjectsResult["failed"] = [];
+  let deleted = 0;
+
+  for (const id of unique) {
+    try {
+      const ok = await deleteSubject(id);
+      if (ok) deleted += 1;
+      else failed.push({ id, reason: "Không tìm thấy môn học" });
+    } catch (e: unknown) {
+      const pg = e as { code?: string; message?: string };
+      if (pg.code === "23503") {
+        failed.push({
+          id,
+          reason: "Môn đang được dùng (đề thi, lớp, ngân hàng câu hỏi…)",
+        });
+      } else {
+        failed.push({ id, reason: pg.message ?? "Không xóa được" });
+      }
+    }
+  }
+
+  return { deleted, failed };
+}

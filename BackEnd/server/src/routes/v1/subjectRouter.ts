@@ -9,7 +9,7 @@ import {
   replaceSubjectPrerequisites,
   getSubjectDetailById,
 } from "~/services/subject.service";
-import { deleteSubject } from "~/models/subject.model";
+import { deleteSubject, deleteSubjectsByIds } from "~/models/subject.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
 
 const router = Router();
@@ -22,7 +22,8 @@ router.get("/", async (req, res, next) => {
   try {
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
     const search = req.query.search as string | undefined;
-    const result = await querySubjectsPaginated(limit, offset, search);
+    const programId = req.query.program_id as string | undefined;
+    const result = await querySubjectsPaginated(limit, offset, search, programId);
     res.json({
       success: true,
       data: buildPaginatedList(result.items, result.total, limit, offset),
@@ -31,6 +32,32 @@ router.get("/", async (req, res, next) => {
     next(err);
   }
 });
+
+/** POST /v1/subjects/bulk-delete — xóa nhiều môn (admin) */
+router.post(
+  "/bulk-delete",
+  roleMiddleware(["admin"]),
+  async (req, res, next) => {
+    try {
+      const raw = req.body?.ids;
+      const ids = Array.isArray(raw)
+        ? raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+        : [];
+      if (ids.length === 0) {
+        res.status(400).json({ success: false, error: "Danh sách ids trống" });
+        return;
+      }
+      if (ids.length > 200) {
+        res.status(400).json({ success: false, error: "Tối đa 200 môn mỗi lần xóa" });
+        return;
+      }
+      const result = await deleteSubjectsByIds(ids);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 /** GET /v1/subjects/:id — kèm danh sách môn tiên quyết */
 router.get("/:id", async (req, res, next) => {

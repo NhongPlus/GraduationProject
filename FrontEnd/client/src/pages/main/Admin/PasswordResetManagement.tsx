@@ -11,7 +11,8 @@ import PageHeader from '@/components/PageHeader/PageHeader';
 const PasswordResetManagement = () => {
   const { t } = useTranslation();
   const [requests, setRequests] = useState<PasswordResetRequestItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -19,14 +20,17 @@ const PasswordResetManagement = () => {
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const load = async () => {
+    const isFirstLoad = initialLoading;
     try {
-      setLoading(true);
+      if (!isFirstLoad) setRefreshing(true);
       const d = await getPendingPasswordResets();
       setRequests(d);
+      setError('');
     } catch {
       setError('Không tải được yêu cầu đặt lại mật khẩu.');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -63,7 +67,7 @@ const PasswordResetManagement = () => {
     }
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Loader />
@@ -78,9 +82,6 @@ const PasswordResetManagement = () => {
           title={t('password_reset.title')}
           subtitle={t('password_reset.subtitle')}
           accent="teal"
-          action={
-            <ButtonLight size="sm" label="Làm mới" disabled={false} onClick={() => void load()} />
-          }
         />
 
         {notice && <Alert color="green" variant="light">{notice}</Alert>}
@@ -92,6 +93,15 @@ const PasswordResetManagement = () => {
         )}
 
         <Paper withBorder radius="md" p="sm">
+          <Group justify="flex-end" mb="sm">
+            <ButtonLight
+              size="sm"
+              label="Làm mới"
+              loading={refreshing}
+              disabled={refreshing}
+              onClick={() => void load()}
+            />
+          </Group>
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>

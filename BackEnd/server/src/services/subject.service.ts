@@ -18,6 +18,7 @@ export async function createSubjectWithPrerequisites(
 ): Promise<SubjectDetail> {
   const name = input.name?.trim();
   if (!name) throw httpError(400, "Tên môn học là bắt buộc");
+  if (!input.program_id) throw httpError(400, "Vui lòng chọn chuyên ngành cho môn học");
 
   let prerequisiteIds: string[] = [];
   if (input.prerequisite_ids?.length) {
