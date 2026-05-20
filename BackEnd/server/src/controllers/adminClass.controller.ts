@@ -264,8 +264,9 @@ export const importConfirmController = async (
       return res.status(403).json({ success: false, message: "Không có quyền" });
     }
     const studentIds = Array.isArray(req.body?.student_ids) ? req.body.student_ids : [];
+    const creates = Array.isArray(req.body?.creates) ? req.body.creates : [];
     const allowTransfer = Boolean(req.body?.allow_transfer);
-    const result = await confirmImportRows(classId, studentIds, allowTransfer);
+    const result = await confirmImportRows(classId, studentIds, creates, allowTransfer);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);

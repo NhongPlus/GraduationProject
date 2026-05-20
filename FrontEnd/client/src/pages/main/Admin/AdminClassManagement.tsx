@@ -21,13 +21,11 @@ import {
 import {
   IconPlus,
   IconTrash,
-  IconEdit,
   IconArrowLeft,
   IconDownload,
   IconUpload,
 } from '@tabler/icons-react';
 import PageHeader from '@/components/PageHeader/PageHeader';
-import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import InputText from '@/components/Input/InputText/InputText';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
@@ -47,7 +45,6 @@ const AdminClassManagement = () => {
   const [detail, setDetail] = useState<AdminClassDto | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<AdminClassDto | null>(null);
   const [programId, setProgramId] = useState<string | null>(null);
   const [intakeYear, setIntakeYear] = useState(16);
   const [section, setSection] = useState('');
@@ -133,24 +130,12 @@ const AdminClassManagement = () => {
   }, [loadStudents, selectedId]);
 
   const openCreate = () => {
-    setEditingClass(null);
     setProgramId(programs[0]?.id ?? null);
     setIntakeYear(16);
     setSection('');
     setDisplayName('');
     setManagerId(null);
     setExpectedSize(0);
-    setFormOpen(true);
-  };
-
-  const openEdit = (c: AdminClassDto) => {
-    setEditingClass(c);
-    setProgramId(c.program_id);
-    setIntakeYear(c.intake_year);
-    setSection(c.section);
-    setDisplayName(c.display_name);
-    setManagerId(c.manager_teacher_id);
-    setExpectedSize(c.expected_size ?? 0);
     setFormOpen(true);
   };
 
@@ -164,32 +149,20 @@ const AdminClassManagement = () => {
     if (!programId || !section.trim()) return;
     const name = displayName.trim() || buildDisplayName();
     try {
-      if (editingClass) {
-        await adminClassApi.updateClass(editingClass.id, {
-          display_name: name,
-          manager_teacher_id: managerId,
-          expected_size: expectedSize,
-          intake_year: intakeYear,
-          section: section.trim(),
-        });
-        setNotice('Đã cập nhật lớp.');
-      } else {
-        await adminClassApi.createClass({
-          program_id: programId,
-          intake_year: intakeYear,
-          section: section.trim(),
-          display_name: name,
-          manager_teacher_id: managerId,
-          expected_size: expectedSize,
-        });
-        setNotice('Đã tạo lớp.');
-      }
+      await adminClassApi.createClass({
+        program_id: programId,
+        intake_year: intakeYear,
+        section: section.trim(),
+        display_name: name,
+        manager_teacher_id: managerId,
+        expected_size: expectedSize,
+      });
+      setNotice('Đã tạo lớp.');
       setFormOpen(false);
       void loadList();
-      if (selectedId) void loadDetail(selectedId);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg || 'Lưu lớp thất bại.');
+      setError(msg || 'Tạo lớp thất bại.');
     }
   };
 
@@ -262,15 +235,44 @@ const AdminClassManagement = () => {
     }
   };
 
+  const importConfirmable = useMemo(
+    () =>
+      importPreview.filter(
+        (r) => r.status === 'ok' || r.status === 'warn_transfer' || r.status === 'will_create'
+      ),
+    [importPreview]
+  );
+
   const handleImportConfirm = async () => {
-    if (!selectedId) return;
-    const ids = importPreview
+    if (!selectedId || importConfirmable.length === 0) return;
+    const studentIds = importPreview
       .filter((r) => (r.status === 'ok' || r.status === 'warn_transfer') && r.student_id)
       .map((r) => r.student_id!);
-    if (!ids.length) return;
+    const creates = importPreview
+      .filter((r) => r.status === 'will_create')
+      .map((r) => ({
+        username: r.username.trim(),
+        email: r.email.trim(),
+        full_name: r.full_name.trim() || undefined,
+      }));
     try {
-      const result = await adminClassApi.importConfirm(selectedId, ids, allowTransfer);
-      setNotice(`Import: đã gán ${result.assigned} sinh viên.`);
+      const result = await adminClassApi.importConfirm(selectedId, {
+        studentIds,
+        creates,
+        allowTransfer,
+      });
+      const parts: string[] = [];
+      if (result.assigned > 0) parts.push(`gán ${result.assigned}`);
+      if (result.created > 0) parts.push(`tạo mới ${result.created}`);
+      const errCount =
+        result.skipped.length + (result.create_errors?.length ?? 0);
+      if (errCount > 0) parts.push(`${errCount} dòng lỗi/bỏ qua`);
+      setNotice(parts.length ? `Import: ${parts.join(', ')}.` : 'Không có dòng nào được xử lý.');
+      if (result.create_errors?.length) {
+        setError(
+          result.create_errors.map((e) => `${e.username}: ${e.reason}`).join('; ')
+        );
+      }
       setAddOpen(false);
       void loadStudents();
       void loadDetail(selectedId);
@@ -324,8 +326,13 @@ const AdminClassManagement = () => {
                 Chủ nhiệm: <strong>{detail.manager_name || '—'}</strong>
               </Text>
               <Text size="sm">
-                Sinh viên: <strong>{detail.student_count ?? 0}</strong>
-                {detail.expected_size > 0 && ` / ${detail.expected_size}`}
+                Sĩ số: <strong>{detail.student_count ?? 0}</strong>
+                {detail.expected_size > 0 && (
+                  <>
+                    {' '}
+                    / {detail.expected_size} <Text span size="xs" c="dimmed">(khai báo)</Text>
+                  </>
+                )}
                 {overCapacity && (
                   <Badge color="orange" ml="xs" size="sm">
                     Vượt sĩ số khai báo
@@ -333,14 +340,9 @@ const AdminClassManagement = () => {
                 )}
               </Text>
             </Stack>
-            <Group>
-              <Button variant="light" leftSection={<IconEdit size={16} />} onClick={() => openEdit(detail)}>
-                Sửa lớp
-              </Button>
-              <Button color="teal" leftSection={<IconPlus size={16} />} onClick={() => void openAddStudents()}>
-                Thêm sinh viên
-              </Button>
-            </Group>
+            <Button color="teal" leftSection={<IconPlus size={16} />} onClick={() => void openAddStudents()}>
+              Thêm sinh viên
+            </Button>
           </Group>
         </Paper>
 
@@ -497,11 +499,15 @@ const AdminClassManagement = () => {
               {importFile && <Text size="sm" mb="xs">{importFile.name}</Text>}
               {importPreview.length > 0 && (
                 <>
+                  <Text size="sm" c="dimmed" mb="xs">
+                    Tên có thể trùng; mã SV và email không được trùng. Dòng lỗi (đỏ) sẽ bỏ qua khi xác nhận.
+                  </Text>
                   <Table striped>
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Dòng</Table.Th>
-                        <Table.Th>Mã</Table.Th>
+                        <Table.Th>Mã SV</Table.Th>
+                        <Table.Th>Email</Table.Th>
                         <Table.Th>Trạng thái</Table.Th>
                       </Table.Tr>
                     </Table.Thead>
@@ -509,9 +515,20 @@ const AdminClassManagement = () => {
                       {importPreview.map((r) => (
                         <Table.Tr key={r.row}>
                           <Table.Td>{r.row}</Table.Td>
-                          <Table.Td>{r.username || r.email}</Table.Td>
+                          <Table.Td>{r.username || '—'}</Table.Td>
+                          <Table.Td>{r.email}</Table.Td>
                           <Table.Td>
-                            <Badge color={r.status === 'ok' ? 'green' : r.status === 'warn_transfer' ? 'orange' : 'red'}>
+                            <Badge
+                              color={
+                                r.status === 'ok'
+                                  ? 'green'
+                                  : r.status === 'will_create'
+                                    ? 'blue'
+                                    : r.status === 'warn_transfer'
+                                      ? 'orange'
+                                      : 'red'
+                              }
+                            >
                               {r.message}
                             </Badge>
                           </Table.Td>
@@ -519,8 +536,12 @@ const AdminClassManagement = () => {
                       ))}
                     </Table.Tbody>
                   </Table>
-                  <Button mt="md" onClick={() => void handleImportConfirm()}>
-                    Xác nhận import
+                  <Button
+                    mt="md"
+                    onClick={() => void handleImportConfirm()}
+                    disabled={importConfirmable.length === 0}
+                  >
+                    Xác nhận import ({importConfirmable.length} dòng)
                   </Button>
                 </>
               )}
@@ -557,7 +578,6 @@ const AdminClassManagement = () => {
                 <Table.Th>Tên lớp</Table.Th>
                 <Table.Th>Chuyên ngành</Table.Th>
                 <Table.Th>Chủ nhiệm</Table.Th>
-                <Table.Th>SV</Table.Th>
                 <Table.Th>Sĩ số</Table.Th>
                 <Table.Th />
               </Table.Tr>
@@ -570,17 +590,17 @@ const AdminClassManagement = () => {
                   </Table.Td>
                   <Table.Td>{c.program_name || c.program_code}</Table.Td>
                   <Table.Td>{c.manager_name || '—'}</Table.Td>
-                  <Table.Td>{c.student_count ?? 0}</Table.Td>
-                  <Table.Td>{c.expected_size > 0 ? c.expected_size : '—'}</Table.Td>
                   <Table.Td>
-                    <Group gap={4}>
-                      <Button size="compact-sm" variant="light" onClick={() => setSelectedId(c.id)}>
-                        Chi tiết
-                      </Button>
-                      <ActionIcon variant="light" onClick={() => openEdit(c)}>
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                    </Group>
+                    {(() => {
+                      const n = c.student_count ?? 0;
+                      const cap = c.expected_size ?? 0;
+                      return cap > 0 ? `${n}/${cap}` : String(n);
+                    })()}
+                  </Table.Td>
+                  <Table.Td>
+                    <Button size="compact-sm" variant="light" onClick={() => setSelectedId(c.id)}>
+                      Chi tiết
+                    </Button>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -589,18 +609,16 @@ const AdminClassManagement = () => {
         </Paper>
       )}
 
-      <Modal opened={formOpen} onClose={() => setFormOpen(false)} title={editingClass ? 'Sửa lớp' : 'Tạo lớp mới'}>
+      <Modal opened={formOpen} onClose={() => setFormOpen(false)} title="Tạo lớp mới">
         <Stack gap="sm">
-          {!editingClass && (
-            <Select
-              label="Chuyên ngành"
-              data={programs.map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
-              value={programId}
-              onChange={setProgramId}
-              searchable
-              required
-            />
-          )}
+          <Select
+            label="Chuyên ngành"
+            data={programs.map((p) => ({ value: p.id, label: `${p.code} — ${p.name}` }))}
+            value={programId}
+            onChange={setProgramId}
+            searchable
+            required
+          />
           <Group grow>
             <NumberInput label="Khóa" value={intakeYear} onChange={(v) => setIntakeYear(Number(v) || 0)} min={1} />
             <InputText label="Tổ" value={section} onChange={(e) => setSection(e.currentTarget.value)} />
@@ -621,7 +639,7 @@ const AdminClassManagement = () => {
             placeholder="Chọn GV (tối đa 2 lớp/GV)"
           />
           <NumberInput
-            label="Sĩ số (0 = không giới hạn mềm)"
+            label="Sĩ số khai báo (0 = chỉ hiển thị số SV thực tế)"
             value={expectedSize}
             onChange={(v) => setExpectedSize(Math.max(0, Number(v) || 0))}
             min={0}

@@ -191,20 +191,20 @@ export function getPredictionTargets(
   };
 }
 
-/** Thứ tự hiển thị khối trên UI dự đoán / picker */
+/** Thứ tự hiển thị khối trên UI dự đoán / picker (theo phân nhóm CNTT16-02) */
 export const PREDICTION_GROUP_ORDER = [
-  "math",
-  "software",
-  "ai_iot",
-  "network",
-  "bigdata",
-  "english",
-  "defense",
-  "philosophy",
-  "soft_skills",
-  "security",
-  "internship",
   "pe",
+  "defense",
+  "english",
+  "ai_iot",
+  "philosophy",
+  "software",
+  "bigdata",
+  "network",
+  "internship",
+  "security",
+  "soft_skills",
+  "math",
 ] as const;
 
 export type PredictionEligibility = {

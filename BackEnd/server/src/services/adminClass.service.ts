@@ -7,14 +7,15 @@ import {
   assignStudentsToClass,
   removeStudentFromClass,
   getAdminClassById,
-  findStudentByUsernameOrEmail,
   type CreateAdminClassInput,
   type UpdateAdminClassInput,
 } from "~/models/adminClass.model";
+import { getUserByEmail, getUserByUsername, type User, type UserRole } from "~/models/user.model";
 import { createUserService } from "~/services/user.service";
 import { generateRandomPassword } from "~/utils/randomPassword";
 
 const MAX_CLASSES_PER_TEACHER = 2;
+const DEFAULT_STUDENT_EMAIL_SUFFIX = "@student.dainam.edu.vn";
 
 export async function assertTeacherClassQuota(
   teacherId: string,
@@ -53,10 +54,88 @@ export async function deleteAdminClassService(id: string) {
   return deleteAdminClass(id);
 }
 
+function roleLabel(role: UserRole): string {
+  if (role === "teacher") return "giáo viên";
+  if (role === "admin") return "quản trị";
+  return role;
+}
+
+export function normalizeStudentEmail(username: string, email?: string): string {
+  const e = email?.trim();
+  if (e) return e;
+  const u = username.trim();
+  return u ? `${u}${DEFAULT_STUDENT_EMAIL_SUFFIX}` : "";
+}
+
+type ResolvedStudent = {
+  id: string;
+  username: string;
+  email: string;
+  full_name: string | null;
+  admin_class_id: string | null;
+};
+
+export type AccountResolveResult =
+  | { kind: "student"; student: ResolvedStudent }
+  | { kind: "create" }
+  | { kind: "error"; message: string };
+
+/** Kiểm tra mã SV / email — tên có thể trùng, ID (username) và email không được trùng giữa các vai trò. */
+export async function resolveStudentAccount(
+  username: string,
+  email?: string
+): Promise<AccountResolveResult> {
+  const u = username.trim();
+  if (!u) return { kind: "error", message: "Thiếu mã sinh viên" };
+
+  const normalizedEmail = normalizeStudentEmail(u, email);
+  const byUsername = await getUserByUsername(u);
+  const byEmail = await getUserByEmail(normalizedEmail);
+
+  if (byUsername && byUsername.role !== "student") {
+    return {
+      kind: "error",
+      message: `Mã SV "${u}" đã dùng cho tài khoản ${roleLabel(byUsername.role)}`,
+    };
+  }
+  if (byEmail && byEmail.role !== "student") {
+    return {
+      kind: "error",
+      message: `Email đã dùng cho tài khoản ${roleLabel(byEmail.role)}`,
+    };
+  }
+  if (byUsername && byEmail && byUsername.id !== byEmail.id) {
+    return {
+      kind: "error",
+      message: "Mã SV và email thuộc hai tài khoản khác nhau trong hệ thống",
+    };
+  }
+
+  const student = (byUsername ?? byEmail) as User | undefined;
+  if (student?.role === "student") {
+    return {
+      kind: "student",
+      student: {
+        id: student.id,
+        username: student.username,
+        email: student.email,
+        full_name: student.full_name,
+        admin_class_id: student.admin_class_id ?? null,
+      },
+    };
+  }
+  return { kind: "create" };
+}
+
 export function buildImportTemplateBuffer(): Buffer {
   const ws = XLSX.utils.aoa_to_sheet([
     ["username", "email", "full_name", "ghi_chu"],
-    ["1671020357", "1671020357@student.dainam.edu.vn", "Nguyễn Văn A", "Tuỳ chọn"],
+    [
+      "1671020357",
+      "1671020357@student.dainam.edu.vn",
+      "Nguyễn Văn A",
+      "Mã SV bắt buộc; email có thể để trống (tự sinh); chưa có TK sẽ được tạo mới",
+    ],
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "SinhVien");
@@ -68,7 +147,7 @@ export type ImportPreviewRow = {
   username: string;
   email: string;
   full_name: string;
-  status: "ok" | "warn_transfer" | "error";
+  status: "ok" | "warn_transfer" | "will_create" | "error";
   message: string;
   student_id?: string;
 };
@@ -83,9 +162,10 @@ export function parseImportExcel(buffer: Buffer): ImportPreviewRow[] {
   for (const raw of rows) {
     rowNum += 1;
     const username = String(raw.username ?? raw["Mã SV"] ?? raw["Ma SV"] ?? "").trim();
-    const email = String(raw.email ?? raw["Email"] ?? "").trim();
+    const emailRaw = String(raw.email ?? raw["Email"] ?? "").trim();
     const full_name = String(raw.full_name ?? raw["Họ tên"] ?? raw["Ho ten"] ?? "").trim();
-    if (!username && !email) continue;
+    if (!username && !emailRaw) continue;
+    const email = normalizeStudentEmail(username, emailRaw);
     out.push({
       row: rowNum,
       username,
@@ -98,65 +178,191 @@ export function parseImportExcel(buffer: Buffer): ImportPreviewRow[] {
   return out;
 }
 
+function markDuplicateRowsInFile(rows: ImportPreviewRow[]): void {
+  const usernameRows = new Map<string, number[]>();
+  const emailRows = new Map<string, number[]>();
+  for (const r of rows) {
+    const u = r.username.trim().toLowerCase();
+    if (u) {
+      const list = usernameRows.get(u) ?? [];
+      list.push(r.row);
+      usernameRows.set(u, list);
+    }
+    const e = r.email.trim().toLowerCase();
+    if (e) {
+      const list = emailRows.get(e) ?? [];
+      list.push(r.row);
+      emailRows.set(e, list);
+    }
+  }
+  for (const r of rows) {
+    const u = r.username.trim().toLowerCase();
+    if (u && (usernameRows.get(u)?.length ?? 0) > 1) {
+      r.status = "error";
+      r.message = "Mã SV trùng trong file Excel";
+      continue;
+    }
+    const e = r.email.trim().toLowerCase();
+    if (e && (emailRows.get(e)?.length ?? 0) > 1) {
+      r.status = "error";
+      r.message = "Email trùng trong file Excel";
+    }
+  }
+}
+
+function applyClassAssignmentStatus(
+  r: ImportPreviewRow,
+  classId: string,
+  student: ResolvedStudent,
+  allowTransfer: boolean
+): ImportPreviewRow {
+  if (student.admin_class_id === classId) {
+    return {
+      ...r,
+      status: "error",
+      message: "Đã trong lớp này",
+      student_id: student.id,
+    };
+  }
+  if (student.admin_class_id && student.admin_class_id !== classId) {
+    if (allowTransfer) {
+      return {
+        ...r,
+        status: "warn_transfer",
+        message: "Sẽ chuyển từ lớp khác",
+        student_id: student.id,
+      };
+    }
+    return {
+      ...r,
+      status: "error",
+      message: "Đang thuộc lớp khác (bật chuyển lớp để import)",
+      student_id: student.id,
+    };
+  }
+  return {
+    ...r,
+    status: "ok",
+    message: "Sẵn sàng gán vào lớp",
+    student_id: student.id,
+  };
+}
+
 export async function enrichImportPreview(
   classId: string,
   rows: ImportPreviewRow[],
   allowTransfer: boolean
 ): Promise<ImportPreviewRow[]> {
+  markDuplicateRowsInFile(rows);
+
   const enriched: ImportPreviewRow[] = [];
   for (const r of rows) {
-    const student = await findStudentByUsernameOrEmail(r.username, r.email);
-    if (!student) {
+    if (r.status === "error") {
+      enriched.push(r);
+      continue;
+    }
+
+    if (!r.username.trim()) {
       enriched.push({
         ...r,
         status: "error",
-        message: "Không tìm thấy tài khoản sinh viên",
+        message: "Thiếu mã sinh viên (username)",
       });
       continue;
     }
-    if (student.admin_class_id === classId) {
+
+    const email = normalizeStudentEmail(r.username, r.email);
+    const resolved = await resolveStudentAccount(r.username, email);
+
+    if (resolved.kind === "error") {
+      enriched.push({ ...r, email, status: "error", message: resolved.message });
+      continue;
+    }
+
+    if (resolved.kind === "create") {
       enriched.push({
         ...r,
-        status: "error",
-        message: "Đã trong lớp này",
-        student_id: student.id,
+        email,
+        status: "will_create",
+        message: "Chưa có tài khoản — sẽ tạo mới và gán lớp",
       });
       continue;
     }
-    if (student.admin_class_id && student.admin_class_id !== classId) {
-      if (allowTransfer) {
-        enriched.push({
-          ...r,
-          status: "warn_transfer",
-          message: "Sẽ chuyển từ lớp khác",
-          student_id: student.id,
-        });
-      } else {
-        enriched.push({
-          ...r,
-          status: "error",
-          message: "Đang thuộc lớp khác (bật chuyển lớp để import)",
-          student_id: student.id,
-        });
-      }
-      continue;
-    }
-    enriched.push({
-      ...r,
-      status: "ok",
-      message: "Sẵn sàng gán",
-      student_id: student.id,
-    });
+
+    enriched.push(applyClassAssignmentStatus({ ...r, email }, classId, resolved.student, allowTransfer));
   }
   return enriched;
 }
 
+export type ImportConfirmCreateRow = {
+  username: string;
+  email: string;
+  full_name?: string;
+};
+
 export async function confirmImportRows(
   classId: string,
   studentIds: string[],
+  creates: ImportConfirmCreateRow[],
   allowTransfer: boolean
-) {
-  return assignStudentsToClass(classId, studentIds, allowTransfer);
+): Promise<{
+  assigned: number;
+  created: number;
+  skipped: { id: string; reason: string }[];
+  create_errors: { username: string; reason: string }[];
+}> {
+  const assignResult = await assignStudentsToClass(classId, studentIds, allowTransfer);
+  let created = 0;
+  const create_errors: { username: string; reason: string }[] = [];
+
+  for (const row of creates) {
+    const username = row.username.trim();
+    const email = normalizeStudentEmail(username, row.email);
+    if (!username) {
+      create_errors.push({ username: "(trống)", reason: "Thiếu mã sinh viên" });
+      continue;
+    }
+
+    const resolved = await resolveStudentAccount(username, email);
+    if (resolved.kind === "error") {
+      create_errors.push({ username, reason: resolved.message });
+      continue;
+    }
+
+    if (resolved.kind === "student") {
+      const one = await assignStudentsToClass(classId, [resolved.student.id], allowTransfer);
+      if (one.assigned > 0) {
+        created += 0;
+        assignResult.assigned += one.assigned;
+      } else if (one.skipped[0]) {
+        create_errors.push({ username, reason: one.skipped[0].reason });
+      }
+      continue;
+    }
+
+    try {
+      const password = generateRandomPassword(10);
+      await createUserService(
+        email,
+        username,
+        password,
+        "student",
+        row.full_name?.trim(),
+        classId
+      );
+      created += 1;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không tạo được tài khoản";
+      create_errors.push({ username, reason: msg });
+    }
+  }
+
+  return {
+    assigned: assignResult.assigned,
+    created,
+    skipped: assignResult.skipped,
+    create_errors,
+  };
 }
 
 export async function addManualStudentToClass(
@@ -169,27 +375,34 @@ export async function addManualStudentToClass(
     allow_transfer?: boolean;
   }
 ) {
-  const existing = await findStudentByUsernameOrEmail(payload.username, payload.email);
-  if (existing) {
+  const username = payload.username.trim();
+  const email = normalizeStudentEmail(username, payload.email);
+  if (!username) throw new Error("Thiếu mã sinh viên");
+
+  const resolved = await resolveStudentAccount(username, email);
+  if (resolved.kind === "error") throw new Error(resolved.message);
+
+  if (resolved.kind === "student") {
     const result = await assignStudentsToClass(
       classId,
-      [existing.id],
+      [resolved.student.id],
       Boolean(payload.allow_transfer)
     );
     if (result.assigned === 0 && result.skipped[0]) {
       throw new Error(result.skipped[0].reason);
     }
-    return { mode: "assigned" as const, student_id: existing.id };
+    return { mode: "assigned" as const, student_id: resolved.student.id };
   }
+
   const password = payload.password?.trim() || generateRandomPassword(10);
   const user = await createUserService(
-    payload.email.trim(),
-    payload.username.trim(),
+    email,
+    username,
     password,
     "student",
-    payload.full_name?.trim()
+    payload.full_name?.trim(),
+    classId
   );
-  await assignStudentsToClass(classId, [user.id], true);
   return { mode: "created" as const, student_id: user.id, password };
 }
 

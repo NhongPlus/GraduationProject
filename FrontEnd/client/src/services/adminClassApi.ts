@@ -30,9 +30,15 @@ export type ImportPreviewRow = {
   username: string;
   email: string;
   full_name: string;
-  status: 'ok' | 'warn_transfer' | 'error';
+  status: 'ok' | 'warn_transfer' | 'will_create' | 'error';
   message: string;
   student_id?: string;
+};
+
+export type ImportConfirmCreateRow = {
+  username: string;
+  email: string;
+  full_name?: string;
 };
 
 const adminClassApi = {
@@ -148,15 +154,29 @@ const adminClassApi = {
 
   importConfirm: async (
     classId: string,
-    studentIds: string[],
-    allowTransfer: boolean
-  ): Promise<{ assigned: number; skipped: { id: string; reason: string }[] }> => {
+    payload: {
+      studentIds: string[];
+      creates: ImportConfirmCreateRow[];
+      allowTransfer: boolean;
+    }
+  ): Promise<{
+    assigned: number;
+    created: number;
+    skipped: { id: string; reason: string }[];
+    create_errors: { username: string; reason: string }[];
+  }> => {
     const res = await apiClient.post<{
       success: boolean;
-      data: { assigned: number; skipped: { id: string; reason: string }[] };
+      data: {
+        assigned: number;
+        created: number;
+        skipped: { id: string; reason: string }[];
+        create_errors: { username: string; reason: string }[];
+      };
     }>(`/admin-classes/${classId}/students/import/confirm`, {
-      student_ids: studentIds,
-      allow_transfer: allowTransfer,
+      student_ids: payload.studentIds,
+      creates: payload.creates,
+      allow_transfer: payload.allowTransfer,
     });
     return res.data.data;
   },
