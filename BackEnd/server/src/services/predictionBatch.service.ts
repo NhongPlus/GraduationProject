@@ -4,6 +4,7 @@ import { getAllUsers } from "~/models/user.model";
 import { getStudentSessions } from "~/services/exam.service";
 import { predictScore, type PredictionRequest } from "~/services/prediction.service";
 import { grade10ToLetter, scoreToGrade10 } from "~/utils/gradeScale";
+import { getPredictionTargets } from "~/utils/subjectGroups.util";
 
 export type RecomputeSummary = {
   total_students: number;
@@ -42,6 +43,16 @@ async function buildRequestForStudent(
   if (rows.length === 0) return null;
 
   const latest = rows[rows.length - 1];
+  const history = rows.slice(0, -1).map((r) => ({
+    subject: r.subject,
+    score: r.score,
+    grade: r.grade,
+  }));
+  const { targets } = getPredictionTargets(
+    latest.subject,
+    rows.map((r) => r.subject)
+  );
+
   return {
     student_id: studentId,
     student_name: fullName ?? undefined,
@@ -50,7 +61,8 @@ async function buildRequestForStudent(
       score: latest.score,
       grade: latest.grade,
     },
-    history: rows.slice(0, -1).map((r) => ({ subject: r.subject, score: r.score, grade: r.grade })),
+    history,
+    target_subjects: targets.length > 0 ? targets : undefined,
   };
 }
 

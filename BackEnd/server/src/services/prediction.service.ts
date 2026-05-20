@@ -1,5 +1,12 @@
 import { env } from "~/config/enviroment";
-import { MINIMAX_SYSTEM_PROMPT, loadKnowledgeBase } from "~/config/prediction.config";
+import {
+  loadModelWeights,
+  predictGrade,
+} from "~/services/gradePredictor.service";
+import {
+  getPredictionTargets,
+  resolveSubjectId,
+} from "~/utils/subjectGroups.util";
 
 export interface JustCompleted {
   subject: string;
@@ -50,127 +57,110 @@ function scoreToGrade(score: number): string {
   return "F";
 }
 
-function gradeToScoreMin(grade: string): number {
-  const map: Record<string, number> = { "A+": 9, A: 8, B: 7, C: 6, "D+": 5, F: 0 };
-  return map[grade] ?? 6;
+function buildScoresMap(
+  req: PredictionRequest,
+  completedId: string | null
+): Record<string, number> {
+  const scores: Record<string, number> = {};
+  for (const h of req.history) {
+    const id = resolveSubjectId(h.subject);
+    if (id && h.score > 0) scores[id] = h.score;
+  }
+  if (completedId && req.just_completed.score > 0) {
+    scores[completedId] = req.just_completed.score;
+  }
+  return scores;
 }
 
-export async function predictScore(req: PredictionRequest): Promise<PredictionResult> {
-  if (!env.MINIMAX_API_KEY) {
-    throw new Error("MINIMAX_API_KEY chưa được cấu hình");
-  }
+function gpaFromScores(scores: Record<string, number>, fallback: number): number {
+  const vals = Object.values(scores).filter((v) => v > 0);
+  if (vals.length === 0) return fallback;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
 
-  const kb = loadKnowledgeBase();
+function vsClassAvgText(score: number, classAvg: number): string {
+  const diff = +(score - classAvg).toFixed(1);
+  if (Math.abs(diff) < 0.05) return `bằng ĐTB lớp (${classAvg})`;
+  if (diff > 0) return `cao hơn ĐTB lớp ${diff} điểm (ĐTB lớp: ${classAvg})`;
+  return `thấp hơn ĐTB lớp ${Math.abs(diff)} điểm (ĐTB lớp: ${classAvg})`;
+}
 
-  // Build history text
-  const historyLines = req.history
-    .slice(0, 20)
-    .map((h) => `  - ${h.subject}: ${h.score}/10 (${h.grade})`)
-    .join("\n");
+function buildMathPredictions(
+  targetNames: string[],
+  scores: Record<string, number>,
+  gpa: number,
+  completedId: string | null,
+  groupLabels: string[]
+): SubjectPrediction[] {
+  const weights = loadModelWeights();
+  const out: SubjectPrediction[] = [];
 
-  // Determine target subjects
-  let targetSubjects: string[];
-  if (req.target_subjects && req.target_subjects.length > 0) {
-    targetSubjects = req.target_subjects;
-  } else {
-    // Auto-detect from chains: find subjects that depend on what student just completed
-    const justCompleted = req.just_completed.subject;
-    const found = kb.subjectChains.filter((chain) =>
-      chain.from.some((f) => justCompleted.toLowerCase().includes(f.toLowerCase()))
-    );
-    targetSubjects = found.map((chain) => chain.to);
-
-    // Also add sequential English subjects
-    if (justCompleted.includes("Tiếng Anh P")) {
-      const match = justCompleted.match(/P(\d+)/);
-      if (match) {
-        const currentPart = parseInt(match[1], 10);
-        const nextParts = [currentPart + 1, currentPart + 2];
-        for (const p of nextParts) {
-          const nextName = `Tiếng Anh P${p}`;
-          if (!targetSubjects.includes(nextName)) targetSubjects.push(nextName);
-        }
+  for (const name of targetNames) {
+    const tid = resolveSubjectId(name);
+    if (!tid) continue;
+    try {
+      const p = predictGrade({ subject_id: tid, scores, gpa });
+      const model = weights.models[tid];
+      let correlation_r = 0;
+      if (completedId && model) {
+        const hit = model.top_correlations.find(
+          (c) => c.subject_id === completedId
+        );
+        correlation_r = hit?.r ?? 0;
       }
+      const trend: SubjectPrediction["trend"] =
+        p.vs_class_avg >= 0.3
+          ? "up"
+          : p.vs_class_avg <= -0.3
+            ? "down"
+            : "stable";
+      const sameGroupNote = groupLabels.length
+        ? `Cùng nhóm: ${groupLabels.join(", ")}. `
+        : "";
+      out.push({
+        subject: name,
+        semester: 0,
+        credits: weights.subject_meta[tid]?.credits ?? 0,
+        predicted_score: p.predicted_score,
+        grade: p.predicted_grade,
+        confidence: p.confidence,
+        trend,
+        correlation_r,
+        reasoning: `${sameGroupNote}Mô hình hồi quy (R²=${p.model_r2}); ${p.features_used
+          .filter((f) => f.same_group)
+          .map((f) => f.name)
+          .slice(0, 2)
+          .join(", ") || "dựa trên GPA và điểm các môn liên quan"}.`,
+      });
+    } catch {
+      /* bỏ qua môn không predict được */
     }
   }
+  return out;
+}
 
-  // Build correlation info for targets
-  const corrLines = targetSubjects
-    .map((target) => {
-      const corr = kb.correlations.find(
-        (c) =>
-          c.from.toLowerCase().includes(req.just_completed.subject.toLowerCase()) &&
-          c.to.toLowerCase().includes(target.toLowerCase())
-      );
-      if (corr) return `  - ${target}: r=${corr.r}`;
-      return `  - ${target}: r=0.00 (không có tương quan trực tiếp)`;
-    })
-    .join("\n");
+async function fetchAiCommentary(
+  req: PredictionRequest,
+  groupLabels: string[],
+  predictions: SubjectPrediction[],
+  vsClassAvg: string
+): Promise<{ analysis: string; overall_advice: string }> {
+  const fallback = {
+    analysis: `Kết quả ${req.just_completed.grade} ở môn ${req.just_completed.subject}, ${vsClassAvg}.`,
+    overall_advice:
+      predictions.length > 0
+        ? `Tập trung các môn cùng nhóm (${groupLabels.join(", ")}): ${predictions.map((p) => p.subject).join(", ")}.`
+        : "Tiếp tục duy trì phong độ học tập.",
+  };
+  if (!env.MINIMAX_API_KEY) return fallback;
 
-  const userPrompt = `## INPUT — Dữ liệu sinh viên
-
-### Thông tin sinh viên
-- Mã SV: ${req.student_id}
-- Họ tên: ${req.student_name ?? "không rõ"}
-
-### Kết quả vừa thi
-- Môn: **${req.just_completed.subject}**
-- Điểm: **${req.just_completed.score}/10** — Xếp loại: **${req.just_completed.grade}**
-
-### Lịch sử điểm (${req.history.length} môn đã thi)
-${historyLines || "(chưa có)"}`;
-
-  const targetList = targetSubjects.join(", ");
-  const classAvgs = kb.subjectAverages
-    .filter((s) => targetSubjects.some((t) => t.toLowerCase().includes(s.subject.toLowerCase())))
-    .map((s) => `${s.subject}: ĐTB lớp=${s.avg}`)
+  const predLines = predictions
+    .map((p) => `${p.subject}: ${p.predicted_score}/10`)
     .join("; ");
-
-  const requestText = `${userPrompt}
-
-### Các môn cần dự đoán: ${targetList}
-${
-  classAvgs ? `\nThông tin thêm từ knowledge base:\n  ${kb.subjectAverages
-    .filter((s) => targetSubjects.some((t) => t.toLowerCase().includes(s.subject.toLowerCase())))
-    .map((s) => `${s.subject}: ĐTB lớp=${s.avg}`)
-    .join("; ")}` : ""
-}
-
-## TASK
-Dựa trên điểm vừa thi, lịch sử học tập, hệ số tương quan Pearson (r), và ĐTB lớp, hãy dự đoán điểm cho từng môn trong "Các môn cần dự đoán".
-
-## OUTPUT — Chỉ trả về JSON, không thêm bất kỳ text nào khác
-
-\`\`\`json
-{
-  "just_completed": {
-    "subject": "${req.just_completed.subject}",
-    "score": ${req.just_completed.score},
-    "grade": "${req.just_completed.grade}",
-    "vs_class_avg": "cao hơn/thấp hơn/bằng ĐTB lớp X điểm",
-    "analysis": "nhận xét ngắn 1 câu về kết quả này"
-  },
-  "predictions": [
-    {
-      "subject": "tên môn",
-      "semester": 0,
-      "credits": 0,
-      "predicted_score": 0.0,
-      "grade": "A+|A|B|C|D+|F",
-      "confidence": 0.0,
-      "trend": "up|stable|down",
-      "correlation_r": 0.0,
-      "reasoning": "giải thích ngắn gọn dựa trên r và lịch sử"
-    }
-  ],
-  "overall_advice": "1-2 câu khuyến nghị cụ thể"
-}
-\`\`\``;
-
-  const messages: Array<{ role: string; content: string }> = [
-    { role: "system", content: MINIMAX_SYSTEM_PROMPT },
-    { role: "user", content: requestText },
-  ];
+  const prompt = `Bạn là giáo viên CNTT. SV vừa thi "${req.just_completed.subject}" đạt ${req.just_completed.score}/10 (${vsClassAvg}).
+Chỉ dự đoán trong nhóm: ${groupLabels.join(", ") || "—"}.
+Điểm dự đoán đã tính sẵn (KHÔNG đổi): ${predLines || "không có môn cùng nhóm"}.
+Trả CHỈ JSON: {"analysis":"1 câu","overall_advice":"1-2 câu"}`;
 
   const response = await fetch(`${env.MINIMAX_BASE_URL}/text/chatcompletion_v2`, {
     method: "POST",
@@ -180,56 +170,90 @@ Dựa trên điểm vừa thi, lịch sử học tập, hệ số tương quan P
     },
     body: JSON.stringify({
       model: env.MINIMAX_MODEL,
-      messages,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Trả lời ngắn tiếng Việt, chỉ JSON, không suy luận dài, không thêm môn ngoài nhóm.",
+        },
+        { role: "user", content: prompt },
+      ],
       temperature: 0.3,
+      max_tokens: 400,
     }),
   });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`MiniMax API error ${response.status}: ${text}`);
-  }
-
-  const json = await response.json() as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-        role?: string;
-      };
-    }>;
+  if (!response.ok) return fallback;
+  const json = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
   };
-  const rawContent = json.choices?.[0]?.message?.content ?? "";
-
-  // Extract JSON from markdown code block if present
-  const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) ?? rawContent.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch ? (jsonMatch[1] ?? jsonMatch[0]) : rawContent;
-
+  const raw = json.choices?.[0]?.message?.content ?? "";
+  const match =
+    raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? raw.match(/\{[\s\S]*\}/);
+  const jsonStr = match ? (match[1] ?? match[0]) : raw;
   try {
-    const parsed = JSON.parse(jsonStr.trim()) as PredictionResult;
-    return parsed;
-  } catch {
-    // Fallback: try to find partial JSON
-    const result: PredictionResult = {
-      just_completed: {
-        subject: req.just_completed.subject,
-        score: req.just_completed.score,
-        grade: req.just_completed.grade,
-        vs_class_avg: "cần kiểm tra lại",
-        analysis: "Dữ liệu không đủ để phân tích chi tiết",
-      },
-      predictions: targetSubjects.map((subj) => ({
-        subject: subj,
-        semester: 0,
-        credits: 0,
-        predicted_score: gradeToScoreMin(req.just_completed.grade),
-        grade: scoreToGrade(gradeToScoreMin(req.just_completed.grade)),
-        confidence: 0.5,
-        trend: "stable" as const,
-        correlation_r: 0,
-        reasoning: "Fallback do parse lỗi — sử dụng điểm môn vừa thi",
-      })),
-      overall_advice: "Không thể phân tích chi tiết. Vui lòng thử lại sau.",
+    const parsed = JSON.parse(jsonStr.trim()) as {
+      analysis?: string;
+      overall_advice?: string;
     };
-    return result;
+    return {
+      analysis: parsed.analysis ?? fallback.analysis,
+      overall_advice: parsed.overall_advice ?? fallback.overall_advice,
+    };
+  } catch {
+    return fallback;
   }
+}
+
+export async function predictScore(req: PredictionRequest): Promise<PredictionResult> {
+  const historyNames = req.history.map((h) => h.subject);
+  const { targets, groupLabels, completedId } =
+    req.target_subjects && req.target_subjects.length > 0
+      ? {
+          targets: req.target_subjects,
+          groupLabels: getPredictionTargets(req.just_completed.subject, historyNames)
+            .groupLabels,
+          completedId: resolveSubjectId(req.just_completed.subject),
+        }
+      : getPredictionTargets(req.just_completed.subject, historyNames);
+
+  const weights = loadModelWeights();
+  const completedMeta = completedId
+    ? weights.subject_meta[completedId]
+    : null;
+  const classAvg = completedMeta?.mean ?? req.just_completed.score;
+  const vsClassAvg = vsClassAvgText(req.just_completed.score, classAvg);
+
+  const scores = buildScoresMap(req, completedId);
+  const gpa = gpaFromScores(scores, req.just_completed.score);
+
+  const predictions = buildMathPredictions(
+    targets,
+    scores,
+    gpa,
+    completedId,
+    groupLabels
+  );
+
+  const commentary = await fetchAiCommentary(
+    req,
+    groupLabels,
+    predictions,
+    vsClassAvg
+  );
+
+  return {
+    just_completed: {
+      subject: req.just_completed.subject,
+      score: req.just_completed.score,
+      grade: req.just_completed.grade,
+      vs_class_avg: vsClassAvg,
+      analysis: commentary.analysis,
+    },
+    predictions,
+    overall_advice:
+      predictions.length === 0
+        ? `Môn "${req.just_completed.subject}" thuộc nhóm ${groupLabels.join(", ") || "chưa phân loại"}. Không còn môn cùng nhóm cần dự đoán tiếp theo lịch sử hiện tại. ${commentary.overall_advice}`
+        : commentary.overall_advice,
+  };
 }
