@@ -1,2 +1,3 @@
-# Netlify / Cloudflare Pages: mọi path trả index.html để React Router (BrowserRouter) xử lý
+# Cloudflare Pages / Netlify: chỉ fallback SPA khi KHÔNG có file tĩnh (assets/*.js vẫn phục vụ trực tiếp).
+# Vercel dùng vercel.json (rewrite có điều kiện Accept: text/html).
 /*    /index.html   200
