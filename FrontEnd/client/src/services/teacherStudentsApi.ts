@@ -119,17 +119,21 @@ const teacherStudentsApi = {
     await apiClient.delete(`/teacher-students/${id}`);
   },
 
-  getGradeExams: async (): Promise<{ class_name: string; exams: GradeExamOption[] }> => {
+  getGradeExams: async (
+    adminClassId?: string
+  ): Promise<{ class_name: string; exams: GradeExamOption[] }> => {
     const res = await apiClient.get<{
       success: boolean;
       data: { class_name: string; exams: GradeExamOption[] };
-    }>('/teacher-students/grade-report/exams');
+    }>('/teacher-students/grade-report/exams', {
+      params: adminClassId ? { admin_class_id: adminClassId } : undefined,
+    });
     return res.data.data;
   },
 
   getGradeReport: async (
     examId: string,
-    params: ListQueryParams = {}
+    params: ListQueryParams & { admin_class_id?: string } = {}
   ): Promise<GradeReport> => {
     const res = await apiClient.get<{ success: boolean; data: Record<string, unknown> }>(
       '/teacher-students/grade-report',
@@ -146,9 +150,12 @@ const teacherStudentsApi = {
     };
   },
 
-  downloadGradeExport: async (examId: string): Promise<void> => {
+  downloadGradeExport: async (examId: string, adminClassId?: string): Promise<void> => {
     const res = await apiClient.get('/teacher-students/grade-report/export', {
-      params: { exam_id: examId },
+      params: {
+        exam_id: examId,
+        ...(adminClassId ? { admin_class_id: adminClassId } : {}),
+      },
       responseType: 'blob',
     });
     const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });

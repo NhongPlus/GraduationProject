@@ -24,6 +24,19 @@ async function getTeacherAdminClassId(userId: string): Promise<string | null> {
   return ac?.id ?? null;
 }
 
+/** Giáo viên: lớp được gán; Admin: truyền admin_class_id trên query. */
+async function resolveAdminClassIdForGrades(req: Request): Promise<string | null> {
+  const user = (req as { user?: { role?: string; userId?: string } }).user;
+  if (user?.role === "admin") {
+    const id = (req.query.admin_class_id as string | undefined)?.trim();
+    return id || null;
+  }
+  if (user?.role === "teacher" && user.userId) {
+    return getTeacherAdminClassId(user.userId);
+  }
+  return null;
+}
+
 export const listStudentsController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
@@ -228,10 +241,12 @@ export const getGradeReportExamsController = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await resolveAdminClassIdForGrades(req);
     if (!adminClassId) {
-      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+      return res.status(400).json({
+        success: false,
+        message: "Chọn lớp hành chính (admin_class_id) để xem bảng điểm",
+      });
     }
 
     const r = await pool.query<{
@@ -268,10 +283,12 @@ export const getGradeReportExamsController = async (
 /** Bảng điểm: có exam_id → 1 dòng/SV; không có → chỉ phiên đã nộp. */
 export const getGradeReportController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await resolveAdminClassIdForGrades(req);
     if (!adminClassId) {
-      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+      return res.status(400).json({
+        success: false,
+        message: "Chọn lớp hành chính (admin_class_id) để xem bảng điểm",
+      });
     }
 
     const examId = (req.query.exam_id as string | undefined)?.trim();
@@ -433,10 +450,12 @@ export const exportGradeReportController = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await resolveAdminClassIdForGrades(req);
     if (!adminClassId) {
-      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+      return res.status(400).json({
+        success: false,
+        message: "Chọn lớp hành chính (admin_class_id) để xuất bảng điểm",
+      });
     }
 
     const examId = (req.query.exam_id as string | undefined)?.trim();
@@ -763,16 +782,33 @@ async function loadStudentTranscriptPayload(studentId: string, adminClassId: str
   };
 }
 
+async function resolveAdminClassIdForTranscript(
+  req: Request,
+  studentId: string
+): Promise<string | null> {
+  const user = (req as { user?: { role?: string; userId?: string } }).user;
+  if (user?.role === "admin") {
+    const r = await pool.query<{ admin_class_id: string | null }>(
+      `SELECT admin_class_id FROM accounts WHERE id = $1 AND role = 'student'`,
+      [studentId]
+    );
+    return r.rows[0]?.admin_class_id ?? null;
+  }
+  if (user?.role === "teacher" && user.userId) {
+    return getTeacherAdminClassId(user.userId);
+  }
+  return null;
+}
+
 export const getStudentTranscriptController = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await resolveAdminClassIdForTranscript(req, req.params.id);
     if (!adminClassId) {
-      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+      return res.status(404).json({ success: false, message: "Không tìm thấy sinh viên hoặc chưa gán lớp" });
     }
     const data = await loadStudentTranscriptPayload(req.params.id, adminClassId);
     if (!data) {
@@ -858,10 +894,9 @@ export const exportStudentTranscriptController = async (
   next: NextFunction
 ) => {
   try {
-    const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await resolveAdminClassIdForTranscript(req, req.params.id);
     if (!adminClassId) {
-      return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
+      return res.status(404).json({ success: false, message: "Không tìm thấy sinh viên hoặc chưa gán lớp" });
     }
     const format = (req.query.format as string) || "html";
     const payload = await loadStudentTranscriptPayload(req.params.id, adminClassId);

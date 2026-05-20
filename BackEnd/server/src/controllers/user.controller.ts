@@ -5,6 +5,7 @@ import {
   createUserService,
   updateUserService,
   deleteUserService,
+  bulkDeleteUsersService,
 } from "~/services/user.service";
 import { changePasswordService } from "~/services/auth.service";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
@@ -14,7 +15,8 @@ export const getUsersController = async (req: Request, res: Response, next: Next
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
     const role = req.query.role as "admin" | "teacher" | "student" | undefined;
     const search = req.query.search as string | undefined;
-    const result = await listUsersPaginated(limit, offset, { role, search });
+    const admin_class_id = req.query.admin_class_id as string | undefined;
+    const result = await listUsersPaginated(limit, offset, { role, search, admin_class_id });
     res.json({
       success: true,
       data: buildPaginatedList(result.items, result.total, limit, offset),
@@ -43,11 +45,40 @@ export const createUserController = async (req: Request, res: Response, next: Ne
 
 export const updateUserController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { full_name, is_active, role } = req.body;
-    const user = await updateUserService(req.params.id, { full_name, is_active, role });
+    const { full_name, is_active, role, username, email, password } = req.body;
+    const user = await updateUserService(req.params.id, {
+      full_name,
+      is_active,
+      role,
+      username,
+      email,
+      password,
+    });
     if (!user) return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
     res.json({ success: true, data: user });
-  } catch (err) { next(err); }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("đã tồn tại")) {
+      return res.status(409).json({ success: false, message: msg });
+    }
+    next(err);
+  }
+};
+
+export const bulkDeleteUsersController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const raw = req.body?.ids;
+    const ids = Array.isArray(raw)
+      ? raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+      : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ success: false, message: "ids là bắt buộc" });
+    }
+    const result = await bulkDeleteUsersService(ids);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const deleteUserController = async (req: Request, res: Response, next: NextFunction) => {

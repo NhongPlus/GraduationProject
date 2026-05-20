@@ -14,7 +14,9 @@ export interface User {
   updated_at: string;
 }
 
-export type PublicUser = Omit<User, "hashed_password">;
+export type PublicUser = Omit<User, "hashed_password"> & {
+  password_plain?: string | null;
+};
 
 export const getUserByEmail = async (email: string): Promise<User | null> => {
   const result = await pool.query(
@@ -50,7 +52,7 @@ export const getAllUsers = async (): Promise<PublicUser[]> => {
 export const queryUsersPaginated = async (
   limit: number,
   offset: number,
-  opts?: { role?: UserRole; search?: string }
+  opts?: { role?: UserRole; search?: string; admin_class_id?: string }
 ): Promise<{ items: PublicUser[]; total: number }> => {
   const conditions: string[] = [];
   const values: unknown[] = [];
@@ -59,6 +61,10 @@ export const queryUsersPaginated = async (
   if (opts?.role) {
     conditions.push(`role = $${idx++}`);
     values.push(opts.role);
+  }
+  if (opts?.admin_class_id) {
+    conditions.push(`admin_class_id = $${idx++}`);
+    values.push(opts.admin_class_id);
   }
   if (opts?.search?.trim()) {
     conditions.push(
@@ -70,7 +76,7 @@ export const queryUsersPaginated = async (
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const baseSelect =
-    "SELECT id, email, username, role, full_name, is_active, created_at, updated_at FROM accounts";
+    "SELECT id, email, username, role, full_name, is_active, password_plain, created_at, updated_at FROM accounts";
 
   const countResult = await pool.query(
     `SELECT COUNT(*)::int AS total FROM accounts ${where}`,
@@ -90,21 +96,41 @@ export const createUser = async (
   username: string,
   hashedPassword: string,
   role: UserRole,
-  fullName?: string
+  fullName?: string,
+  passwordPlain?: string | null
 ): Promise<User> => {
   const result = await pool.query(
-    `INSERT INTO accounts (email, username, hashed_password, role, full_name)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [email, username, hashedPassword, role, fullName ?? null]
+    `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [email, username, hashedPassword, passwordPlain ?? null, role, fullName ?? null]
   );
   return result.rows[0];
 };
 
+export type UserUpdateFields = {
+  full_name?: string | null;
+  is_active?: boolean;
+  role?: UserRole;
+  username?: string;
+  email?: string;
+  hashed_password?: string;
+  password_plain?: string | null;
+};
+
 export const updateUser = async (
   id: string,
-  fields: Partial<Pick<User, "full_name" | "is_active" | "role">>
+  fields: UserUpdateFields
 ): Promise<User | null> => {
-  const keys = Object.keys(fields) as Array<keyof typeof fields>;
+  const allowed: Array<keyof UserUpdateFields> = [
+    "full_name",
+    "is_active",
+    "role",
+    "username",
+    "email",
+    "hashed_password",
+    "password_plain",
+  ];
+  const keys = allowed.filter((k) => fields[k] !== undefined);
   if (keys.length === 0) return null;
   const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
   const values = keys.map((k) => fields[k]);

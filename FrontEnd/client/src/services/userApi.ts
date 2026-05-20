@@ -10,13 +10,19 @@ export interface UserAccount {
   role: UserRole;
   full_name: string | null;
   is_active: boolean;
+  password_plain?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+export type StudentListParams = ListQueryParams & {
+  role?: 'student';
+  admin_class_id?: string;
+};
+
 const userApi = {
-  listUsers: async (params: ListQueryParams & { role?: UserRole } = {}): Promise<PaginatedList<UserAccount>> =>
-    fetchPaginatedList<UserAccount>('/users', params),
+  listStudents: async (params: StudentListParams = {}): Promise<PaginatedList<UserAccount>> =>
+    fetchPaginatedList<UserAccount>('/users', { ...params, role: 'student' }),
 
   getUsers: async (params?: { role?: UserRole; limit?: number }): Promise<UserAccount[]> => {
     const result = await fetchPaginatedList<UserAccount>('/users', {
@@ -45,7 +51,14 @@ const userApi = {
 
   updateUser: async (
     id: string,
-    fields: Partial<Pick<UserAccount, 'full_name' | 'is_active' | 'role'>>
+    fields: {
+      full_name?: string | null;
+      username?: string;
+      email?: string;
+      is_active?: boolean;
+      role?: UserRole;
+      password?: string;
+    }
   ): Promise<UserAccount> => {
     const res = await apiClient.patch<{ success: boolean; data: UserAccount }>(`/users/${id}`, fields);
     return res.data.data;
@@ -53,6 +66,16 @@ const userApi = {
 
   deleteUser: async (id: string): Promise<void> => {
     await apiClient.delete(`/users/${id}`);
+  },
+
+  bulkDeleteUsers: async (
+    ids: string[]
+  ): Promise<{ deleted: number; failed: { id: string; reason: string }[] }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { deleted: number; failed: { id: string; reason: string }[] };
+    }>('/users/bulk-delete', { ids });
+    return res.data.data;
   },
 };
 

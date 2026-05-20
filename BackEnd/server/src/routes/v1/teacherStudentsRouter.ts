@@ -16,19 +16,19 @@ import {
 const teacherStudentsRouter = Router();
 
 teacherStudentsRouter.use(authMiddleware);
-teacherStudentsRouter.use(roleMiddleware(["teacher"]));
 
-teacherStudentsRouter.get("/", listStudentsController);
+const teacherOnly = roleMiddleware(["teacher"]);
+const teacherOrAdmin = roleMiddleware(["teacher", "admin"]);
 
-teacherStudentsRouter.get("/:id/transcript/export", exportStudentTranscriptController);
-teacherStudentsRouter.get("/:id/transcript", getStudentTranscriptController);
+teacherStudentsRouter.get("/grade-report/exams", teacherOrAdmin, getGradeReportExamsController);
+teacherStudentsRouter.get("/grade-report/export", teacherOrAdmin, exportGradeReportController);
+teacherStudentsRouter.get("/grade-report", teacherOrAdmin, getGradeReportController);
+teacherStudentsRouter.post("/grade-report/email", teacherOnly, sendGradeReportEmailController);
 
-teacherStudentsRouter.patch("/:id", updateStudentController);
-teacherStudentsRouter.delete("/:id", deleteStudentController);
-
-teacherStudentsRouter.get("/grade-report/exams", getGradeReportExamsController);
-teacherStudentsRouter.get("/grade-report/export", exportGradeReportController);
-teacherStudentsRouter.get("/grade-report", getGradeReportController);
-teacherStudentsRouter.post("/grade-report/email", sendGradeReportEmailController);
+teacherStudentsRouter.get("/", teacherOnly, listStudentsController);
+teacherStudentsRouter.get("/:id/transcript/export", teacherOrAdmin, exportStudentTranscriptController);
+teacherStudentsRouter.get("/:id/transcript", teacherOrAdmin, getStudentTranscriptController);
+teacherStudentsRouter.patch("/:id", teacherOnly, updateStudentController);
+teacherStudentsRouter.delete("/:id", teacherOnly, deleteStudentController);
 
 export default teacherStudentsRouter;
