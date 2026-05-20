@@ -1,13 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Box, Table, Title, SimpleGrid, Paper, Text, Stack, Group, Badge, Select, TextInput, Loader,
+  Box,
+  Table,
+  Title,
+  SimpleGrid,
+  Paper,
+  Text,
+  Stack,
+  Group,
+  Badge,
+  Select,
+  TextInput,
+  Loader,
+  Button,
 } from '@mantine/core';
+import { IconRefresh, IconSearch } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { ListPaginationBar } from '@/components/ListPagination';
 import dashboardApi from '@/services/dashboardApi';
 import type { StaffDashboardDto, StaffRecentActivityDto } from '@/services/dashboardApi';
+import userApi, { type UserAccount } from '@/services/userApi';
+import teacherStudentsApi, { type StudentItem } from '@/services/teacherStudentsApi';
+import adminClassApi, { type AdminClassDto } from '@/services/adminClassApi';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
 type AdminDashboardProps = {
@@ -28,6 +44,17 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
+
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentSearchDebounced, setStudentSearchDebounced] = useState('');
+  const [studentClassId, setStudentClassId] = useState<string | null>(null);
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentPageSize, setStudentPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [studentTotal, setStudentTotal] = useState(0);
+  const [students, setStudents] = useState<(UserAccount | StudentItem)[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState('');
+  const [adminClasses, setAdminClasses] = useState<AdminClassDto[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setKeywordDebounced(keyword.trim()), 350);
@@ -67,6 +94,66 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
     };
   }, [page, pageSize, activityStatus, activityTime, keywordDebounced, t]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setStudentSearchDebounced(studentSearch.trim());
+      setStudentPage(1);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [studentSearch]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      void adminClassApi.getClasses().then(setAdminClasses).catch(() => {});
+    }
+  }, [isAdmin]);
+
+  const loadStudents = useCallback(async () => {
+    try {
+      setStudentsLoading(true);
+      setStudentsError('');
+      const params = {
+        limit: studentPageSize,
+        offset: pageToOffset(studentPage, studentPageSize),
+        search: studentSearchDebounced || undefined,
+      };
+      if (isAdmin) {
+        const result = await userApi.listStudents({
+          ...params,
+          admin_class_id: studentClassId || undefined,
+        });
+        setStudents(result.items);
+        setStudentTotal(result.total);
+      } else {
+        const result = await teacherStudentsApi.list(params);
+        setStudents(result.items);
+        setStudentTotal(result.total);
+      }
+    } catch {
+      setStudentsError(t('errors.user_list_failed'));
+    } finally {
+      setStudentsLoading(false);
+    }
+  }, [isAdmin, studentPage, studentPageSize, studentSearchDebounced, studentClassId, t]);
+
+  useEffect(() => {
+    void loadStudents();
+  }, [loadStudents]);
+
+  useEffect(() => {
+    setStudentPage(1);
+  }, [studentClassId]);
+
+  const classFilterOptions = [
+    { value: '', label: t('dashboard.filter_class_all') },
+    ...adminClasses.map((c) => ({
+      value: c.id,
+      label: `${c.display_name} (${c.student_count ?? 0})`,
+    })),
+  ];
+
+  const showStudentSection = isAdmin || data.viewer === 'teacher';
+
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
       <Group justify="space-between" align="flex-start" mb="md" wrap="wrap">
@@ -100,29 +187,94 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
         ))}
       </SimpleGrid>
 
-      {isAdmin && data.recent_students.length > 0 && (
+      {showStudentSection && (
         <Stack gap="sm" mb="xl">
-          <Title order={4}>{t('admin.student_list_title')}</Title>
-          <Table highlightOnHover verticalSpacing="sm" withTableBorder>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('my_results.index')}</Table.Th>
-                <Table.Th>{t('admin.full_name')}</Table.Th>
-                <Table.Th>{t('admin.username')}</Table.Th>
-                <Table.Th>{t('admin.email')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {data.recent_students.map((stu, index) => (
-                <Table.Tr key={stu.id}>
-                  <Table.Td>{index + 1}</Table.Td>
-                  <Table.Td>{stu.full_name || '—'}</Table.Td>
-                  <Table.Td>{stu.username}</Table.Td>
-                  <Table.Td>{stu.email}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+          <Group justify="space-between" align="center" wrap="wrap">
+            <Title order={4}>{t('admin.student_list_title')}</Title>
+            {isAdmin && (
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                leftSection={<IconRefresh size={14} />}
+                onClick={() => void loadStudents()}
+                loading={studentsLoading}
+              >
+                Làm mới
+              </Button>
+            )}
+          </Group>
+
+          <Paper withBorder radius="md" p="sm">
+            <Group align="flex-end" wrap="wrap" gap="sm">
+              <TextInput
+                label={t('dashboard.filter_keyword')}
+                placeholder={t('teacher_students.search_placeholder')}
+                leftSection={<IconSearch size={14} />}
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.currentTarget.value)}
+                style={{ minWidth: 260, flex: '1 1 200px' }}
+              />
+              {isAdmin && (
+                <Select
+                  label={t('dashboard.filter_class')}
+                  placeholder={t('dashboard.filter_class_all')}
+                  data={classFilterOptions}
+                  value={studentClassId ?? ''}
+                  onChange={(v) => setStudentClassId(v || null)}
+                  clearable
+                  searchable
+                  style={{ minWidth: 220 }}
+                />
+              )}
+            </Group>
+          </Paper>
+
+          <Paper withBorder radius="md">
+            <ListPaginationBar
+              page={studentPage}
+              total={studentTotal}
+              limit={studentPageSize}
+              onPageChange={setStudentPage}
+              onLimitChange={(next) => {
+                setStudentPageSize(next);
+                setStudentPage(1);
+              }}
+            />
+            {studentsLoading ? (
+              <Box p="xl" className="flex justify-center">
+                <Loader size="sm" />
+              </Box>
+            ) : studentsError ? (
+              <Text size="sm" c="red" p="md">
+                {studentsError}
+              </Text>
+            ) : students.length === 0 ? (
+              <Text size="sm" c="dimmed" p="md">
+                {t('dashboard.students_empty')}
+              </Text>
+            ) : (
+              <Table highlightOnHover verticalSpacing="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>{t('my_results.index')}</Table.Th>
+                    <Table.Th>{t('admin.full_name')}</Table.Th>
+                    <Table.Th>{t('admin.username')}</Table.Th>
+                    <Table.Th>{t('admin.email')}</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {students.map((stu, index) => (
+                    <Table.Tr key={stu.id}>
+                      <Table.Td>{pageToOffset(studentPage, studentPageSize) + index + 1}</Table.Td>
+                      <Table.Td>{stu.full_name || '—'}</Table.Td>
+                      <Table.Td>{stu.username}</Table.Td>
+                      <Table.Td>{stu.email}</Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
+          </Paper>
         </Stack>
       )}
 
