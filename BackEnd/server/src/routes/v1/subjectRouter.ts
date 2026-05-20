@@ -12,6 +12,7 @@ import {
 import { deleteSubject, deleteSubjectsByIds } from "~/models/subject.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
 import { getSubjectPickerCatalog } from "~/services/predictionCatalog.service";
+import { getSubjectIdsForCatalogGroup } from "~/services/subjectCatalogGroup.service";
 
 const router = Router();
 
@@ -41,13 +42,23 @@ router.get("/", async (req, res, next) => {
     const programId = req.query.program_id as string | undefined;
     const subCategory = req.query.sub_category as string | undefined;
     const subjectGroupId = req.query.subject_group_id as string | undefined;
+    const catalogGroupId = req.query.catalog_group as string | undefined;
+    let catalogGroup: { code: string; subjectIds: string[] } | undefined;
+    if (catalogGroupId?.trim()) {
+      const code = catalogGroupId.trim();
+      catalogGroup = {
+        code,
+        subjectIds: await getSubjectIdsForCatalogGroup(code),
+      };
+    }
     const result = await querySubjectsPaginated(
       limit,
       offset,
       search,
       programId,
       subCategory,
-      subjectGroupId
+      subjectGroupId,
+      catalogGroup
     );
     res.json({
       success: true,

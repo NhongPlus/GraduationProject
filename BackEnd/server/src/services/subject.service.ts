@@ -12,6 +12,7 @@ import {
   type SubjectDetail,
 } from "~/services/subjectPrerequisite.service";
 import { httpError } from "~/services/exam.service";
+import { linkSubjectToCatalogGroup } from "~/services/subjectCatalogGroup.service";
 
 export async function createSubjectWithPrerequisites(
   input: CreateSubjectInput
@@ -25,11 +26,12 @@ export async function createSubjectWithPrerequisites(
     prerequisiteIds = await validatePrerequisiteIds(input.prerequisite_ids);
   }
 
-  const created = await createSubject({
+  const linked = await linkSubjectToCatalogGroup({
     ...input,
     name,
     prerequisite_ids: prerequisiteIds,
   });
+  const created = await createSubject(linked);
   return attachPrerequisites(created);
 }
 
@@ -42,7 +44,8 @@ export async function updateSubjectWithPrerequisites(
     input = { ...input, prerequisite_ids: validated };
   }
 
-  const updated = await updateSubject(id, input);
+  const linked = await linkSubjectToCatalogGroup(input);
+  const updated = await updateSubject(id, linked);
   if (!updated) return null;
   return attachPrerequisites(updated);
 }

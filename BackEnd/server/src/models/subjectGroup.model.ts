@@ -33,6 +33,17 @@ export async function getSubjectGroupById(id: string): Promise<SubjectGroup | nu
   return r.rows[0] ?? null;
 }
 
+export async function getSubjectGroupByProgramAndCode(
+  programId: string,
+  code: string
+): Promise<SubjectGroup | null> {
+  const r = await pool.query<SubjectGroup>(
+    `SELECT * FROM subject_groups WHERE program_id = $1 AND code = $2 LIMIT 1`,
+    [programId, code.trim().toLowerCase()]
+  );
+  return r.rows[0] ?? null;
+}
+
 export interface CreateSubjectGroupInput {
   program_id: string;
   code: string;

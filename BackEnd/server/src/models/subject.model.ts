@@ -48,7 +48,8 @@ export const querySubjectsPaginated = async (
   search?: string,
   programId?: string,
   subCategory?: string,
-  subjectGroupId?: string
+  subjectGroupId?: string,
+  catalogGroup?: { code: string; subjectIds: string[] }
 ): Promise<{ items: Subject[]; total: number }> => {
   const conditions: string[] = [];
   const values: unknown[] = [];
@@ -59,14 +60,26 @@ export const querySubjectsPaginated = async (
     values.push(programId);
   }
 
-  if (subCategory?.trim()) {
-    conditions.push(`sub_category = $${idx++}`);
-    values.push(subCategory.trim());
-  }
-
-  if (subjectGroupId?.trim()) {
-    conditions.push(`subject_group_id = $${idx++}`);
-    values.push(subjectGroupId.trim());
+  if (catalogGroup && (catalogGroup.subjectIds.length > 0 || catalogGroup.code)) {
+    if (catalogGroup.subjectIds.length > 0) {
+      conditions.push(
+        `(id = ANY($${idx++}::uuid[]) OR sub_category = $${idx++})`
+      );
+      values.push(catalogGroup.subjectIds);
+      values.push(catalogGroup.code);
+    } else {
+      conditions.push(`sub_category = $${idx++}`);
+      values.push(catalogGroup.code);
+    }
+  } else {
+    if (subCategory?.trim()) {
+      conditions.push(`sub_category = $${idx++}`);
+      values.push(subCategory.trim());
+    }
+    if (subjectGroupId?.trim()) {
+      conditions.push(`subject_group_id = $${idx++}`);
+      values.push(subjectGroupId.trim());
+    }
   }
 
   if (search?.trim()) {

@@ -55,6 +55,8 @@ const subjectApi = {
       program_id?: string;
       sub_category?: string;
       subject_group_id?: string;
+      /** Mã nhóm từ GET /subjects/picker-catalog (pe, math, ai_iot, …) */
+      catalog_group?: string;
     } = {}
   ): Promise<PaginatedList<SubjectDto>> =>
     fetchPaginatedList<SubjectDto>('/subjects', params),

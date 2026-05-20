@@ -29,7 +29,7 @@ import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 import subjectApi from '@/services/subjectApi';
 import programApi, { type ProgramDto } from '@/services/programApi';
-import subjectGroupApi, { type SubjectGroupDto } from '@/services/subjectGroupApi';
+import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
@@ -55,30 +55,13 @@ interface SubjectFormData {
   semester: number;
   category: string;
   sub_category: string | null;
-  subject_group_id: string;
+  subject_group_id: string | null;
   program_id: string;
   prerequisite_ids: string[];
   is_active: boolean;
 }
 
-const SUB_CATEGORIES = [
-  { value: 'math', label: 'Đại số / Toán' },
-  { value: 'english', label: 'Tiếng Anh' },
-  { value: 'programming', label: 'Lập trình' },
-  { value: 'software_eng', label: 'Phần mềm' },
-  { value: 'ai', label: 'AI / ML' },
-  { value: 'network', label: 'Mạng' },
-  { value: 'soft_skills', label: 'Kỹ năng mềm' },
-  { value: 'national_defense', label: 'Quốc phòng' },
-  { value: 'internship', label: 'Thực tập' },
-];
-
-const SUB_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  SUB_CATEGORIES.map((c) => [c.value, c.label])
-);
-
-const subCategoryLabel = (value: string | null | undefined) =>
-  value ? (SUB_CATEGORY_LABELS[value] ?? value) : '—';
+type CatalogGroupRow = { id: string; label: string; subject_count: number };
 
 const CATEGORIES = [
   { value: 'general', label: 'Tổng quát' },
@@ -97,16 +80,14 @@ const fullScreenModalProps = {
 };
 
 const GroupNameBadge = ({
-  groupId,
-  groups,
-  fallback,
+  catalogGroups,
+  subCategory,
 }: {
-  groupId?: string | null;
-  groups: SubjectGroupDto[];
-  fallback?: string | null;
+  catalogGroups: CatalogGroupRow[];
+  subCategory?: string | null;
 }) => {
-  const g = groupId ? groups.find((x) => x.id === groupId) : null;
-  const label = g?.name ?? (fallback ? subCategoryLabel(fallback) : null);
+  const g = subCategory ? catalogGroups.find((x) => x.id === subCategory) : null;
+  const label = g?.label ?? subCategory ?? null;
   if (!label) {
     return (
       <Badge size="sm" variant="light" color="gray">
@@ -158,13 +139,12 @@ const SubjectCatalogManagementPage = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [groups, setGroups] = useState<SubjectGroupDto[]>([]);
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [groupFormOpen, setGroupFormOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<SubjectGroupDto | null>(null);
-  const [groupCode, setGroupCode] = useState('');
-  const [groupName, setGroupName] = useState('');
-  const [groupDesc, setGroupDesc] = useState('');
+  const { catalog, loading: catalogLoading, error: catalogError } = useSubjectPickerCatalog();
+  const catalogGroups: CatalogGroupRow[] = catalog.map((g) => ({
+    id: g.id,
+    label: g.label,
+    subject_count: g.subjects.length,
+  }));
   const [activeTab, setActiveTab] = useState<string | null>('groups');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -198,29 +178,16 @@ const SubjectCatalogManagementPage = () => {
     if (accessToken) void loadPrograms();
   }, [accessToken, loadPrograms]);
 
-  const loadGroups = useCallback(async () => {
-    if (!selectedProgramId) {
-      setGroups([]);
-      return;
-    }
-    try {
-      setGroupsLoading(true);
-      const list = await subjectGroupApi.listByProgram(selectedProgramId);
-      setGroups(list);
-      setSelectedGroupId((prev) => {
-        if (prev && list.some((g) => g.id === prev)) return prev;
-        return null;
-      });
-    } catch {
-      setError('Không tải được nhóm môn.');
-    } finally {
-      setGroupsLoading(false);
-    }
-  }, [selectedProgramId]);
+  useEffect(() => {
+    if (catalogError) setError(catalogError);
+  }, [catalogError]);
 
   useEffect(() => {
-    void loadGroups();
-  }, [loadGroups]);
+    setSelectedGroupId((prev) => {
+      if (prev && catalogGroups.some((g) => g.id === prev)) return prev;
+      return null;
+    });
+  }, [catalogGroups]);
 
   const fetchSubjects = useCallback(async () => {
     if (!accessToken) return;
@@ -231,7 +198,7 @@ const SubjectCatalogManagementPage = () => {
         offset: pageToOffset(page, pageSize),
         search: debouncedSearch || undefined,
         program_id: selectedProgramId ?? undefined,
-        subject_group_id: selectedGroupId ?? undefined,
+        catalog_group: selectedGroupId ?? undefined,
       });
       setSubjects(data.items as Subject[]);
       setTotal(data.total);
@@ -386,62 +353,6 @@ const SubjectCatalogManagementPage = () => {
     }
   };
 
-  const openGroupCreate = () => {
-    setEditingGroup(null);
-    setGroupCode('');
-    setGroupName('');
-    setGroupDesc('');
-    setGroupFormOpen(true);
-  };
-
-  const openGroupEdit = (g: SubjectGroupDto) => {
-    setEditingGroup(g);
-    setGroupCode(g.code);
-    setGroupName(g.name);
-    setGroupDesc(g.description ?? '');
-    setGroupFormOpen(true);
-  };
-
-  const handleSaveGroup = async () => {
-    if (!selectedProgramId || !groupCode.trim() || !groupName.trim()) return;
-    try {
-      if (editingGroup) {
-        await subjectGroupApi.update(editingGroup.id, {
-          code: groupCode.trim(),
-          name: groupName.trim(),
-          description: groupDesc.trim() || null,
-        });
-        setNotice('Đã cập nhật nhóm môn.');
-      } else {
-        await subjectGroupApi.create({
-          program_id: selectedProgramId,
-          code: groupCode.trim(),
-          name: groupName.trim(),
-          description: groupDesc.trim() || null,
-        });
-        setNotice('Đã tạo nhóm môn.');
-      }
-      setGroupFormOpen(false);
-      void loadGroups();
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'Lưu nhóm môn thất bại.');
-    }
-  };
-
-  const handleDeleteGroup = async (g: SubjectGroupDto) => {
-    if (!confirm(`Xóa nhóm «${g.name}»?`)) return;
-    try {
-      await subjectGroupApi.delete(g.id);
-      if (selectedGroupId === g.id) setSelectedGroupId(null);
-      setNotice('Đã xóa nhóm môn.');
-      void loadGroups();
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'Không xóa được nhóm môn.');
-    }
-  };
-
   const programOptions = programs.map((p) => ({
     value: p.id,
     label: `${p.code} — ${p.name} (${p.subject_count ?? 0} môn)`,
@@ -452,16 +363,16 @@ const SubjectCatalogManagementPage = () => {
     : [];
 
   const subjectsInGroup = selectedGroupId
-    ? subjectsInProgram.filter((s) => s.subject_group_id === selectedGroupId)
+    ? subjectsInProgram.filter((s) => s.sub_category === selectedGroupId)
     : subjectsInProgram;
 
-  const groupOptions = groups.map((g) => ({
+  const groupOptions = catalogGroups.map((g) => ({
     value: g.id,
-    label: `${g.name} (${g.subject_count ?? 0} môn)`,
+    label: `${g.label} (${g.subject_count} môn)`,
   }));
 
   const selectedProgram = programs.find((p) => p.id === selectedProgramId);
-  const selectedGroup = groups.find((g) => g.id === selectedGroupId);
+  const selectedGroup = catalogGroups.find((g) => g.id === selectedGroupId);
   const canManageSubjects = Boolean(selectedProgramId && selectedGroupId);
 
   return (
@@ -471,7 +382,7 @@ const SubjectCatalogManagementPage = () => {
           <Box>
             <Title order={2}>Quản lý nhóm môn & môn học</Title>
             <Text c="dimmed" size="sm" mt={4}>
-              Chọn chuyên ngành, quản lý nhóm môn (CRUD), sau đó thêm môn trong từng nhóm. Quản lý chuyên ngành ở menu riêng.
+              Nhóm môn lấy từ catalog thống nhất (API /subjects/picker-catalog) — đồng bộ với dự đoán điểm, ngân hàng câu hỏi và soạn đề.
             </Text>
           </Box>
           {activeTab === 'subjects' && (
@@ -481,11 +392,6 @@ const SubjectCatalogManagementPage = () => {
               disabled={!canManageSubjects}
               onClick={() => setCreateOpen(true)}
             />
-          )}
-          {activeTab === 'groups' && selectedProgramId && (
-            <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
-              Thêm nhóm môn
-            </Button>
           )}
         </Group>
 
@@ -522,7 +428,7 @@ const SubjectCatalogManagementPage = () => {
               {selectedGroup && (
                 <>
                   {' '}
-                  › <strong>{selectedGroup.name}</strong>
+                  › <strong>{selectedGroup.label}</strong>
                 </>
               )}
             </Text>
@@ -546,10 +452,17 @@ const SubjectCatalogManagementPage = () => {
                   Chọn chuyên ngành ở trên để quản lý nhóm môn.
                 </Text>
               </Paper>
-            ) : groupsLoading ? (
+            ) : catalogLoading ? (
               <Loader />
             ) : (
               <Paper withBorder radius="md">
+                <Text size="sm" c="dimmed" p="md">
+                  Danh sách nhóm chỉ đọc từ catalog hệ thống. Chỉnh sửa cấu trúc nhóm trong{' '}
+                  <Text span ff="monospace" fw={600}>
+                    subject_groups.json
+                  </Text>{' '}
+                  trên server.
+                </Text>
                 <Table striped highlightOnHover>
                   <Table.Thead>
                     <Table.Tr>
@@ -560,46 +473,34 @@ const SubjectCatalogManagementPage = () => {
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
-                    {groups.map((g) => (
+                    {catalogGroups.map((g) => (
                       <Table.Tr key={g.id}>
                         <Table.Td>
                           <Text ff="monospace" fw={600}>
-                            {g.code}
+                            {g.id}
                           </Text>
                         </Table.Td>
-                        <Table.Td>{g.name}</Table.Td>
-                        <Table.Td>{g.subject_count ?? 0}</Table.Td>
+                        <Table.Td>{g.label}</Table.Td>
+                        <Table.Td>{g.subject_count}</Table.Td>
                         <Table.Td>
-                          <Group gap={4}>
-                            <ActionIcon variant="light" color="blue" onClick={() => openGroupEdit(g)}>
-                              <IconEdit size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color="teal"
-                              onClick={() => {
-                                setSelectedGroupId(g.id);
-                                setActiveTab('subjects');
-                              }}
-                            >
-                              <IconPlus size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="light"
-                              color="red"
-                              onClick={() => void handleDeleteGroup(g)}
-                            >
-                              <IconTrash size={16} />
-                            </ActionIcon>
-                          </Group>
+                          <Button
+                            size="compact-sm"
+                            variant="light"
+                            onClick={() => {
+                              setSelectedGroupId(g.id);
+                              setActiveTab('subjects');
+                            }}
+                          >
+                            Xem môn
+                          </Button>
                         </Table.Td>
                       </Table.Tr>
                     ))}
-                    {groups.length === 0 && (
+                    {catalogGroups.length === 0 && (
                       <Table.Tr>
                         <Table.Td colSpan={4}>
                           <Text c="dimmed" ta="center" py="md">
-                            Chưa có nhóm môn. Bấm «Thêm nhóm môn».
+                            Không tải được catalog nhóm môn.
                           </Text>
                         </Table.Td>
                       </Table.Tr>
@@ -737,9 +638,8 @@ const SubjectCatalogManagementPage = () => {
                     </Table.Td>
                     <Table.Td>
                       <GroupNameBadge
-                        groupId={subject.subject_group_id}
-                        groups={groups}
-                        fallback={subject.sub_category}
+                        catalogGroups={catalogGroups}
+                        subCategory={subject.sub_category}
                       />
                     </Table.Td>
                     <Table.Td>
@@ -773,7 +673,7 @@ const SubjectCatalogManagementPage = () => {
                   <Table.Tr>
                     <Table.Td colSpan={10}>
                       <Text c="dimmed" ta="center" py="lg">
-                        Chưa có môn trong nhóm «{selectedGroup?.name ?? 'đã chọn'}». Bấm «Thêm môn học».
+                        Chưa có môn trong nhóm «{selectedGroup?.label ?? 'đã chọn'}». Bấm «Thêm môn học».
                       </Text>
                     </Table.Td>
                   </Table.Tr>
@@ -796,9 +696,10 @@ const SubjectCatalogManagementPage = () => {
           <Container size="md" py="xl" pb={80}>
             <SubjectForm
               programs={programs}
+              catalogGroups={catalogGroups}
               defaultProgramId={selectedProgramId}
-              defaultGroupId={selectedGroupId}
-              allSubjects={subjectsInGroup}
+              defaultCatalogGroupId={selectedGroupId}
+              allSubjects={subjectsInProgram}
               onSubmit={(data) => void handleCreate(data)}
               onCancel={() => setCreateOpen(false)}
             />
@@ -813,8 +714,9 @@ const SubjectCatalogManagementPage = () => {
               <SubjectForm
                 initial={editingSubject}
                 programs={programs}
+                catalogGroups={catalogGroups}
                 defaultProgramId={editingSubject.program_id ?? selectedProgramId}
-                defaultGroupId={editingSubject.subject_group_id ?? selectedGroupId}
+                defaultCatalogGroupId={editingSubject.sub_category ?? selectedGroupId}
                 allSubjects={subjectsInProgram}
                 onSubmit={(data) => void handleUpdate(editingSubject.id, data)}
                 onCancel={() => setEditOpen(false)}
@@ -824,48 +726,6 @@ const SubjectCatalogManagementPage = () => {
         </ScrollArea>
       </Modal>
 
-      <Modal
-        opened={groupFormOpen}
-        onClose={() => setGroupFormOpen(false)}
-        title={editingGroup ? 'Sửa nhóm môn' : 'Thêm nhóm môn'}
-        size="md"
-        centered
-      >
-        <Stack gap="md">
-          <TextInput
-            label="Mã nhóm"
-            required
-            value={groupCode}
-            onChange={(e) => setGroupCode(e.currentTarget.value.toUpperCase().replace(/\s/g, ''))}
-            placeholder="VD: programming, math"
-          />
-          <TextInput
-            label="Tên nhóm môn"
-            required
-            value={groupName}
-            onChange={(e) => setGroupName(e.currentTarget.value)}
-            placeholder="VD: Lập trình"
-          />
-          <Textarea
-            label="Mô tả"
-            value={groupDesc}
-            onChange={(e) => setGroupDesc(e.currentTarget.value)}
-            minRows={2}
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={() => setGroupFormOpen(false)}>
-              Hủy
-            </Button>
-            <Button
-              color="teal"
-              onClick={() => void handleSaveGroup()}
-              disabled={!groupCode.trim() || !groupName.trim()}
-            >
-              Lưu
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </Box>
   );
 };
@@ -873,8 +733,9 @@ const SubjectCatalogManagementPage = () => {
 type SubjectFormProps = {
   initial?: Subject;
   programs: ProgramDto[];
+  catalogGroups: CatalogGroupRow[];
   defaultProgramId: string | null;
-  defaultGroupId?: string | null;
+  defaultCatalogGroupId?: string | null;
   allSubjects: Subject[];
   onSubmit: (data: SubjectFormData) => void;
   onCancel: () => void;
@@ -883,8 +744,9 @@ type SubjectFormProps = {
 function SubjectForm({
   initial,
   programs,
+  catalogGroups,
   defaultProgramId,
-  defaultGroupId,
+  defaultCatalogGroupId,
   allSubjects,
   onSubmit,
   onCancel,
@@ -894,47 +756,33 @@ function SubjectForm({
   const [credits, setCredits] = useState<number>(initial?.credits ?? 0);
   const [semester, setSemester] = useState<number>(initial?.semester ?? 0);
   const [category, setCategory] = useState(initial?.category ?? 'general');
-  const [subjectGroupId, setSubjectGroupId] = useState<string | null>(
-    initial?.subject_group_id ?? defaultGroupId ?? null
+  const [catalogGroupId, setCatalogGroupId] = useState<string | null>(
+    initial?.sub_category ?? defaultCatalogGroupId ?? null
   );
   const [programId, setProgramId] = useState(initial?.program_id ?? defaultProgramId ?? '');
-  const [formGroups, setFormGroups] = useState<SubjectGroupDto[]>([]);
   const [prerequisiteIds, setPrerequisiteIds] = useState<string[]>(
     initial?.prerequisites?.map((p) => p.id) ?? []
   );
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
 
-  useEffect(() => {
-    if (!programId) {
-      setFormGroups([]);
-      return;
-    }
-    void subjectGroupApi
-      .listByProgram(programId)
-      .then(setFormGroups)
-      .catch(() => setFormGroups([]));
-  }, [programId]);
-
-  const selectedFormGroup = formGroups.find((g) => g.id === subjectGroupId);
-
   const prereqOptions = allSubjects
     .filter((s) => s.id !== initial?.id && s.program_id === programId)
-    .filter((s) => !subjectGroupId || s.subject_group_id === subjectGroupId)
+    .filter((s) => !catalogGroupId || s.sub_category === catalogGroupId)
     .map((s) => ({
       value: s.id,
       label: s.code ? `${s.code} — ${s.name}` : s.name,
     }));
 
   const handleSubmit = () => {
-    if (!name.trim() || !programId || !subjectGroupId) return;
+    if (!name.trim() || !programId || !catalogGroupId) return;
     onSubmit({
       name: name.trim(),
       code: code.trim(),
       credits,
       semester,
       category,
-      sub_category: selectedFormGroup?.code ?? initial?.sub_category ?? null,
-      subject_group_id: subjectGroupId,
+      sub_category: catalogGroupId,
+      subject_group_id: null,
       program_id: programId,
       prerequisite_ids: prerequisiteIds,
       is_active: isActive,
@@ -956,20 +804,20 @@ function SubjectForm({
         value={programId || null}
         onChange={(v) => {
           setProgramId(v ?? '');
-          if (!initial) setSubjectGroupId(null);
+          if (!initial) setCatalogGroupId(null);
         }}
         searchable
       />
       <Select
-        label="2. Nhóm môn"
-        description="Nhóm học phần trong chuyên ngành"
+        label="2. Nhóm môn (catalog hệ thống)"
+        description="Cùng danh sách với picker dự đoán / ngân hàng câu hỏi"
         required
-        data={formGroups.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` }))}
-        value={subjectGroupId}
-        onChange={setSubjectGroupId}
+        data={catalogGroups.map((g) => ({ value: g.id, label: g.label }))}
+        value={catalogGroupId}
+        onChange={setCatalogGroupId}
         searchable
         placeholder={programId ? 'Chọn nhóm môn' : 'Chọn chuyên ngành trước'}
-        disabled={!programId || formGroups.length === 0}
+        disabled={!programId || catalogGroups.length === 0}
       />
       <Divider label="3. Thông tin môn" labelPosition="left" />
       <TextInput
@@ -1026,7 +874,7 @@ function SubjectForm({
           color="teal"
           size="md"
           onClick={handleSubmit}
-          disabled={!programId || !subjectGroupId || !name.trim()}
+          disabled={!programId || !catalogGroupId || !name.trim()}
         >
           Lưu
         </Button>
