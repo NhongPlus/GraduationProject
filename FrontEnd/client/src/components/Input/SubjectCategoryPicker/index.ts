@@ -1,3 +1,4 @@
 export { default } from './SubjectCategoryPicker';
-export { groupSubjectsByCategory, formatSubjectLabel, CATEGORY_ORDER } from './subjectGrouping';
+export { formatSubjectLabel } from './subjectGrouping';
+export { catalogToPickerGroups } from './predictionSubjectGrouping';
 export type { SubjectCategoryGroup } from './subjectGrouping';

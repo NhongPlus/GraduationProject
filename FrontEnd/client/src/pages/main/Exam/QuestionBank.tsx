@@ -12,7 +12,8 @@ import apiClient from '@/services/apiClient';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
-import subjectApi, { type SubjectDto } from '@/services/subjectApi';
+import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
+import type { SubjectDto } from '@/services/subjectApi';
 import questionBankApi from '@/services/questionBankApi';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset, clampPage } from '@/utils/pagination';
@@ -71,7 +72,7 @@ const QuestionBankPage = () => {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [items, setItems] = useState<QBItem[]>([]);
-  const [subjects, setSubjects] = useState<SubjectDto[]>([]);
+  const { subjects, loading: catalogLoading } = useSubjectPickerCatalog();
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -160,24 +161,15 @@ const QuestionBankPage = () => {
     }
   }, [accessToken, t]);
 
-  const fetchSubjects = useCallback(async () => {
-    if (!accessToken) return;
-    try {
-      const data = await subjectApi.getSubjects();
-      setSubjects(data);
-      setImportSubjectId((prev) => prev ?? data[0]?.id ?? null);
-    } catch {
-      // keep page usable even when subjects fail
-    }
-  }, [accessToken]);
-
   useEffect(() => {
     void fetchItems(filter, page, pageSize);
   }, [filter, page, pageSize, fetchItems]);
 
   useEffect(() => {
-    void fetchSubjects();
-  }, [fetchSubjects]);
+    if (subjects.length > 0) {
+      setImportSubjectId((prev) => prev ?? subjects[0]?.id ?? null);
+    }
+  }, [subjects]);
 
   const handleSearch = () => {
     clearSelection();
@@ -332,9 +324,12 @@ const QuestionBankPage = () => {
                 size="sm"
                 subjects={subjects}
                 placeholder={
-                  loading ? t('exam_authoring.loading') : t('question_bank.select_subject')
+                  loading || catalogLoading
+                    ? t('exam_authoring.loading')
+                    : t('question_bank.select_subject')
                 }
-                disabled={loading || subjects.length === 0}
+                disabled={loading || catalogLoading || subjects.length === 0}
+                catalogLoading={catalogLoading}
                 value={importSubjectId}
                 onChange={setImportSubjectId}
                 required
@@ -370,7 +365,8 @@ const QuestionBankPage = () => {
               size="sm"
               subjects={subjects}
               placeholder={t('question_bank.select_subject')}
-              disabled={loading || subjects.length === 0}
+              disabled={loading || catalogLoading || subjects.length === 0}
+              catalogLoading={catalogLoading}
               value={filter.subject_id ?? null}
               onChange={(id) => {
                 clearSelection();
@@ -567,6 +563,7 @@ const QuestionBankPage = () => {
       <Modal opened={createModalOpen} onClose={() => setCreateModalOpen(false)} title={t('question_bank.create_modal_title')} size="lg">
         <QBForm
           subjects={subjects}
+          catalogLoading={catalogLoading}
           onSubmit={data => void handleCreate(data)}
           onCancel={() => setCreateModalOpen(false)}
         />
@@ -578,6 +575,7 @@ const QuestionBankPage = () => {
           <QBForm
             initial={editingItem}
             subjects={subjects}
+            catalogLoading={catalogLoading}
             onSubmit={data => void handleUpdate(editingItem.id, data)}
             onCancel={() => setEditModalOpen(false)}
           />
@@ -599,11 +597,12 @@ const QuestionBankPage = () => {
 type QBFormProps = {
   initial?: QBItem;
   subjects: SubjectDto[];
+  catalogLoading?: boolean;
   onSubmit: (data: Partial<QBItem>) => void;
   onCancel: () => void;
 };
 
-function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
+function QBForm({ initial, subjects, catalogLoading, onSubmit, onCancel }: QBFormProps) {
   const { t } = useTranslation();
   const [content, setContent] = useState(initial?.content ?? '');
   const [questionType, setQuestionType] = useState<QuestionType>(initial?.question_type ?? 'mcq');
@@ -646,9 +645,9 @@ function QBForm({ initial, subjects, onSubmit, onCancel }: QBFormProps) {
       <SubjectCategoryPicker
         label={t('question_bank.form_subject')}
         size="sm"
-        subjects={subjects}
         placeholder={t('question_bank.select_subject')}
-        disabled={subjects.length === 0}
+        disabled={catalogLoading || subjects.length === 0}
+        catalogLoading={catalogLoading}
         value={subjectId}
         onChange={setSubjectId}
         required

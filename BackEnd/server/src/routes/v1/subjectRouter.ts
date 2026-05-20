@@ -11,10 +11,26 @@ import {
 } from "~/services/subject.service";
 import { deleteSubject, deleteSubjectsByIds } from "~/models/subject.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
+import { getSubjectPickerCatalog } from "~/services/predictionCatalog.service";
 
 const router = Router();
 
 router.use(authMiddleware);
+
+/** GET /v1/subjects/picker-catalog — nhóm môn thống nhất (subject_groups.json) cho mọi picker */
+router.get(
+  "/picker-catalog",
+  roleMiddleware(["admin", "teacher", "student"]),
+  async (_req, res, next) => {
+    try {
+      const data = await getSubjectPickerCatalog();
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 router.use(roleMiddleware(["admin", "teacher"]));
 
 /** GET /v1/subjects */

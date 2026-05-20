@@ -3,13 +3,11 @@ import { Box, Title, Text, Progress, Table, Loader, Paper, Group, Alert, Stack, 
 import { useTranslation } from 'react-i18next';
 import examApi, {
   type PredictionResult,
-  type PredictionSubject,
   type PredictionRecomputeSummary,
   type PredictionEligibility,
-  type PredictionCatalogGroup,
 } from '@/services/examApi';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
-import { catalogToPickerGroups } from '@/components/Input/SubjectCategoryPicker/predictionSubjectGrouping';
+import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth';
@@ -24,7 +22,8 @@ const Prediction = () => {
 
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [pastGrades, setPastGrades] = useState<HistoryRow[]>([]);
-  const [catalog, setCatalog] = useState<PredictionCatalogGroup[]>([]);
+  const { groups: pickerGroups, subjects: flatSubjects, loading: catalogLoading } =
+    useSubjectPickerCatalog();
   const [targetSubjectId, setTargetSubjectId] = useState<string | null>(null);
   const [eligibility, setEligibility] = useState<PredictionEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
@@ -36,11 +35,6 @@ const Prediction = () => {
   const [recomputeSummary, setRecomputeSummary] = useState<PredictionRecomputeSummary | null>(null);
   const [recomputeError, setRecomputeError] = useState('');
 
-  const pickerGroups = useMemo(() => catalogToPickerGroups(catalog), [catalog]);
-  const flatSubjects = useMemo(
-    () => pickerGroups.flatMap((g) => g.subjects),
-    [pickerGroups]
-  );
   const selectedSubject = useMemo(
     () => flatSubjects.find((s) => s.id === targetSubjectId) ?? null,
     [flatSubjects, targetSubjectId]
@@ -50,14 +44,10 @@ const Prediction = () => {
     setLoading(true);
     setError('');
     try {
-      const [sessions, exams, catalogData] = await Promise.all([
+      const [sessions, exams] = await Promise.all([
         examApi.getMySessions(),
         examApi.getExams(),
-        examApi.getPredictionSubjectCatalog(),
       ]);
-      setCatalog(catalogData);
-      const localFlat = catalogToPickerGroups(catalogData).flatMap((g) => g.subjects);
-
       const completed = sessions.filter(
         (s) => s.status !== 'active' && s.score != null && s.max_points
       );
@@ -84,22 +74,27 @@ const Prediction = () => {
         return;
       }
 
-      const cached = await examApi.getMyPredictionCache();
-      if (cached) {
-        setPredictionResult(cached);
-        const match =
-          localFlat.find((s) => s.id === cached.target_subject_id) ??
-          localFlat.find(
-            (s) => s.name === cached.target_subject || cached.predictions[0]?.subject === s.name
-          );
-        if (match) setTargetSubjectId(match.id);
-      }
     } catch {
       setError(t('errors.prediction_failed'));
     } finally {
       setLoading(false);
     }
   }, [t]);
+
+  useEffect(() => {
+    if (flatSubjects.length === 0) return;
+    void examApi.getMyPredictionCache().then((cached) => {
+      if (!cached) return;
+      setPredictionResult(cached);
+      const match =
+        flatSubjects.find((s) => s.id === cached.target_subject_id) ??
+        flatSubjects.find(
+          (s) =>
+            s.name === cached.target_subject || cached.predictions[0]?.subject === s.name
+        );
+      if (match) setTargetSubjectId(match.id);
+    });
+  }, [flatSubjects]);
 
   useEffect(() => {
     if (userRole === 'admin') {
@@ -254,8 +249,8 @@ const Prediction = () => {
         <SubjectCategoryPicker
           label={t('prediction.target_subject_label')}
           placeholder={t('prediction.target_subject_placeholder')}
-          subjects={flatSubjects}
           externalGroups={pickerGroups}
+          catalogLoading={catalogLoading}
           searchMode="global"
           value={targetSubjectId}
           onChange={setTargetSubjectId}

@@ -627,11 +627,10 @@ const examApi = {
     return res.data.data;
   },
 
+  /** @deprecated Dùng subjectPickerApi.getCatalog — alias giữ tương thích */
   getPredictionSubjectCatalog: async (): Promise<PredictionCatalogGroup[]> => {
-    const res = await apiClient.get<{ success: boolean; data: PredictionCatalogGroup[] }>(
-      '/prediction/subject-catalog'
-    );
-    return res.data.data;
+    const { getSubjectPickerCatalog } = await import('@/services/subjectPickerApi');
+    return getSubjectPickerCatalog();
   },
 
   getPredictionEligibility: async (targetSubjectId: string): Promise<PredictionEligibility> => {

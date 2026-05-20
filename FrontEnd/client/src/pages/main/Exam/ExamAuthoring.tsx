@@ -38,7 +38,7 @@ import {
   IconEdit,
 } from '@tabler/icons-react';
 import adminClassApi, { type AdminClassDto } from '@/services/adminClassApi';
-import subjectApi, { type SubjectDto } from '@/services/subjectApi';
+import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
 import examApi, { type ExamImportPreview, type ImportedQuestionDraft } from '@/services/examApi';
 import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPreviewModal';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
@@ -119,7 +119,7 @@ export default function ExamAuthoring() {
   const { examId } = useParams<{ examId: string }>();
   const isEditMode = Boolean(examId);
   const [adminClass, setAdminClass] = useState<AdminClassDto | null>(null);
-  const [subjects, setSubjects] = useState<SubjectDto[]>([]);
+  const { subjects: pickerSubjects, loading: catalogLoading } = useSubjectPickerCatalog();
   const examForm = useForm<ExamMetaFormValues>({
     mode: 'uncontrolled',
     initialValues: {
@@ -170,11 +170,11 @@ export default function ExamAuthoring() {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const [subjectList, existingExam, existingQuestions] = await Promise.all([
-          subjectApi.getSubjects(),
+        const [existingExam, existingQuestions] = await Promise.all([
           examId ? examApi.getExam(examId) : Promise.resolve(null),
           examId ? examApi.getQuestions(examId) : Promise.resolve([]),
         ]);
+        const subjectList = pickerSubjects;
         let mineClass: AdminClassDto | null = null;
         try {
           mineClass = await adminClassApi.getMine();
@@ -184,7 +184,6 @@ export default function ExamAuthoring() {
             list.find((c) => c.display_name.includes('16-02')) ?? list[0] ?? null;
         }
         setAdminClass(mineClass);
-        setSubjects(subjectList);
         examForm.setValues((prev) => {
           const adminClassIdNext =
             prev.adminClassId ?? existingExam?.admin_class_id ?? mineClass?.id ?? null;
@@ -245,8 +244,7 @@ export default function ExamAuthoring() {
     };
 
     void loadInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync exam meta once per examId; examForm is stable
-  }, [examId]);
+  }, [examId, pickerSubjects, t]);
 
   const numVersions = numVersionsCount;
 
@@ -298,9 +296,9 @@ export default function ExamAuthoring() {
 
   const subjectLabel = useMemo(() => {
     if (!selectedSubjectId) return '';
-    const subject = subjects.find((s) => s.id === selectedSubjectId);
+    const subject = pickerSubjects.find((s) => s.id === selectedSubjectId);
     return subject ? formatSubjectLabel(subject) : '';
-  }, [selectedSubjectId, subjects]);
+  }, [selectedSubjectId, pickerSubjects]);
 
   const bankLinkedIds = useMemo(() => {
     const ids = new Set<string>();
@@ -682,11 +680,13 @@ export default function ExamAuthoring() {
                 <SubjectCategoryPicker
                   label={t('exam_authoring.subject_label')}
                   size="sm"
-                  subjects={subjects}
                   placeholder={
-                    loading ? t('exam_authoring.loading') : t('exam_authoring.select_subject')
+                    loading || catalogLoading
+                      ? t('exam_authoring.loading')
+                      : t('exam_authoring.select_subject')
                   }
-                  disabled={isEditMode || !adminClass || loading}
+                  disabled={isEditMode || !adminClass || loading || catalogLoading}
+                  catalogLoading={catalogLoading}
                   value={examForm.getValues().subjectId}
                   onChange={(id) => {
                     examForm.setFieldValue('subjectId', id);

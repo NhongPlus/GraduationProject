@@ -3,7 +3,7 @@ import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 import { getCachedPredictionByUserId } from "~/models/studentPredictionCache.model";
 import { recomputePredictionsForAllStudents } from "~/services/predictionBatch.service";
-import { getPredictionSubjectCatalog } from "~/services/predictionCatalog.service";
+import { getSubjectPickerCatalog } from "~/services/predictionCatalog.service";
 import {
   generatePredictionForStudent,
   getStudentEligibility,
@@ -22,7 +22,7 @@ router.get(
   roleMiddleware(["student", "admin"]),
   async (_req, res, next) => {
     try {
-      const data = await getPredictionSubjectCatalog();
+      const data = await getSubjectPickerCatalog();
       return res.json({ success: true, data });
     } catch (err) {
       next(err);

@@ -25,7 +25,8 @@ export type PredictionCatalogGroup = {
  * Catalog môn dự đoán — nhóm theo subject_groups.json (12 nhóm CNTT16-02).
  * Một môn có thể xuất hiện ở nhiều nhóm (vd. Lập trình cơ bản: Học máy & IoT + Phần mềm).
  */
-export async function getPredictionSubjectCatalog(): Promise<PredictionCatalogGroup[]> {
+/** Catalog nhóm môn cho mọi SubjectCategoryPicker (admin / GV / SV). */
+export async function getSubjectPickerCatalog(): Promise<PredictionCatalogGroup[]> {
   const r = await pool.query<{
     id: string;
     name: string;
@@ -121,3 +122,6 @@ export async function getPredictionSubjectCatalog(): Promise<PredictionCatalogGr
 
   return groups;
 }
+
+/** @deprecated Dùng getSubjectPickerCatalog — giữ alias cho route /prediction/subject-catalog */
+export const getPredictionSubjectCatalog = getSubjectPickerCatalog;

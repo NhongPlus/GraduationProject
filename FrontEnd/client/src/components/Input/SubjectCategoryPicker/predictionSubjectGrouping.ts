@@ -1,7 +1,10 @@
 import type { SubjectDto } from '@/services/subjectApi';
 import type { SubjectCategoryGroup } from './subjectGrouping';
 
-export type PredictionCatalogGroupDto = {
+/** @deprecated Import từ subjectPickerApi — giữ alias type */
+export type PredictionCatalogGroupDto = SubjectPickerCatalogGroupDto;
+
+export type SubjectPickerCatalogGroupDto = {
   id: string;
   label: string;
   subjects: Array<{
