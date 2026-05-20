@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import pool from "~/config/db";
 import bcrypt from "bcrypt";
-import { getAdminClassByManager } from "~/models/adminClass.model";
+import { getAdminClassByManager, teacherManagesClass } from "~/models/adminClass.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 import { isEmailConfigured, sendEmail } from "~/services/email.service";
 import { buildTranscriptCourses, calcCumulativeGpa } from "~/utils/gradeScale";
@@ -19,7 +19,13 @@ interface StudentRow {
 const STUDENT_RETURN_COLS =
   "id, email, username, full_name, is_active, password_plain, created_at::text";
 
-async function getTeacherAdminClassId(userId: string): Promise<string | null> {
+async function getTeacherAdminClassId(
+  userId: string,
+  preferredClassId?: string
+): Promise<string | null> {
+  if (preferredClassId && (await teacherManagesClass(userId, preferredClassId))) {
+    return preferredClassId;
+  }
   const ac = await getAdminClassByManager(userId);
   return ac?.id ?? null;
 }
@@ -32,7 +38,8 @@ async function resolveAdminClassIdForGrades(req: Request): Promise<string | null
     return id || null;
   }
   if (user?.role === "teacher" && user.userId) {
-    return getTeacherAdminClassId(user.userId);
+    const q = (req.query.admin_class_id as string | undefined)?.trim();
+    return getTeacherAdminClassId(user.userId, q);
   }
   return null;
 }
@@ -40,7 +47,10 @@ async function resolveAdminClassIdForGrades(req: Request): Promise<string | null
 export const listStudentsController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await getTeacherAdminClassId(
+      user.userId,
+      (req.query.admin_class_id as string | undefined)?.trim()
+    );
     if (!adminClassId) {
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
@@ -75,7 +85,10 @@ export const listStudentsController = async (req: Request, res: Response, next: 
 export const addStudentController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await getTeacherAdminClassId(
+      user.userId,
+      (req.query.admin_class_id as string | undefined)?.trim()
+    );
     if (!adminClassId) {
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
@@ -107,7 +120,10 @@ export const addStudentController = async (req: Request, res: Response, next: Ne
 export const updateStudentController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await getTeacherAdminClassId(
+      user.userId,
+      (req.query.admin_class_id as string | undefined)?.trim()
+    );
     if (!adminClassId) {
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
@@ -164,7 +180,10 @@ export const updateStudentController = async (req: Request, res: Response, next:
 export const deleteStudentController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await getTeacherAdminClassId(
+      user.userId,
+      (req.query.admin_class_id as string | undefined)?.trim()
+    );
     if (!adminClassId) {
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
@@ -620,7 +639,10 @@ export const sendGradeReportEmailController = async (
     }
 
     const user = (req as any).user;
-    const adminClassId = await getTeacherAdminClassId(user.userId);
+    const adminClassId = await getTeacherAdminClassId(
+      user.userId,
+      (req.query.admin_class_id as string | undefined)?.trim()
+    );
     if (!adminClassId) {
       return res.status(403).json({ success: false, message: "Chưa được gán lớp quản lý" });
     }
@@ -795,7 +817,8 @@ async function resolveAdminClassIdForTranscript(
     return r.rows[0]?.admin_class_id ?? null;
   }
   if (user?.role === "teacher" && user.userId) {
-    return getTeacherAdminClassId(user.userId);
+    const q = (req.query.admin_class_id as string | undefined)?.trim();
+    return getTeacherAdminClassId(user.userId, q);
   }
   return null;
 }

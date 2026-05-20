@@ -10,6 +10,7 @@ import {
   IconPencilCheck,
   IconSchool,
   IconFolders,
+  IconUsersGroup,
 } from '@tabler/icons-react';
 import authRoute from './authRoute';
 import type { NavGroup, Routes } from '@/@types/routes';
@@ -170,6 +171,18 @@ export const protectedRoutes: Routes = [
       position: 'sub',
       groupKey: 'user_management',
       order: 1,
+    },
+  },
+  {
+    key: 'admin-class-management',
+    path: '/admin/admin-classes',
+    component: lazy(() => import('@/pages/main/Admin/AdminClassManagement')),
+    authority: ['admin'],
+    nav: {
+      labelKey: 'nav.admin_class_management',
+      position: 'sub',
+      groupKey: 'user_management',
+      order: 2,
     },
   },
   {
