@@ -1,5 +1,6 @@
 import { AppShell } from '@mantine/core';
-import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '@/components/SideBar/SideBar';
 import { NavbarNested } from '@/components/NavBar/NavbarNested';
 import Views from '@/components/Layout/Views';
@@ -7,8 +8,22 @@ import { useState } from 'react';
 
 const DefaultLayout = () => {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isExamMode = pathname.startsWith('/exam/');
   const [navbarCollapsed, setNavbarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const mustChange = localStorage.getItem('first_login') === 'true';
+    const role = localStorage.getItem('user_role');
+    if (
+      mustChange &&
+      role !== 'admin' &&
+      !pathname.startsWith('/change-password-required') &&
+      !isExamMode
+    ) {
+      navigate('/change-password-required', { replace: true });
+    }
+  }, [pathname, navigate, isExamMode]);
 
   if (isExamMode) {
     return (

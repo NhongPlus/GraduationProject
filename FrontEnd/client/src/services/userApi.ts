@@ -10,18 +10,30 @@ export interface UserAccount {
   role: UserRole;
   full_name: string | null;
   is_active: boolean;
+  first_login?: boolean;
   password_plain?: string | null;
+  homeroom_teacher_name?: string | null;
+  homeroom_teacher_email?: string | null;
+  admin_class_name?: string | null;
+  managed_class_names?: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type StudentListParams = ListQueryParams & {
-  role?: 'student';
+export type UserListParams = ListQueryParams & {
+  role?: UserRole;
+  roles?: string;
+  search?: string;
+  search_student?: string;
+  search_teacher?: string;
   admin_class_id?: string;
 };
 
 const userApi = {
-  listStudents: async (params: StudentListParams = {}): Promise<PaginatedList<UserAccount>> =>
+  listUsers: async (params: UserListParams = {}): Promise<PaginatedList<UserAccount>> =>
+    fetchPaginatedList<UserAccount>('/users', params),
+
+  listStudents: async (params: UserListParams = {}): Promise<PaginatedList<UserAccount>> =>
     fetchPaginatedList<UserAccount>('/users', { ...params, role: 'student' }),
 
   getUsers: async (params?: { role?: UserRole; limit?: number }): Promise<UserAccount[]> => {
@@ -38,12 +50,20 @@ const userApi = {
     return res.data.data;
   },
 
+  adminResetPassword: async (id: string): Promise<{ email_sent: boolean }> => {
+    const res = await apiClient.post<{ success: boolean; data: { email_sent: boolean } }>(
+      `/users/${id}/reset-password`
+    );
+    return res.data.data;
+  },
+
   addUser: async (user: {
     email: string;
     username: string;
     password: string;
     role: UserRole;
     full_name?: string;
+    admin_class_id?: string | null;
   }): Promise<UserAccount> => {
     const res = await apiClient.post<{ success: boolean; data: UserAccount }>('/users', user);
     return res.data.data;

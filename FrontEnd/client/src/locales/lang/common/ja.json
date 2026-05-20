@@ -372,6 +372,19 @@
     "filter_unanswered": "まだです",
     "filter_flagged": "フラグ"
   },
+  "first_login": {
+    "title": "初回ログイン — パスワード変更",
+    "description": "初回ログイン、または管理者がパスワードをリセットしました。続行する前に新しいパスワードを設定してください。",
+    "current_password": "現在のパスワード（メール記載）",
+    "new_password": "新しいパスワード",
+    "confirm_password": "新しいパスワード（確認）",
+    "submit": "保存して続行",
+    "missing_fields": "すべての項目を入力してください。",
+    "min_length": "新しいパスワードは8文字以上です。",
+    "mismatch": "確認用パスワードが一致しません。",
+    "session_error": "セッションが無効です。再度ログインしてください。",
+    "failed": "パスワードを変更できませんでした。"
+  },
   "roles": {
     "student": "がくせい",
     "teacher": "せんせい",

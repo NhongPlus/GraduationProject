@@ -41,8 +41,10 @@ const StudentManagement = () => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [search, setSearch] = useState('');
-  const [searchDebounced, setSearchDebounced] = useState('');
+  const [searchStudent, setSearchStudent] = useState('');
+  const [searchTeacher, setSearchTeacher] = useState('');
+  const [searchStudentDebounced, setSearchStudentDebounced] = useState('');
+  const [searchTeacherDebounced, setSearchTeacherDebounced] = useState('');
   const [classFilterId, setClassFilterId] = useState<string | null>(null);
   const [classes, setClasses] = useState<AdminClassDto[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -55,7 +57,7 @@ const StudentManagement = () => {
   const [visiblePasswordIds, setVisiblePasswordIds] = useState<Set<string>>(new Set());
 
   const [editOpen, setEditOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     id: '',
     full_name: '',
@@ -72,16 +74,19 @@ const StudentManagement = () => {
     username: '',
     email: '',
     password: 'Test@123',
+    role: 'student' as 'student' | 'teacher',
+    admin_class_id: '' as string,
   });
   const [createErr, setCreateErr] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setSearchDebounced(search.trim());
+      setSearchStudentDebounced(searchStudent.trim());
+      setSearchTeacherDebounced(searchTeacher.trim());
       setPage(1);
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [searchStudent, searchTeacher]);
 
   useEffect(() => {
     void adminClassApi.getClasses().then(setClasses).catch(() => {});
@@ -91,10 +96,12 @@ const StudentManagement = () => {
     const isFirst = initialLoading;
     try {
       if (!isFirst) setRefreshing(true);
-      const r = await userApi.listStudents({
+      const r = await userApi.listUsers({
         limit: pageSize,
         offset: pageToOffset(page, pageSize),
-        search: searchDebounced || undefined,
+        roles: 'student,teacher',
+        search_student: searchStudentDebounced || undefined,
+        search_teacher: searchTeacherDebounced || undefined,
         admin_class_id: classFilterId || undefined,
       });
       setStudents(r.items);
@@ -106,12 +113,12 @@ const StudentManagement = () => {
       setInitialLoading(false);
       setRefreshing(false);
     }
-  }, [page, pageSize, searchDebounced, classFilterId, initialLoading, t]);
+  }, [page, pageSize, searchStudentDebounced, searchTeacherDebounced, classFilterId, initialLoading, t]);
 
   useEffect(() => {
     void loadStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, searchDebounced, classFilterId]);
+  }, [page, pageSize, searchStudentDebounced, searchTeacherDebounced, classFilterId]);
 
   const pageStudentIds = useMemo(() => students.map((s) => s.id), [students]);
   const allPageSelected =
@@ -174,17 +181,31 @@ const StudentManagement = () => {
     setEditOpen(true);
   };
 
-  const openPasswordReset = (s: UserAccount) => {
-    setEditForm({
-      id: s.id,
-      full_name: s.full_name ?? '',
-      username: s.username,
-      email: s.email,
-      is_active: s.is_active,
-      password: '',
-    });
-    setEditErr('');
-    setPasswordOpen(true);
+  const handleAdminResetPassword = async (s: UserAccount) => {
+    if (s.role !== 'student' && s.role !== 'teacher') return;
+    if (
+      !window.confirm(
+        `Đặt lại mật khẩu cho ${s.full_name || s.username}? Mật khẩu ngẫu nhiên 10 ký tự sẽ gửi qua email ${s.email}.`
+      )
+    ) {
+      return;
+    }
+    setResettingPasswordId(s.id);
+    setError('');
+    try {
+      const result = await userApi.adminResetPassword(s.id);
+      setNotice(
+        result.email_sent
+          ? `Đã gửi mật khẩu mới qua email cho ${s.email}. Người dùng phải đổi mật khẩu khi đăng nhập lần đầu.`
+          : `Đã đặt mật khẩu mới (gửi email thất bại — kiểm tra SMTP).`
+      );
+      void loadStudents();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Đặt lại mật khẩu thất bại.');
+    } finally {
+      setResettingPasswordId(null);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -202,8 +223,7 @@ const StudentManagement = () => {
         ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
       });
       setEditOpen(false);
-      setPasswordOpen(false);
-      setNotice('Đã cập nhật sinh viên.');
+      setNotice('Đã cập nhật người dùng.');
       void loadStudents();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -223,11 +243,26 @@ const StudentManagement = () => {
         username: createForm.username.trim(),
         email: createForm.email.trim(),
         password: createForm.password.trim(),
-        role: 'student',
+        role: createForm.role,
+        admin_class_id:
+          createForm.role === 'student' && createForm.admin_class_id
+            ? createForm.admin_class_id
+            : undefined,
       });
       setCreateOpen(false);
-      setCreateForm({ full_name: '', username: '', email: '', password: 'Test@123' });
-      setNotice('Đã tạo tài khoản sinh viên.');
+      setCreateForm({
+        full_name: '',
+        username: '',
+        email: '',
+        password: 'Test@123',
+        role: 'student',
+        admin_class_id: '',
+      });
+      setNotice(
+        createForm.role === 'teacher'
+          ? 'Đã tạo tài khoản giảng viên.'
+          : 'Đã tạo tài khoản sinh viên.'
+      );
       void loadStudents();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -288,10 +323,18 @@ const StudentManagement = () => {
           <Group justify="space-between" wrap="wrap" align="flex-end" gap="sm">
             <Group wrap="wrap" align="flex-end" gap="sm" style={{ flex: 1 }}>
               <InputText
-                placeholder={t('teacher_students.search_placeholder')}
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-                style={{ minWidth: 260, flex: '1 1 200px' }}
+                label="Tìm sinh viên / GV"
+                placeholder="Tên, mã, email người dùng..."
+                value={searchStudent}
+                onChange={(e) => setSearchStudent(e.currentTarget.value)}
+                style={{ minWidth: 220, flex: '1 1 180px' }}
+              />
+              <InputText
+                label="Tìm chủ nhiệm"
+                placeholder="Tên giáo viên chủ nhiệm..."
+                value={searchTeacher}
+                onChange={(e) => setSearchTeacher(e.currentTarget.value)}
+                style={{ minWidth: 220, flex: '1 1 180px' }}
               />
               <Select
                 label="Lớp hành chính"
@@ -311,7 +354,7 @@ const StudentManagement = () => {
             <Group gap="sm">
               <ButtonFilled
                 size="sm"
-                label={t('teacher_students.add_student')}
+                label="Thêm người dùng"
                 leftSection={<IconPlus size={16} />}
                 disabled={false}
                 onClick={() => setCreateOpen(true)}
@@ -392,8 +435,10 @@ const StudentManagement = () => {
                     />
                   </Table.Th>
                   <Table.Th>#</Table.Th>
+                  <Table.Th>Vai trò</Table.Th>
                   <Table.Th>{t('teacher_students.col_code')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_name')}</Table.Th>
+                  <Table.Th>Chủ nhiệm</Table.Th>
                   <Table.Th>{t('teacher_students.col_email')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_password')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_status')}</Table.Th>
@@ -411,11 +456,27 @@ const StudentManagement = () => {
                     </Table.Td>
                     <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                     <Table.Td>
+                      <Badge
+                        size="sm"
+                        variant="light"
+                        color={s.role === 'teacher' ? 'blue' : 'teal'}
+                      >
+                        {s.role === 'teacher' ? 'Giảng viên' : 'Sinh viên'}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
                       <Text size="sm" ff="monospace">
                         {s.username}
                       </Text>
                     </Table.Td>
                     <Table.Td>{s.full_name || '—'}</Table.Td>
+                    <Table.Td>
+                      <Text size="sm" lineClamp={2}>
+                        {s.role === 'student'
+                          ? s.homeroom_teacher_name || '—'
+                          : s.managed_class_names || '—'}
+                      </Text>
+                    </Table.Td>
                     <Table.Td>{s.email}</Table.Td>
                     <Table.Td>
                       <Group gap={4} wrap="nowrap">
@@ -459,15 +520,18 @@ const StudentManagement = () => {
                             <IconPencil size={16} />
                           </ActionIcon>
                         </Tooltip>
-                        <Tooltip label="Đặt lại mật khẩu">
-                          <ActionIcon
-                            color="orange"
-                            variant="light"
-                            onClick={() => openPasswordReset(s)}
-                          >
-                            <IconKey size={16} />
-                          </ActionIcon>
-                        </Tooltip>
+                        {(s.role === 'student' || s.role === 'teacher') && (
+                          <Tooltip label="Đặt lại mật khẩu & gửi email">
+                            <ActionIcon
+                              color="orange"
+                              variant="light"
+                              loading={resettingPasswordId === s.id}
+                              onClick={() => void handleAdminResetPassword(s)}
+                            >
+                              <IconKey size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
                         <Tooltip label={t('common.delete')}>
                           <ActionIcon
                             color="red"
@@ -483,7 +547,7 @@ const StudentManagement = () => {
                 ))}
                 {students.length === 0 && !refreshing && (
                   <Table.Tr>
-                    <Table.Td colSpan={8}>
+                    <Table.Td colSpan={10}>
                       <Text c="dimmed" ta="center" py="md">
                         {t('teacher_students.empty')}
                       </Text>
@@ -548,36 +612,26 @@ const StudentManagement = () => {
       </Modal>
 
       <Modal
-        opened={passwordOpen}
-        onClose={() => setPasswordOpen(false)}
-        title="Đặt lại mật khẩu"
-      >
-        <Stack gap="sm">
-          <Text size="sm" c="dimmed">
-            {editForm.full_name || editForm.username} — {editForm.email}
-          </Text>
-          <InputText
-            label={t('common.password')}
-            placeholder="Mật khẩu mới"
-            value={editForm.password}
-            onChange={(e) => setEditForm((p) => ({ ...p, password: e.currentTarget.value }))}
-          />
-          {editErr && <Text c="red" size="sm">{editErr}</Text>}
-          <ButtonFilled
-            label="Lưu mật khẩu"
-            disabled={!editForm.password.trim()}
-            onClick={handleSaveEdit}
-            color="teal"
-          />
-        </Stack>
-      </Modal>
-
-      <Modal
         opened={createOpen}
         onClose={() => setCreateOpen(false)}
-        title={t('teacher_students.add_modal_title')}
+        title="Thêm người dùng"
       >
         <Stack gap="sm">
+          <Select
+            label="Vai trò"
+            value={createForm.role}
+            onChange={(v) =>
+              setCreateForm((p) => ({
+                ...p,
+                role: (v as 'student' | 'teacher') || 'student',
+              }))
+            }
+            data={[
+              { value: 'student', label: 'Sinh viên' },
+              { value: 'teacher', label: 'Giảng viên' },
+            ]}
+            allowDeselect={false}
+          />
           <InputText
             label={t('teacher_students.col_name')}
             value={createForm.full_name}
@@ -593,6 +647,17 @@ const StudentManagement = () => {
             value={createForm.email}
             onChange={(e) => setCreateForm((p) => ({ ...p, email: e.currentTarget.value }))}
           />
+          {createForm.role === 'student' && (
+            <Select
+              label="Lớp hành chính"
+              placeholder="Chọn lớp (tuỳ chọn)"
+              data={classFilterOptions.filter((o) => o.value !== '')}
+              value={createForm.admin_class_id || null}
+              onChange={(v) => setCreateForm((p) => ({ ...p, admin_class_id: v ?? '' }))}
+              clearable
+              searchable
+            />
+          )}
           <InputText
             label={t('common.password')}
             value={createForm.password}

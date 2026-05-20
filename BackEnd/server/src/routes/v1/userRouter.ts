@@ -9,6 +9,7 @@ import {
   deleteUserController,
   bulkDeleteUsersController,
   changePasswordController,
+  adminResetPasswordController,
 } from "~/controllers/user.controller";
 
 const userRouter = Router();
@@ -20,6 +21,7 @@ userRouter.post("/bulk-delete", roleMiddleware(["admin"]), bulkDeleteUsersContro
 userRouter.post("/", roleMiddleware(["admin"]), createUserController);
 userRouter.get("/:id", roleMiddleware(["admin"]), getUserController);
 userRouter.patch("/:id", roleMiddleware(["admin"]), updateUserController);
+userRouter.post("/:id/reset-password", roleMiddleware(["admin"]), adminResetPasswordController);
 userRouter.patch("/:id/password", changePasswordController);
 userRouter.delete("/:id", roleMiddleware(["admin"]), deleteUserController);
 

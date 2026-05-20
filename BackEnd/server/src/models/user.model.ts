@@ -10,12 +10,18 @@ export interface User {
   role: UserRole;
   full_name: string | null;
   is_active: boolean;
+  first_login: boolean;
+  admin_class_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type PublicUser = Omit<User, "hashed_password"> & {
   password_plain?: string | null;
+  homeroom_teacher_name?: string | null;
+  homeroom_teacher_email?: string | null;
+  admin_class_name?: string | null;
+  managed_class_names?: string | null;
 };
 
 export const getUserByEmail = async (email: string): Promise<User | null> => {
@@ -49,43 +55,79 @@ export const getAllUsers = async (): Promise<PublicUser[]> => {
   return result.rows;
 };
 
+export type UserListFilters = {
+  role?: UserRole;
+  roles?: UserRole[];
+  search?: string;
+  search_student?: string;
+  search_teacher?: string;
+  admin_class_id?: string;
+};
+
 export const queryUsersPaginated = async (
   limit: number,
   offset: number,
-  opts?: { role?: UserRole; search?: string; admin_class_id?: string }
+  opts?: UserListFilters
 ): Promise<{ items: PublicUser[]; total: number }> => {
   const conditions: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
 
-  if (opts?.role) {
-    conditions.push(`role = $${idx++}`);
+  if (opts?.roles?.length) {
+    conditions.push(`a.role = ANY($${idx++}::text[])`);
+    values.push(opts.roles);
+  } else if (opts?.role) {
+    conditions.push(`a.role = $${idx++}`);
     values.push(opts.role);
   }
   if (opts?.admin_class_id) {
-    conditions.push(`admin_class_id = $${idx++}`);
+    conditions.push(`a.admin_class_id = $${idx++}`);
     values.push(opts.admin_class_id);
   }
-  if (opts?.search?.trim()) {
+  const studentQ = opts?.search_student?.trim() || opts?.search?.trim();
+  if (studentQ) {
     conditions.push(
-      `(email ILIKE $${idx} OR username ILIKE $${idx} OR COALESCE(full_name, '') ILIKE $${idx})`
+      `(a.email ILIKE $${idx} OR a.username ILIKE $${idx} OR COALESCE(a.full_name, '') ILIKE $${idx})`
     );
-    values.push(`%${opts.search.trim()}%`);
+    values.push(`%${studentQ}%`);
+    idx++;
+  }
+  const teacherQ = opts?.search_teacher?.trim();
+  if (teacherQ) {
+    conditions.push(
+      `(COALESCE(m.full_name, '') ILIKE $${idx} OR COALESCE(m.email, '') ILIKE $${idx} OR COALESCE(m.username, '') ILIKE $${idx})`
+    );
+    values.push(`%${teacherQ}%`);
     idx++;
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const baseSelect =
-    "SELECT id, email, username, role, full_name, is_active, password_plain, created_at, updated_at FROM accounts";
+  const fromClause = `
+    FROM accounts a
+    LEFT JOIN admin_classes ac ON ac.id = a.admin_class_id
+    LEFT JOIN accounts m ON m.id = ac.manager_teacher_id
+  `;
 
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total FROM accounts ${where}`,
+    `SELECT COUNT(*)::int AS total ${fromClause} ${where}`,
     values
   );
   const total = countResult.rows[0]?.total ?? 0;
 
+  const baseSelect = `
+    SELECT a.id, a.email, a.username, a.role, a.full_name, a.is_active, a.first_login,
+           a.password_plain, a.admin_class_id, a.created_at, a.updated_at,
+           m.full_name AS homeroom_teacher_name,
+           m.email AS homeroom_teacher_email,
+           ac.display_name AS admin_class_name,
+           (SELECT string_agg(ac2.display_name, ', ' ORDER BY ac2.display_name)
+            FROM admin_classes ac2 WHERE ac2.manager_teacher_id = a.id) AS managed_class_names
+  `;
+
   const result = await pool.query(
-    `${baseSelect} ${where} ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+    `${baseSelect} ${fromClause} ${where}
+     ORDER BY a.role ASC, a.created_at DESC
+     LIMIT $${idx++} OFFSET $${idx++}`,
     [...values, limit, offset]
   );
   return { items: result.rows as PublicUser[], total };
@@ -97,12 +139,22 @@ export const createUser = async (
   hashedPassword: string,
   role: UserRole,
   fullName?: string,
-  passwordPlain?: string | null
+  passwordPlain?: string | null,
+  opts?: { first_login?: boolean; admin_class_id?: string | null }
 ): Promise<User> => {
   const result = await pool.query(
-    `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [email, username, hashedPassword, passwordPlain ?? null, role, fullName ?? null]
+    `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, first_login, admin_class_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [
+      email,
+      username,
+      hashedPassword,
+      passwordPlain ?? null,
+      role,
+      fullName ?? null,
+      opts?.first_login ?? false,
+      opts?.admin_class_id ?? null,
+    ]
   );
   return result.rows[0];
 };
@@ -115,6 +167,7 @@ export type UserUpdateFields = {
   email?: string;
   hashed_password?: string;
   password_plain?: string | null;
+  first_login?: boolean;
 };
 
 export const updateUser = async (

@@ -143,6 +143,12 @@ export const protectedRoutes: Routes = [
     },
   },
   {
+    key: 'change-password-required',
+    path: '/change-password-required',
+    component: lazy(() => import('@/pages/auth/ChangePasswordRequired/ChangePasswordRequired')),
+    authority: ['user', 'teacher'],
+  },
+  {
     key: 'profile',
     path: '/profile',
     component: lazy(() => import('@/pages/main/Profile/Profile')),
@@ -250,24 +256,6 @@ export const protectedRoutes: Routes = [
     key: 'exam-sessions-detail',
     path: '/exam-sessions/:examId',
     component: lazy(() => import('@/pages/main/Exam/ExamSessions')),
-    authority: ['admin', 'teacher'],
-  },
-  {
-    key: 'proctoring',
-    path: '/proctoring',
-    component: lazy(() => import('@/pages/main/Proctoring/ProctoringList')),
-    authority: ['admin'],
-    nav: {
-      labelKey: 'nav.proctoring',
-      position: 'sub',
-      groupKey: 'admin_tools',
-      order: 4,
-    },
-  },
-  {
-    key: 'proctoring-detail',
-    path: '/proctoring/:examId',
-    component: lazy(() => import('@/pages/main/Proctoring/ProctoringDashboard')),
     authority: ['admin', 'teacher'],
   },
   {

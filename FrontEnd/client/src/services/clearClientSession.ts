@@ -8,9 +8,11 @@ import { clearAuthState } from '@/store/authSlice';
 export async function clearClientSession(): Promise<void> {
   await persistor.purge();
   localStorage.removeItem('access_token');
+  localStorage.removeItem('user_id');
   localStorage.removeItem('user_role');
   localStorage.removeItem('user_name');
   localStorage.removeItem('user_email');
+  localStorage.removeItem('first_login');
   localStorage.removeItem('persist:root');
   store.dispatch(clearAuthState());
   window.dispatchEvent(new Event('auth-change'));

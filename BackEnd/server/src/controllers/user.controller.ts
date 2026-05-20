@@ -6,17 +6,34 @@ import {
   updateUserService,
   deleteUserService,
   bulkDeleteUsersService,
+  adminResetPasswordService,
 } from "~/services/user.service";
+import type { UserRole } from "~/models/user.model";
 import { changePasswordService } from "~/services/auth.service";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 
 export const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
-    const role = req.query.role as "admin" | "teacher" | "student" | undefined;
+    const role = req.query.role as UserRole | undefined;
+    const rolesRaw = req.query.roles as string | undefined;
+    const roles = rolesRaw
+      ? rolesRaw.split(",").map((r) => r.trim()).filter((r): r is UserRole =>
+          r === "admin" || r === "teacher" || r === "student"
+        )
+      : undefined;
     const search = req.query.search as string | undefined;
+    const search_student = req.query.search_student as string | undefined;
+    const search_teacher = req.query.search_teacher as string | undefined;
     const admin_class_id = req.query.admin_class_id as string | undefined;
-    const result = await listUsersPaginated(limit, offset, { role, search, admin_class_id });
+    const result = await listUsersPaginated(limit, offset, {
+      role,
+      roles,
+      search,
+      search_student,
+      search_teacher,
+      admin_class_id,
+    });
     res.json({
       success: true,
       data: buildPaginatedList(result.items, result.total, limit, offset),
@@ -34,11 +51,18 @@ export const getUserController = async (req: Request, res: Response, next: NextF
 
 export const createUserController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, username, password, role, full_name } = req.body;
+    const { email, username, password, role, full_name, admin_class_id } = req.body;
     if (!email || !username || !password || !role) {
       return res.status(400).json({ success: false, message: "email/username/password/role là bắt buộc" });
     }
-    const user = await createUserService(email, username, password, role, full_name);
+    const user = await createUserService(
+      email,
+      username,
+      password,
+      role,
+      full_name,
+      admin_class_id
+    );
     res.status(201).json({ success: true, data: user });
   } catch (err) { next(err); }
 };
@@ -89,6 +113,29 @@ export const deleteUserController = async (req: Request, res: Response, next: Ne
   } catch (err) { next(err); }
 };
 
+export const adminResetPasswordController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const result = await adminResetPasswordService(req.params.id);
+    res.json({
+      success: true,
+      message: result.email_sent
+        ? "Đã đặt mật khẩu mới và gửi email cho người dùng"
+        : "Đã đặt mật khẩu mới (gửi email thất bại — kiểm tra cấu hình SMTP)",
+      data: result,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("Không tìm thấy") || msg.includes("Chỉ đặt lại")) {
+      return res.status(400).json({ success: false, message: msg });
+    }
+    next(err);
+  }
+};
+
 export const changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { current_password, new_password } = req.body;
@@ -105,7 +152,11 @@ export const changePasswordController = async (req: Request, res: Response, next
     }
 
     await changePasswordService(targetId, current_password, new_password);
-    res.json({ success: true, message: "Đã đổi mật khẩu thành công" });
+    res.json({
+      success: true,
+      message: "Đã đổi mật khẩu thành công",
+      data: { first_login: false },
+    });
   } catch (err: any) {
     if (err.message?.includes("hiện tại không đúng") || err.message?.includes("ít nhất 8")) {
       return res.status(400).json({ success: false, message: err.message });

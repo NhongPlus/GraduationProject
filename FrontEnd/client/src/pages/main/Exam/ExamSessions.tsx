@@ -174,15 +174,6 @@ const ExamSessions = () => {
                         disabled={false}
                         onClick={() => navigate(`/grading/${session.id}`)}
                       />
-                      {session.status === 'active' && (
-                        <ButtonLight
-                          size="xs"
-                          color="cyan"
-                          label={t('proctoring.title')}
-                          disabled={false}
-                          onClick={() => navigate(`/proctoring/${examId}`)}
-                        />
-                      )}
                     </Group>
                   </Table.Td>
                 </Table.Tr>

@@ -59,7 +59,13 @@ function Login() {
       }
       saveSession(result.token, result.user);
       dispatch(refreshAuthFromStorage());
-      navigate(appConfig.authenticatedEntryPath, { replace: true });
+      const mustChange =
+        result.user.first_login &&
+        result.user.role !== 'admin';
+      navigate(
+        mustChange ? '/change-password-required' : appConfig.authenticatedEntryPath,
+        { replace: true }
+      );
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
       const msg =

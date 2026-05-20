@@ -513,6 +513,19 @@
     "filter_unanswered": "Chưa làm",
     "filter_flagged": "Đã gắn cờ"
   },
+  "first_login": {
+    "title": "Đổi mật khẩu lần đầu",
+    "description": "Đây là lần đăng nhập đầu tiên hoặc mật khẩu vừa được quản trị viên đặt lại. Vui lòng đổi mật khẩu trước khi tiếp tục.",
+    "current_password": "Mật khẩu hiện tại (trong email)",
+    "new_password": "Mật khẩu mới",
+    "confirm_password": "Nhập lại mật khẩu mới",
+    "submit": "Lưu và tiếp tục",
+    "missing_fields": "Vui lòng nhập đủ các trường mật khẩu.",
+    "min_length": "Mật khẩu mới phải có ít nhất 8 ký tự.",
+    "mismatch": "Mật khẩu xác nhận không khớp.",
+    "session_error": "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.",
+    "failed": "Không đổi được mật khẩu."
+  },
   "roles": {
     "student": "Sinh viên",
     "teacher": "Giảng viên",

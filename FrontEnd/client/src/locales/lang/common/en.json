@@ -375,6 +375,19 @@
     "filter_unanswered": "Unanswered",
     "filter_flagged": "Flagged"
   },
+  "first_login": {
+    "title": "Change password on first login",
+    "description": "This is your first login or an administrator reset your password. Please set a new password before continuing.",
+    "current_password": "Current password (from email)",
+    "new_password": "New password",
+    "confirm_password": "Confirm new password",
+    "submit": "Save and continue",
+    "missing_fields": "Please fill in all password fields.",
+    "min_length": "New password must be at least 8 characters.",
+    "mismatch": "Confirmation does not match.",
+    "session_error": "Invalid session. Please sign in again.",
+    "failed": "Could not change password."
+  },
   "roles": {
     "student": "Student",
     "teacher": "Teacher",

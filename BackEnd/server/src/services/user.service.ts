@@ -11,7 +11,10 @@ import {
   User,
   PublicUser,
   UserUpdateFields,
+  type UserListFilters,
 } from "~/models/user.model";
+import { generateRandomPassword } from "~/utils/randomPassword";
+import { sendPasswordReset } from "~/services/email.service";
 
 export const getUsers = async (): Promise<PublicUser[]> => {
   return getAllUsers();
@@ -20,7 +23,7 @@ export const getUsers = async (): Promise<PublicUser[]> => {
 export const listUsersPaginated = async (
   limit: number,
   offset: number,
-  opts?: { role?: User["role"]; search?: string; admin_class_id?: string }
+  opts?: UserListFilters
 ) => queryUsersPaginated(limit, offset, opts);
 
 export const getUserDetail = async (id: string): Promise<PublicUser | null> => {
@@ -35,22 +38,47 @@ export const createUserService = async (
   username: string,
   password: string,
   role: User["role"],
-  fullName?: string
+  fullName?: string,
+  adminClassId?: string | null
 ): Promise<PublicUser> => {
   if (await getUserByEmail(email)) throw new Error("Email đã tồn tại");
   if (await getUserByUsername(username)) throw new Error("Username đã tồn tại");
 
   const hashed = await bcrypt.hash(password, 12);
-  const user = await createUser(
-    email,
-    username,
-    hashed,
-    role,
-    fullName,
-    role === "student" ? password : null
-  );
+  const storePlain = role === "student" || role === "teacher";
+  const user = await createUser(email, username, hashed, role, fullName, storePlain ? password : null, {
+    first_login: storePlain,
+    admin_class_id: role === "student" ? adminClassId ?? null : null,
+  });
   const { hashed_password, ...publicUser } = user;
   return publicUser;
+};
+
+export const adminResetPasswordService = async (
+  userId: string
+): Promise<{ email_sent: boolean }> => {
+  const user = await getUserById(userId);
+  if (!user) throw new Error("Không tìm thấy người dùng");
+  if (user.role !== "student" && user.role !== "teacher") {
+    throw new Error("Chỉ đặt lại mật khẩu cho sinh viên hoặc giảng viên");
+  }
+
+  const tempPassword = generateRandomPassword(10);
+  const hashed = await bcrypt.hash(tempPassword, 12);
+  await updateUser(userId, {
+    hashed_password: hashed,
+    password_plain: tempPassword,
+    first_login: true,
+  });
+
+  let email_sent = false;
+  try {
+    await sendPasswordReset(user.email, tempPassword, user.full_name ?? undefined);
+    email_sent = true;
+  } catch {
+    email_sent = false;
+  }
+  return { email_sent };
 };
 
 export const updateUserService = async (

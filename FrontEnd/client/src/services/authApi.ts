@@ -10,6 +10,7 @@ export interface UserInfo {
   role: UserRole;
   full_name: string | null;
   is_active: boolean;
+  first_login?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -66,9 +67,11 @@ export const registerUserAsAdmin = async (
 
 export const saveSession = (token: string, user: UserInfo) => {
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  localStorage.setItem('user_id', user.id);
   localStorage.setItem('user_role', user.role);
   localStorage.setItem('user_name', user.full_name || user.username);
   localStorage.setItem('user_email', user.email);
+  localStorage.setItem('first_login', user.first_login ? 'true' : 'false');
   window.dispatchEvent(new Event('auth-change'));
 };
 
