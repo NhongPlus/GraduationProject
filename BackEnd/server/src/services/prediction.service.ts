@@ -3,10 +3,15 @@ import {
   loadModelWeights,
   predictGrade,
 } from "~/services/gradePredictor.service";
+import type { WrongItem } from "~/services/wrongAnswerBundle.service";
 import {
+  getGroupsForSubject,
   getPredictionTargets,
+  loadGroupsFile,
   resolveSubjectId,
 } from "~/utils/subjectGroups.util";
+
+export type { WrongItem };
 
 export interface JustCompleted {
   subject: string;
@@ -43,9 +48,13 @@ export interface SubjectPrediction {
 }
 
 export interface PredictionResult {
+  target_subject?: string;
+  target_subject_id?: string;
   just_completed: JustCompleted;
   predictions: SubjectPrediction[];
   overall_advice: string;
+  wrong_summary?: WrongItem[];
+  improvement?: string[];
 }
 
 function scoreToGrade(score: number): string {
@@ -143,24 +152,46 @@ async function fetchAiCommentary(
   req: PredictionRequest,
   groupLabels: string[],
   predictions: SubjectPrediction[],
-  vsClassAvg: string
-): Promise<{ analysis: string; overall_advice: string }> {
+  vsClassAvg: string,
+  wrongItems: WrongItem[]
+): Promise<{ analysis: string; overall_advice: string; improvement: string[] }> {
+  const fallbackImprovement =
+    wrongItems.length > 0
+      ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
+      : [];
   const fallback = {
     analysis: `Kết quả ${req.just_completed.grade} ở môn ${req.just_completed.subject}, ${vsClassAvg}.`,
     overall_advice:
       predictions.length > 0
         ? `Tập trung các môn cùng nhóm (${groupLabels.join(", ")}): ${predictions.map((p) => p.subject).join(", ")}.`
         : "Tiếp tục duy trì phong độ học tập.",
+    improvement: fallbackImprovement,
   };
   if (!env.MINIMAX_API_KEY) return fallback;
 
   const predLines = predictions
-    .map((p) => `${p.subject}: ${p.predicted_score}/10`)
+    .map((p) => `${p.subject}: ${p.predicted_score}/10 (R²≈${Math.round(p.confidence * 100) / 100})`)
     .join("; ");
-  const prompt = `Bạn là giáo viên CNTT. SV vừa thi "${req.just_completed.subject}" đạt ${req.just_completed.score}/10 (${vsClassAvg}).
-Chỉ dự đoán trong nhóm: ${groupLabels.join(", ") || "—"}.
-Điểm dự đoán đã tính sẵn (KHÔNG đổi): ${predLines || "không có môn cùng nhóm"}.
-Trả CHỈ JSON: {"analysis":"1 câu","overall_advice":"1-2 câu"}`;
+
+  const diagnosticPayload = {
+    exam_subject: req.just_completed.subject,
+    exam_score_10: req.just_completed.score,
+    wrong_items: wrongItems,
+    predict_targets: predictions.map((p) => ({
+      subject: p.subject,
+      score_math: p.predicted_score,
+      model_r2: p.confidence,
+    })),
+  };
+
+  const prompt = `Bạn là giáo viên CNTT. Phân tích dựa trên JSON sau (câu trong wrong_items đã là câu SAI, không cần đáp án ABCD):
+${JSON.stringify(diagnosticPayload)}
+
+Quy tắc:
+- KHÔNG đổi score_math trong predict_targets.
+- Chỉ nhận xét môn trong predict_targets / nhóm: ${groupLabels.join(", ") || "—"}.
+- improvement: gợi ý ôn cụ thể từ stem/explanation_short (trích q nếu cần).
+Trả CHỈ JSON: {"analysis":"1 câu về bài vừa thi","overall_advice":"1-2 câu","improvement":["gợi ý 1","gợi ý 2"]}`;
 
   const response = await fetch(`${env.MINIMAX_BASE_URL}/text/chatcompletion_v2`, {
     method: "POST",
@@ -179,7 +210,7 @@ Trả CHỈ JSON: {"analysis":"1 câu","overall_advice":"1-2 câu"}`;
         { role: "user", content: prompt },
       ],
       temperature: 0.3,
-      max_tokens: 400,
+      max_tokens: 900,
     }),
   });
 
@@ -195,27 +226,51 @@ Trả CHỈ JSON: {"analysis":"1 câu","overall_advice":"1-2 câu"}`;
     const parsed = JSON.parse(jsonStr.trim()) as {
       analysis?: string;
       overall_advice?: string;
+      improvement?: string[];
     };
+    const improvement = Array.isArray(parsed.improvement)
+      ? parsed.improvement.filter((s) => typeof s === "string" && s.trim()).slice(0, 8)
+      : fallback.improvement;
     return {
       analysis: parsed.analysis ?? fallback.analysis,
       overall_advice: parsed.overall_advice ?? fallback.overall_advice,
+      improvement,
     };
   } catch {
     return fallback;
   }
 }
 
-export async function predictScore(req: PredictionRequest): Promise<PredictionResult> {
+export type PredictScoreOptions = {
+  wrong_items?: WrongItem[];
+};
+
+export async function predictScore(
+  req: PredictionRequest,
+  options: PredictScoreOptions = {}
+): Promise<PredictionResult> {
+  const wrongItems = options.wrong_items ?? [];
   const historyNames = req.history.map((h) => h.subject);
-  const { targets, groupLabels, completedId } =
+  const explicitTargets =
     req.target_subjects && req.target_subjects.length > 0
-      ? {
-          targets: req.target_subjects,
-          groupLabels: getPredictionTargets(req.just_completed.subject, historyNames)
-            .groupLabels,
+      ? req.target_subjects
+      : null;
+
+  const { targets, groupLabels, completedId } = explicitTargets
+    ? (() => {
+        const targetName = explicitTargets[0];
+        const gids = getGroupsForSubject(targetName);
+        const file = loadGroupsFile();
+        const labels = gids
+          .map((gid) => file.groups[gid]?.label)
+          .filter((l): l is string => Boolean(l));
+        return {
+          targets: explicitTargets,
+          groupLabels: labels,
           completedId: resolveSubjectId(req.just_completed.subject),
-        }
-      : getPredictionTargets(req.just_completed.subject, historyNames);
+        };
+      })()
+    : getPredictionTargets(req.just_completed.subject, historyNames);
 
   const weights = loadModelWeights();
   const completedMeta = completedId
@@ -239,7 +294,8 @@ export async function predictScore(req: PredictionRequest): Promise<PredictionRe
     req,
     groupLabels,
     predictions,
-    vsClassAvg
+    vsClassAvg,
+    wrongItems
   );
 
   return {
@@ -255,5 +311,8 @@ export async function predictScore(req: PredictionRequest): Promise<PredictionRe
       predictions.length === 0
         ? `Môn "${req.just_completed.subject}" thuộc nhóm ${groupLabels.join(", ") || "chưa phân loại"}. Không còn môn cùng nhóm cần dự đoán tiếp theo lịch sử hiện tại. ${commentary.overall_advice}`
         : commentary.overall_advice,
+    wrong_summary: wrongItems.length > 0 ? wrongItems : undefined,
+    improvement:
+      commentary.improvement.length > 0 ? commentary.improvement : undefined,
   };
 }

@@ -22,10 +22,16 @@ import styles from './SubjectCategoryPicker.module.scss';
 
 export type { SubjectCategoryGroup };
 
+export type SubjectPickerSearchMode = 'block' | 'global';
+
 export interface SubjectCategoryPickerProps {
   label?: string;
   placeholder?: string;
   subjects: SubjectDto[];
+  /** Nếu truyền — dùng khối tùy chỉnh (vd. subject_groups) thay vì category DB */
+  externalGroups?: SubjectCategoryGroup[];
+  /** block: chỉ tìm trong khối trái; global: tìm toàn bộ môn, tự nhảy khối */
+  searchMode?: SubjectPickerSearchMode;
   value?: string | null;
   onChange?: (subjectId: string | null) => void;
   error?: string;
@@ -39,6 +45,8 @@ export default function SubjectCategoryPicker({
   label,
   placeholder = 'Chọn môn học',
   subjects,
+  externalGroups,
+  searchMode = 'block',
   value = null,
   onChange,
   error,
@@ -48,7 +56,10 @@ export default function SubjectCategoryPicker({
   size = 'sm',
 }: SubjectCategoryPickerProps) {
   const [opened, { close, toggle }] = useDisclosure(false);
-  const groups = useMemo(() => groupSubjectsByCategory(subjects), [subjects]);
+  const groups = useMemo(
+    () => externalGroups ?? groupSubjectsByCategory(subjects),
+    [externalGroups, subjects]
+  );
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -57,13 +68,37 @@ export default function SubjectCategoryPicker({
     [subjects, value]
   );
 
+  const globalSearchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (searchMode !== 'global' || !q) return null;
+    const hits: Array<{ group: SubjectCategoryGroup; subject: SubjectDto }> = [];
+    for (const group of groups) {
+      for (const subject of group.subjects) {
+        if (
+          subject.name.toLowerCase().includes(q) ||
+          (subject.code ?? '').toLowerCase().includes(q)
+        ) {
+          hits.push({ group, subject });
+        }
+      }
+    }
+    return hits;
+  }, [groups, search, searchMode]);
+
   const activeGroup = useMemo(() => {
     if (!groups.length) return null;
+    if (globalSearchResults?.length) {
+      const g = globalSearchResults[0].group;
+      return g;
+    }
     const key = activeCategory ?? groups[0].category;
     return groups.find((g) => g.category === key) ?? groups[0];
-  }, [groups, activeCategory]);
+  }, [groups, activeCategory, globalSearchResults]);
 
   const filteredSubjects = useMemo(() => {
+    if (globalSearchResults) {
+      return globalSearchResults.map((h) => h.subject);
+    }
     if (!activeGroup) return [];
     const q = search.trim().toLowerCase();
     if (!q) return activeGroup.subjects;
@@ -72,9 +107,8 @@ export default function SubjectCategoryPicker({
         s.name.toLowerCase().includes(q) ||
         (s.code ?? '').toLowerCase().includes(q)
     );
-  }, [activeGroup, search]);
+  }, [activeGroup, search, globalSearchResults]);
 
-  // Khởi tạo / đồng bộ khối khi đổi danh sách môn hoặc value — không ghi đè khi user bấm cột trái
   useEffect(() => {
     if (!groups.length) {
       setActiveCategory(null);
@@ -92,6 +126,12 @@ export default function SubjectCategoryPicker({
     }
   }, [opened, selected?.id, selected?.category]);
 
+  useEffect(() => {
+    if (globalSearchResults?.length) {
+      setActiveCategory(globalSearchResults[0].group.category);
+    }
+  }, [globalSearchResults]);
+
   const displayValue = selected ? formatSubjectLabel(selected) : '';
 
   const handlePick = (subjectId: string) => {
@@ -105,6 +145,11 @@ export default function SubjectCategoryPicker({
     onChange?.(null);
     setSearch('');
   };
+
+  const searchPlaceholder =
+    searchMode === 'global'
+      ? 'Tìm môn trong tất cả khối...'
+      : 'Tìm môn trong khối đang chọn...';
 
   return (
     <InputWrapper
@@ -170,7 +215,7 @@ export default function SubjectCategoryPicker({
           <Box className={styles.search}>
             <TextInput
               size="xs"
-              placeholder="Tìm môn trong khối đang chọn..."
+              placeholder={searchPlaceholder}
               leftSection={<IconSearch size={14} />}
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}

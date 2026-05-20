@@ -1,0 +1,46 @@
+import { upsertPredictionCache } from "~/models/studentPredictionCache.model";
+import {
+  buildStudentPredictionInput,
+  getStudentEligibility,
+} from "~/services/predictionData.service";
+import { predictScore } from "~/services/prediction.service";
+import { buildWrongAnswerBundle } from "~/services/wrongAnswerBundle.service";
+import { runWithPredictionAiSlot } from "~/utils/predictionAiQueue";
+import { httpError } from "~/services/exam.service";
+
+export async function generatePredictionForStudent(
+  studentId: string,
+  fullName: string | null,
+  targetSubjectId: string
+) {
+  const trimmed = targetSubjectId?.trim();
+  if (!trimmed) {
+    throw httpError(400, "Vui lòng chọn môn cần dự đoán");
+  }
+
+  const built = await buildStudentPredictionInput(
+    studentId,
+    fullName,
+    trimmed
+  );
+  if (!built) {
+    throw httpError(400, "Chưa đủ dữ liệu bài thi đã hoàn thành để dự đoán");
+  }
+
+  const wrongItems = await buildWrongAnswerBundle(built.contextSession);
+
+  const result = await runWithPredictionAiSlot(() =>
+    predictScore(built.request, { wrong_items: wrongItems })
+  );
+
+  const payload = {
+    ...result,
+    target_subject: built.target_subject,
+    target_subject_id: trimmed,
+  };
+
+  await upsertPredictionCache(studentId, payload);
+  return payload;
+}
+
+export { getStudentEligibility };

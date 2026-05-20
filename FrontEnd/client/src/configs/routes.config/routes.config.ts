@@ -114,7 +114,7 @@ export const protectedRoutes: Routes = [
     key: 'prediction',
     path: '/prediction',
     component: lazy(() => import('@/pages/main/Exam/Prediction')),
-    authority: ['user', 'admin'],
+    authority: ['user'],
     nav: {
       labelKey: 'nav.prediction',
       position: 'main',
@@ -126,7 +126,7 @@ export const protectedRoutes: Routes = [
     key: 'my-results',
     path: '/my-results',
     component: lazy(() => import('@/pages/main/Exam/MyResults')),
-    authority: ['user', 'admin'],
+    authority: ['user'],
     nav: {
       labelKey: 'nav.my_results',
       position: 'sub',
@@ -175,7 +175,7 @@ export const protectedRoutes: Routes = [
     key: 'grading',
     path: '/grading',
     component: lazy(() => import('@/pages/main/Grading/GradingIndex')),
-    authority: ['admin', 'teacher'],
+    authority: ['teacher'],
     nav: {
       labelKey: 'nav.grading',
       position: 'main',
@@ -188,7 +188,7 @@ export const protectedRoutes: Routes = [
     key: 'grading-session',
     path: '/grading/:sessionId',
     component: lazy(() => import('@/pages/main/Grading/Grading')),
-    authority: ['admin', 'teacher'],
+    authority: ['teacher'],
   },
   {
     key: 'exam-sessions',
@@ -200,7 +200,7 @@ export const protectedRoutes: Routes = [
     key: 'question-bank',
     path: '/question-bank',
     component: lazy(() => import('@/pages/main/Exam/QuestionBank')),
-    authority: ['admin', 'teacher'],
+    authority: ['teacher'],
     nav: {
       labelKey: 'nav.question_bank',
       position: 'main',

@@ -1,10 +1,14 @@
-import { getExamById } from "~/models/exam.model";
 import { upsertPredictionCache } from "~/models/studentPredictionCache.model";
 import { getAllUsers } from "~/models/user.model";
-import { getStudentSessions } from "~/services/exam.service";
-import { predictScore, type PredictionRequest } from "~/services/prediction.service";
-import { grade10ToLetter, scoreToGrade10 } from "~/utils/gradeScale";
+import {
+  buildStudentPredictionInput,
+  loadStudentCompletedExams,
+} from "~/services/predictionData.service";
+import { getSubjectByName } from "~/models/subject.model";
 import { getPredictionTargets } from "~/utils/subjectGroups.util";
+import { predictScore } from "~/services/prediction.service";
+import { buildWrongAnswerBundle } from "~/services/wrongAnswerBundle.service";
+import { runWithPredictionAiSlot } from "~/utils/predictionAiQueue";
 
 export type RecomputeSummary = {
   total_students: number;
@@ -14,59 +18,7 @@ export type RecomputeSummary = {
   errors: string[];
 };
 
-async function buildRequestForStudent(
-  studentId: string,
-  fullName: string | null
-): Promise<PredictionRequest | null> {
-  const sessions = await getStudentSessions(studentId);
-  const completed = sessions.filter(
-    (s) =>
-      s.status !== "active" &&
-      s.score != null &&
-      s.max_points != null &&
-      Number(s.max_points) > 0
-  );
-  if (completed.length === 0) return null;
-
-  const newestFirst = completed.slice(0, 20);
-  const chronological = newestFirst.slice().reverse();
-
-  const rows: { subject: string; score: number; grade: string }[] = [];
-  for (const s of chronological) {
-    const exam = await getExamById(s.exam_id);
-    const grade10 = scoreToGrade10(s.score, s.max_points);
-    if (grade10 == null) continue;
-    const grade = grade10ToLetter(grade10);
-    const subject = exam?.subject_name || exam?.title || s.exam_id;
-    rows.push({ subject, score: grade10, grade });
-  }
-  if (rows.length === 0) return null;
-
-  const latest = rows[rows.length - 1];
-  const history = rows.slice(0, -1).map((r) => ({
-    subject: r.subject,
-    score: r.score,
-    grade: r.grade,
-  }));
-  const { targets } = getPredictionTargets(
-    latest.subject,
-    rows.map((r) => r.subject)
-  );
-
-  return {
-    student_id: studentId,
-    student_name: fullName ?? undefined,
-    just_completed: {
-      subject: latest.subject,
-      score: latest.score,
-      grade: latest.grade,
-    },
-    history,
-    target_subjects: targets.length > 0 ? targets : undefined,
-  };
-}
-
-/** Admin: gọi MiniMax cho từng sinh viên có lịch sử, ghi cache (SV không gọi AI). */
+/** Admin (tuỳ chọn): tính lần lượt từng SV — vẫn qua hàng đợi 5 slot / timeout 120s. */
 export async function recomputePredictionsForAllStudents(): Promise<RecomputeSummary> {
   const users = await getAllUsers();
   const students = users.filter((u) => u.role === "student");
@@ -80,12 +32,39 @@ export async function recomputePredictionsForAllStudents(): Promise<RecomputeSum
 
   for (const u of students) {
     try {
-      const req = await buildRequestForStudent(u.id, u.full_name);
-      if (!req) {
+      const rows = await loadStudentCompletedExams(u.id);
+      if (rows.length === 0) {
         summary.skipped_no_data += 1;
         continue;
       }
-      const result = await predictScore(req);
+      const latest = rows[rows.length - 1];
+      const { targets } = getPredictionTargets(
+        latest.subject,
+        rows.map((r) => r.subject)
+      );
+      const targetName = targets[0];
+      if (!targetName) {
+        summary.skipped_no_data += 1;
+        continue;
+      }
+      const targetRow = await getSubjectByName(targetName);
+      if (!targetRow) {
+        summary.skipped_no_data += 1;
+        continue;
+      }
+      const built = await buildStudentPredictionInput(
+        u.id,
+        u.full_name,
+        targetRow.id
+      );
+      if (!built) {
+        summary.skipped_no_data += 1;
+        continue;
+      }
+      const wrongItems = await buildWrongAnswerBundle(built.contextSession);
+      const result = await runWithPredictionAiSlot(() =>
+        predictScore(built.request, { wrong_items: wrongItems })
+      );
       await upsertPredictionCache(u.id, result);
       summary.computed += 1;
     } catch (e: unknown) {

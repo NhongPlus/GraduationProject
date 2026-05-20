@@ -32,7 +32,7 @@ function normalizeName(s: string): string {
     .trim();
 }
 
-function loadGroupsFile(): SubjectGroupsFile {
+export function loadGroupsFile(): SubjectGroupsFile {
   if (groupsCache) return groupsCache;
   const candidates = [
     path.resolve(__dirname, "../data/subject_groups.json"),
@@ -189,6 +189,186 @@ export function getPredictionTargets(
     groupLabels: [...new Set(labels)],
     completedId,
   };
+}
+
+/** Thứ tự hiển thị khối trên UI dự đoán / picker */
+export const PREDICTION_GROUP_ORDER = [
+  "math",
+  "software",
+  "ai_iot",
+  "network",
+  "bigdata",
+  "english",
+  "defense",
+  "philosophy",
+  "soft_skills",
+  "security",
+  "internship",
+  "pe",
+] as const;
+
+export type PredictionEligibility = {
+  eligible: boolean;
+  target_subject: string;
+  target_id: string | null;
+  group_labels: string[];
+  missing_prerequisites: string[];
+  scored_in_group: string[];
+  message: string;
+};
+
+/** Môn tiên quyết trong nhóm (ordered): tất cả môn đứng trước môn đích. */
+export function getPrerequisiteIdsForTarget(targetId: string): string[] {
+  const groups = loadGroupsFile();
+  const required = new Set<string>();
+  for (const g of Object.values(groups.groups)) {
+    if (!g.ordered) continue;
+    const idx = g.subjects.indexOf(targetId);
+    if (idx <= 0) continue;
+    for (let i = 0; i < idx; i++) required.add(g.subjects[i]);
+  }
+  return [...required];
+}
+
+export function assessTargetEligibility(
+  targetSubjectName: string,
+  completedSubjectNames: string[]
+): PredictionEligibility {
+  const targetId = resolveSubjectId(targetSubjectName);
+  const completedSet = new Set(completedSubjectNames);
+  const groupIds = targetId ? getGroupsForSubject(targetSubjectName) : [];
+  const groups = loadGroupsFile();
+  const groupLabels = groupIds
+    .map((gid) => groups.groups[gid]?.label)
+    .filter((l): l is string => Boolean(l));
+
+  if (!targetId) {
+    return {
+      eligible: false,
+      target_subject: targetSubjectName,
+      target_id: null,
+      group_labels: groupLabels,
+      missing_prerequisites: [],
+      scored_in_group: [],
+      message: "Không nhận diện được môn trong mô hình dự đoán.",
+    };
+  }
+
+  if (groupIds.length === 0) {
+    return {
+      eligible: false,
+      target_subject: targetSubjectName,
+      target_id: targetId,
+      group_labels: [],
+      missing_prerequisites: [],
+      scored_in_group: [],
+      message: "Môn này chưa được gán nhóm dự đoán (subject_groups).",
+    };
+  }
+
+  const prereqIds = getPrerequisiteIdsForTarget(targetId);
+  const missing: string[] = [];
+  for (const pid of prereqIds) {
+    if (!historyHasSubject(completedSet, pid)) {
+      const name = getSubjectName(pid);
+      if (name) missing.push(name);
+    }
+  }
+
+  const scoredInGroup: string[] = [];
+  for (const gid of groupIds) {
+    const g = groups.groups[gid];
+    if (!g) continue;
+    for (const sid of g.subjects) {
+      if (sid === targetId) continue;
+      if (historyHasSubject(completedSet, sid)) {
+        const name = getSubjectName(sid);
+        if (name && !scoredInGroup.includes(name)) scoredInGroup.push(name);
+      }
+    }
+  }
+
+  const hasContextInGroup = scoredInGroup.length > 0;
+  const eligible = missing.length === 0 && hasContextInGroup;
+
+  let message = "";
+  if (missing.length > 0) {
+    message = `Chưa đủ dữ kiện: cần điểm các môn tiên quyết trong nhóm (${groupLabels.join(", ")}): ${missing.join(", ")}.`;
+  } else if (!hasContextInGroup) {
+    message = `Chưa đủ dữ kiện: cần hoàn thành ít nhất một bài thi môn cùng nhóm (${groupLabels.join(", ")}) trước khi dự đoán.`;
+  } else {
+    message = "Đủ dữ kiện để dự đoán.";
+  }
+
+  return {
+    eligible,
+    target_subject: targetSubjectName,
+    target_id: targetId,
+    group_labels: groupLabels,
+    missing_prerequisites: missing,
+    scored_in_group: scoredInGroup,
+    message,
+  };
+}
+
+export function listPredictionGroupCatalog(): Array<{
+  id: string;
+  label: string;
+  subject_ids: string[];
+  subject_names: string[];
+}> {
+  const file = loadGroupsFile();
+  const ordered = [...PREDICTION_GROUP_ORDER];
+  const out: Array<{
+    id: string;
+    label: string;
+    subject_ids: string[];
+    subject_names: string[];
+  }> = [];
+
+  for (const gid of ordered) {
+    const g = file.groups[gid];
+    if (!g) continue;
+    out.push({
+      id: gid,
+      label: g.label,
+      subject_ids: g.subjects,
+      subject_names: g.subjects
+        .map((sid) => getSubjectName(sid))
+        .filter((n): n is string => Boolean(n)),
+    });
+  }
+
+  for (const [gid, g] of Object.entries(file.groups)) {
+    if (ordered.includes(gid as (typeof ordered)[number])) continue;
+    out.push({
+      id: gid,
+      label: g.label,
+      subject_ids: g.subjects,
+      subject_names: g.subjects
+        .map((sid) => getSubjectName(sid))
+        .filter((n): n is string => Boolean(n)),
+    });
+  }
+
+  return out;
+}
+
+export function subjectInSameGroupAsTarget(
+  subjectLabel: string,
+  targetId: string
+): boolean {
+  const sid = resolveSubjectId(subjectLabel);
+  if (!sid) return false;
+  const targetGroups = new Set<string>();
+  const groups = loadGroupsFile();
+  for (const [gid, g] of Object.entries(groups.groups)) {
+    if (g.subjects.includes(targetId)) targetGroups.add(gid);
+  }
+  for (const gid of targetGroups) {
+    if (groups.groups[gid]?.subjects.includes(sid)) return true;
+  }
+  return false;
 }
 
 export function resetSubjectGroupsCache(): void {

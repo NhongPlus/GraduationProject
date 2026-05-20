@@ -63,7 +63,9 @@
     },
     "math": {
       "label": "Đại số / Toán",
-      "subjects": ["S09", "S21", "S16", "S17"]
+      "subjects": ["S09", "S21", "S16", "S17"],
+      "ordered": true,
+      "note": "Thứ tự tiên quyết: Đại số TT → Giải tích → Rời rạc → XSTK"
     }
   },
   "overlap_subjects": {

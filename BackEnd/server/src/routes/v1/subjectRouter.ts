@@ -1,24 +1,23 @@
 import { Router } from "express";
 import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
-import {
-  createSubject,
-  querySubjectsPaginated,
-  getSubjectById,
-  updateSubject,
-  deleteSubject,
-  type CreateSubjectInput,
-  type UpdateSubjectInput,
-} from "~/models/subject.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
+import { querySubjectsPaginated } from "~/models/subject.model";
+import {
+  createSubjectWithPrerequisites,
+  updateSubjectWithPrerequisites,
+  replaceSubjectPrerequisites,
+  getSubjectDetailById,
+} from "~/services/subject.service";
+import { deleteSubject } from "~/models/subject.model";
+import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
 
 const router = Router();
 
-// All subject routes require admin or teacher
 router.use(authMiddleware);
 router.use(roleMiddleware(["admin", "teacher"]));
 
-// GET /v1/subjects — list all
+/** GET /v1/subjects */
 router.get("/", async (req, res, next) => {
   try {
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
@@ -33,10 +32,10 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// GET /v1/subjects/:id
+/** GET /v1/subjects/:id — kèm danh sách môn tiên quyết */
 router.get("/:id", async (req, res, next) => {
   try {
-    const subject = await getSubjectById(req.params.id);
+    const subject = await getSubjectDetailById(req.params.id);
     if (!subject) {
       res.status(404).json({ success: false, error: "Không tìm thấy môn học" });
       return;
@@ -47,29 +46,65 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-// POST /v1/subjects — create (admin only)
+/** PUT /v1/subjects/:id/prerequisites — admin chỉnh phụ thuộc */
+router.put(
+  "/:id/prerequisites",
+  roleMiddleware(["admin"]),
+  async (req, res, next) => {
+    try {
+      const raw = req.body?.prerequisite_ids;
+      const prerequisiteIds = Array.isArray(raw)
+        ? raw.filter((x): x is string => typeof x === "string")
+        : [];
+      const subject = await replaceSubjectPrerequisites(
+        req.params.id,
+        prerequisiteIds
+      );
+      if (!subject) {
+        res.status(404).json({ success: false, error: "Không tìm thấy môn học" });
+        return;
+      }
+      res.json({ success: true, data: subject });
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status ?? 500;
+      const message = err instanceof Error ? err.message : "Lỗi cập nhật phụ thuộc";
+      if (status < 500) {
+        res.status(status).json({ success: false, error: message });
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/** POST /v1/subjects — tạo môn + prerequisite_ids (admin) */
 router.post("/", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
-    const { name } = req.body as CreateSubjectInput;
-    if (!name) {
+    const body = req.body as CreateSubjectInput & { prerequisite_ids?: string[] };
+    if (!body.name?.trim()) {
       res.status(400).json({ success: false, error: "Tên môn học là bắt buộc" });
       return;
     }
-    const subject = await createSubject(req.body as CreateSubjectInput);
+    const subject = await createSubjectWithPrerequisites(body);
     res.status(201).json({ success: true, data: subject });
-  } catch (err: any) {
-    if (err.code === "23505") {
+  } catch (err: unknown) {
+    const pg = err as { code?: string; status?: number; message?: string };
+    if (pg.code === "23505") {
       res.status(409).json({ success: false, error: "Tên môn học đã tồn tại" });
+      return;
+    }
+    if (pg.status && pg.status < 500) {
+      res.status(pg.status).json({ success: false, error: pg.message });
       return;
     }
     next(err);
   }
 });
 
-// PATCH /v1/subjects/:id — update (admin only)
+/** PATCH /v1/subjects/:id */
 router.patch("/:id", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
-    const subject = await updateSubject(
+    const subject = await updateSubjectWithPrerequisites(
       req.params.id,
       req.body as UpdateSubjectInput
     );
@@ -78,16 +113,20 @@ router.patch("/:id", roleMiddleware(["admin"]), async (req, res, next) => {
       return;
     }
     res.json({ success: true, data: subject });
-  } catch (err: any) {
-    if (err.code === "23505") {
+  } catch (err: unknown) {
+    const pg = err as { code?: string; status?: number; message?: string };
+    if (pg.code === "23505") {
       res.status(409).json({ success: false, error: "Tên môn học đã tồn tại" });
+      return;
+    }
+    if (pg.status && pg.status < 500) {
+      res.status(pg.status).json({ success: false, error: pg.message });
       return;
     }
     next(err);
   }
 });
 
-// DELETE /v1/subjects/:id — delete (admin only)
 router.delete("/:id", roleMiddleware(["admin"]), async (req, res, next) => {
   try {
     const deleted = await deleteSubject(req.params.id);

@@ -12,6 +12,15 @@ export function formatExamScorePair(
   return `${formatExamScore(score)}/${formatExamScore(maxPoints)}`;
 }
 
+export function grade10ToLetter(grade10: number): string {
+  if (grade10 >= 9) return 'A+';
+  if (grade10 >= 8) return 'A';
+  if (grade10 >= 7) return 'B';
+  if (grade10 >= 6) return 'C';
+  if (grade10 >= 5) return 'D+';
+  return 'F';
+}
+
 export function scoreToGrade10(
   score: number | null | undefined,
   maxPoints: number | null | undefined

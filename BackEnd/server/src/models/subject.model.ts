@@ -7,15 +7,35 @@ export interface Subject {
   credits: number;
   semester: number;
   category: string;
+  sub_category?: string | null;
+  prerequisites?: string[] | null;
   is_active: boolean;
   created_at: string;
 }
 
+function mapSubjectRow(row: Record<string, unknown>): Subject {
+  const prereq = row.prerequisites;
+  let prerequisites: string[] | null = null;
+  if (Array.isArray(prereq)) {
+    prerequisites = prereq.filter((x): x is string => typeof x === "string");
+  }
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    code: (row.code as string) ?? "",
+    credits: Number(row.credits) || 0,
+    semester: Number(row.semester) || 0,
+    category: (row.category as string) ?? "general",
+    sub_category: (row.sub_category as string) ?? null,
+    prerequisites,
+    is_active: Boolean(row.is_active),
+    created_at: row.created_at as string,
+  };
+}
+
 export const getAllSubjects = async (): Promise<Subject[]> => {
-  const result = await pool.query(
-    "SELECT * FROM subjects ORDER BY semester ASC, name ASC"
-  );
-  return result.rows;
+  const result = await pool.query("SELECT * FROM subjects ORDER BY semester ASC, name ASC");
+  return result.rows.map(mapSubjectRow);
 };
 
 export const querySubjectsPaginated = async (
@@ -49,15 +69,22 @@ export const querySubjectsPaginated = async (
      LIMIT $${idx++} OFFSET $${idx++}`,
     [...values, limit, offset]
   );
-  return { items: result.rows as Subject[], total };
+  return { items: result.rows.map(mapSubjectRow), total };
 };
 
 export const getSubjectById = async (id: string): Promise<Subject | null> => {
+  const result = await pool.query("SELECT * FROM subjects WHERE id = $1", [id]);
+  const row = result.rows[0];
+  return row ? mapSubjectRow(row) : null;
+};
+
+export const getSubjectByName = async (name: string): Promise<Subject | null> => {
   const result = await pool.query(
-    "SELECT * FROM subjects WHERE id = $1",
-    [id]
+    "SELECT * FROM subjects WHERE name = $1 LIMIT 1",
+    [name.trim()]
   );
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+  return row ? mapSubjectRow(row) : null;
 };
 
 export interface CreateSubjectInput {
@@ -66,14 +93,15 @@ export interface CreateSubjectInput {
   credits?: number;
   semester?: number;
   category?: string;
+  sub_category?: string | null;
+  prerequisite_ids?: string[];
 }
 
-export const createSubject = async (
-  input: CreateSubjectInput
-): Promise<Subject> => {
+export const createSubject = async (input: CreateSubjectInput): Promise<Subject> => {
+  const prereq = input.prerequisite_ids?.length ? input.prerequisite_ids : null;
   const result = await pool.query(
-    `INSERT INTO subjects (name, code, credits, semester, category)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO subjects (name, code, credits, semester, category, sub_category, prerequisites)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       input.name,
@@ -81,9 +109,11 @@ export const createSubject = async (
       input.credits ?? 0,
       input.semester ?? 0,
       input.category ?? "general",
+      input.sub_category ?? null,
+      prereq,
     ]
   );
-  return result.rows[0];
+  return mapSubjectRow(result.rows[0]);
 };
 
 export interface UpdateSubjectInput {
@@ -92,6 +122,8 @@ export interface UpdateSubjectInput {
   credits?: number;
   semester?: number;
   category?: string;
+  sub_category?: string | null;
+  prerequisite_ids?: string[];
   is_active?: boolean;
 }
 
@@ -103,26 +135,64 @@ export const updateSubject = async (
   const values: unknown[] = [];
   let idx = 1;
 
-  if (input.name !== undefined) { fields.push(`name = $${idx++}`); values.push(input.name); }
-  if (input.code !== undefined) { fields.push(`code = $${idx++}`); values.push(input.code); }
-  if (input.credits !== undefined) { fields.push(`credits = $${idx++}`); values.push(input.credits); }
-  if (input.semester !== undefined) { fields.push(`semester = $${idx++}`); values.push(input.semester); }
-  if (input.category !== undefined) { fields.push(`category = $${idx++}`); values.push(input.category); }
-  if (input.is_active !== undefined) { fields.push(`is_active = $${idx++}`); values.push(input.is_active); }
+  if (input.name !== undefined) {
+    fields.push(`name = $${idx++}`);
+    values.push(input.name);
+  }
+  if (input.code !== undefined) {
+    fields.push(`code = $${idx++}`);
+    values.push(input.code);
+  }
+  if (input.credits !== undefined) {
+    fields.push(`credits = $${idx++}`);
+    values.push(input.credits);
+  }
+  if (input.semester !== undefined) {
+    fields.push(`semester = $${idx++}`);
+    values.push(input.semester);
+  }
+  if (input.category !== undefined) {
+    fields.push(`category = $${idx++}`);
+    values.push(input.category);
+  }
+  if (input.sub_category !== undefined) {
+    fields.push(`sub_category = $${idx++}`);
+    values.push(input.sub_category);
+  }
+  if (input.prerequisite_ids !== undefined) {
+    fields.push(`prerequisites = $${idx++}`);
+    values.push(
+      input.prerequisite_ids.length > 0 ? input.prerequisite_ids : null
+    );
+  }
+  if (input.is_active !== undefined) {
+    fields.push(`is_active = $${idx++}`);
+    values.push(input.is_active);
+  }
 
-  if (fields.length === 0) return null;
+  if (fields.length === 0) return getSubjectById(id);
 
   const result = await pool.query(
     `UPDATE subjects SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
     [...values, id]
   );
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+  return row ? mapSubjectRow(row) : null;
+};
+
+export const setSubjectPrerequisites = async (
+  id: string,
+  prerequisiteIds: string[]
+): Promise<Subject | null> => {
+  const result = await pool.query(
+    `UPDATE subjects SET prerequisites = $2 WHERE id = $1 RETURNING *`,
+    [id, prerequisiteIds.length > 0 ? prerequisiteIds : null]
+  );
+  const row = result.rows[0];
+  return row ? mapSubjectRow(row) : null;
 };
 
 export const deleteSubject = async (id: string): Promise<boolean> => {
-  const result = await pool.query(
-    "DELETE FROM subjects WHERE id = $1",
-    [id]
-  );
+  const result = await pool.query("DELETE FROM subjects WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
 };

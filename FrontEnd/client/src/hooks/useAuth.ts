@@ -24,10 +24,10 @@ const useAuth = () => {
 
   return {
     authenticated,
-    /** Teacher không gắn `user` — tránh mở các route chỉ dành cho sinh viên (vd. my-results, prediction). */
+    /** Admin chỉ `admin`; teacher/student tách route SV (prediction, my-results) và GV (grading, question-bank). */
     userAuthority:
       userRole === 'admin'
-        ? ['admin', 'user']
+        ? ['admin']
         : userRole === 'teacher'
           ? ['teacher']
           : ['user'],

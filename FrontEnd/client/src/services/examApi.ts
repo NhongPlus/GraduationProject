@@ -234,10 +234,44 @@ export interface JustCompleted {
   analysis?: string;
 }
 
+export interface WrongItemSummary {
+  q: number;
+  stem: string;
+  explanation_short?: string;
+}
+
+export interface PredictionEligibility {
+  eligible: boolean;
+  target_subject: string;
+  target_id: string | null;
+  group_labels: string[];
+  missing_prerequisites: string[];
+  scored_in_group: string[];
+  message: string;
+}
+
+export interface PredictionCatalogGroup {
+  id: string;
+  label: string;
+  subjects: Array<{
+    id: string;
+    name: string;
+    code: string;
+    credits: number;
+    model_subject_id: string | null;
+    prerequisite_ids?: string[];
+    prerequisite_names?: string[];
+  }>;
+}
+
 export interface PredictionResult {
+  target_subject?: string;
+  target_subject_id?: string;
   just_completed: JustCompleted;
   predictions: PredictionSubject[];
   overall_advice: string;
+  wrong_summary?: WrongItemSummary[];
+  improvement?: string[];
 }
 
 export interface PredictionRecomputeSummary {
@@ -585,10 +619,35 @@ const examApi = {
     return res.data.data;
   },
 
-  /** Sinh viên / admin: đọc cache do admin tính batch (không gọi MiniMax từ trình duyệt). */
+  /** Sinh viên / admin: đọc cache dự đoán đã lưu. */
   getMyPredictionCache: async (): Promise<PredictionResult | null> => {
     const res = await apiClient.get<{ success: boolean; data: PredictionResult | null }>(
       '/prediction/me'
+    );
+    return res.data.data;
+  },
+
+  getPredictionSubjectCatalog: async (): Promise<PredictionCatalogGroup[]> => {
+    const res = await apiClient.get<{ success: boolean; data: PredictionCatalogGroup[] }>(
+      '/prediction/subject-catalog'
+    );
+    return res.data.data;
+  },
+
+  getPredictionEligibility: async (targetSubjectId: string): Promise<PredictionEligibility> => {
+    const res = await apiClient.get<{ success: boolean; data: PredictionEligibility }>(
+      '/prediction/me/eligibility',
+      { params: { target_subject_id: targetSubjectId } }
+    );
+    return res.data.data;
+  },
+
+  /** Sinh viên: dự đoán một môn đã chọn (5 song song, timeout 120s). */
+  generateMyPrediction: async (targetSubjectId: string): Promise<PredictionResult> => {
+    const res = await apiClient.post<{ success: boolean; data: PredictionResult }>(
+      '/prediction/me/generate',
+      { target_subject_id: targetSubjectId },
+      { timeout: 125_000 }
     );
     return res.data.data;
   },

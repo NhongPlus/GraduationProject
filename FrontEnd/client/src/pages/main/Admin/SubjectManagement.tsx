@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Title, Table, Modal, Group, Stack, Text, Loader, Badge, Paper,
-  ActionIcon, TextInput, NumberInput, Select, Switch,
+  ActionIcon, TextInput, NumberInput, Select, Switch, MultiSelect,
   Button,
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconEdit, IconSearch } from '@tabler/icons-react';
@@ -19,6 +19,8 @@ interface Subject {
   credits: number;
   semester: number;
   category: string;
+  sub_category?: string | null;
+  prerequisites?: { id: string; name: string; code: string }[];
   is_active: boolean;
   created_at: string;
 }
@@ -29,8 +31,22 @@ interface SubjectFormData {
   credits: number;
   semester: number;
   category: string;
+  sub_category: string | null;
+  prerequisite_ids: string[];
   is_active: boolean;
 }
+
+const SUB_CATEGORIES = [
+  { value: 'math', label: 'Đại số / Toán' },
+  { value: 'english', label: 'Tiếng Anh' },
+  { value: 'programming', label: 'Lập trình' },
+  { value: 'software_eng', label: 'Phần mềm' },
+  { value: 'ai', label: 'AI / ML' },
+  { value: 'network', label: 'Mạng' },
+  { value: 'soft_skills', label: 'Kỹ năng mềm' },
+  { value: 'national_defense', label: 'Quốc phòng' },
+  { value: 'internship', label: 'Thực tập' },
+];
 
 const CATEGORIES = [
   { value: 'general', label: 'Tổng quát' },
@@ -82,6 +98,7 @@ const SubjectManagementPage = () => {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350);
@@ -110,6 +127,11 @@ const SubjectManagementPage = () => {
     void fetchSubjects();
   }, [fetchSubjects]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+    void subjectApi.getSubjects().then((list) => setAllSubjects(list as Subject[])).catch(() => {});
+  }, [accessToken]);
+
   const handleDelete = async (id: string) => {
     if (!confirm('Xóa môn học này? Hành động này không thể hoàn tác.')) return;
     try {
@@ -123,10 +145,27 @@ const SubjectManagementPage = () => {
     }
   };
 
+  const openEdit = async (subject: Subject) => {
+    try {
+      const detail = await subjectApi.getSubject(subject.id);
+      setEditingSubject(detail as Subject);
+      setEditModalOpen(true);
+    } catch {
+      setEditingSubject(subject);
+      setEditModalOpen(true);
+    }
+  };
+
   const handleCreate = async (data: SubjectFormData) => {
     try {
-      await apiClient.post('/subjects', data, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      await subjectApi.createSubject({
+        name: data.name,
+        code: data.code,
+        credits: data.credits,
+        semester: data.semester,
+        category: data.category,
+        sub_category: data.sub_category,
+        prerequisite_ids: data.prerequisite_ids,
       });
       setCreateModalOpen(false);
       setNotice('Đã tạo môn học.');
@@ -138,8 +177,15 @@ const SubjectManagementPage = () => {
 
   const handleUpdate = async (id: string, data: SubjectFormData) => {
     try {
-      await apiClient.patch(`/subjects/${id}`, data, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      await subjectApi.updateSubject(id, {
+        name: data.name,
+        code: data.code,
+        credits: data.credits,
+        semester: data.semester,
+        category: data.category,
+        sub_category: data.sub_category,
+        prerequisite_ids: data.prerequisite_ids,
+        is_active: data.is_active,
       });
       setEditModalOpen(false);
       setNotice('Đã cập nhật môn học.');
@@ -195,6 +241,7 @@ const SubjectManagementPage = () => {
                   <Table.Th>Tín chỉ</Table.Th>
                   <Table.Th>Học kỳ</Table.Th>
                   <Table.Th>Loại</Table.Th>
+                  <Table.Th>Tiên quyết</Table.Th>
                   <Table.Th>Trạng thái</Table.Th>
                   <Table.Th>Thao tác</Table.Th>
                 </Table.Tr>
@@ -208,6 +255,13 @@ const SubjectManagementPage = () => {
                     <Table.Td><Text size="sm">{subject.semester}</Text></Table.Td>
                     <Table.Td><CategoryBadge category={subject.category} /></Table.Td>
                     <Table.Td>
+                      <Text size="xs" c="dimmed" lineClamp={2}>
+                        {(subject.prerequisites?.length ?? 0) > 0
+                          ? subject.prerequisites!.map((p) => p.name).join(', ')
+                          : '—'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
                       <Badge color={subject.is_active ? 'green' : 'gray'} size="sm">
                         {subject.is_active ? 'Hoạt động' : 'Không hoạt động'}
                       </Badge>
@@ -217,7 +271,7 @@ const SubjectManagementPage = () => {
                         <ActionIcon
                           variant="subtle"
                           color="blue"
-                          onClick={() => { setEditingSubject(subject); setEditModalOpen(true); }}
+                          onClick={() => void openEdit(subject)}
                         >
                           <IconEdit size={16} />
                         </ActionIcon>
@@ -249,6 +303,7 @@ const SubjectManagementPage = () => {
       {/* Create Modal */}
       <Modal opened={createModalOpen} onClose={() => setCreateModalOpen(false)} title="Thêm môn học" size="md">
         <SubjectForm
+          allSubjects={allSubjects}
           onSubmit={data => void handleCreate(data)}
           onCancel={() => setCreateModalOpen(false)}
         />
@@ -259,6 +314,7 @@ const SubjectManagementPage = () => {
         {editingSubject && (
           <SubjectForm
             initial={editingSubject}
+            allSubjects={allSubjects}
             onSubmit={data => void handleUpdate(editingSubject.id, data)}
             onCancel={() => setEditModalOpen(false)}
           />
@@ -270,17 +326,29 @@ const SubjectManagementPage = () => {
 
 type SubjectFormProps = {
   initial?: Subject;
+  allSubjects: Subject[];
   onSubmit: (data: SubjectFormData) => void;
   onCancel: () => void;
 };
 
-function SubjectForm({ initial, onSubmit, onCancel }: SubjectFormProps) {
+function SubjectForm({ initial, allSubjects, onSubmit, onCancel }: SubjectFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [code, setCode] = useState(initial?.code ?? '');
   const [credits, setCredits] = useState<number>(initial?.credits ?? 0);
   const [semester, setSemester] = useState<number>(initial?.semester ?? 0);
   const [category, setCategory] = useState(initial?.category ?? 'general');
+  const [subCategory, setSubCategory] = useState<string | null>(initial?.sub_category ?? null);
+  const [prerequisiteIds, setPrerequisiteIds] = useState<string[]>(
+    initial?.prerequisites?.map((p) => p.id) ?? []
+  );
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
+
+  const prereqOptions = allSubjects
+    .filter((s) => s.id !== initial?.id)
+    .map((s) => ({
+      value: s.id,
+      label: s.code ? `${s.code} — ${s.name}` : s.name,
+    }));
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -290,6 +358,8 @@ function SubjectForm({ initial, onSubmit, onCancel }: SubjectFormProps) {
       credits,
       semester,
       category,
+      sub_category: subCategory,
+      prerequisite_ids: prerequisiteIds,
       is_active: isActive,
     });
   };
@@ -329,6 +399,25 @@ function SubjectForm({ initial, onSubmit, onCancel }: SubjectFormProps) {
         value={category}
         onChange={v => setCategory(v ?? 'general')}
         data={CATEGORIES}
+      />
+      <Select
+        label="Khối dự đoán (sub_category)"
+        description="Dùng nhóm môn trên trang Dự đoán điểm SV"
+        value={subCategory}
+        onChange={v => setSubCategory(v)}
+        data={SUB_CATEGORIES}
+        clearable
+        placeholder="Chọn khối"
+      />
+      <MultiSelect
+        label="Môn tiên quyết (phụ thuộc)"
+        description="SV cần có điểm/bài thi các môn này trước khi dự đoán môn này"
+        data={prereqOptions}
+        value={prerequisiteIds}
+        onChange={setPrerequisiteIds}
+        searchable
+        clearable
+        placeholder="Chọn môn phụ thuộc"
       />
       <Group justify="space-between">
         <Text size="sm" fw={500}>Hoạt động</Text>
