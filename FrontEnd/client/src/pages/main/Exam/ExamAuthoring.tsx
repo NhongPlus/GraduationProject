@@ -643,7 +643,7 @@ export default function ExamAuthoring() {
       {/* Two-column layout */}
       <Group align="flex-start" gap="md" wrap="wrap" style={{ rowGap: '12px' }}>
         {/* LEFT COLUMN — Exam info + Import (compact sidebar) */}
-        <Stack gap="sm" style={{ minWidth: 370, flex: '0 0 370px' }}>
+        <Stack gap="sm" style={{ minWidth: 450, flex: '0 0 450px' }}>
           {/* Thông tin bài thi — collapsible */}
           <Paper radius="md" withBorder style={{ overflow: 'hidden' }}>
             <Box

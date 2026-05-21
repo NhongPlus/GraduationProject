@@ -23,6 +23,25 @@ export interface SubjectDto {
   created_at: string;
 }
 
+export type SubjectImportPreviewRow = {
+  row: number;
+  name: string;
+  code: string;
+  credits: number;
+  semester: number;
+  category: string;
+  status: 'ok' | 'error';
+  message: string;
+};
+
+export type SubjectImportConfirmRow = {
+  name: string;
+  code?: string;
+  credits?: number;
+  semester?: number;
+  category?: string;
+};
+
 export type CreateSubjectPayload = {
   name: string;
   code?: string;
@@ -35,7 +54,39 @@ export type CreateSubjectPayload = {
   program_id?: string | null;
 };
 
-/** Nhóm môn + danh sách môn — GET /subjects/picker-catalog */
+/** Môn trong catalog thống nhất */
+export type SubjectCatalogSubject = {
+  id: string;
+  name: string;
+  code: string;
+  credits: number;
+  semester: number;
+  category: string;
+  sub_category: string | null;
+  subject_group_id: string | null;
+  model_subject_id: string | null;
+  prerequisite_ids?: string[];
+  prerequisite_names?: string[];
+};
+
+/** Nhóm môn + môn — GET /subjects/catalog */
+export type SubjectCatalogGroup = {
+  id: string;
+  code: string;
+  name: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  subject_count: number;
+  subjects: SubjectCatalogSubject[];
+};
+
+export type SubjectCatalogResponse = {
+  program_id: string;
+  groups: SubjectCatalogGroup[];
+};
+
+/** @deprecated Dùng SubjectCatalogGroup — tương thích picker */
 export type SubjectPickerCatalogGroup = {
   id: string;
   label: string;
@@ -50,26 +101,59 @@ export type SubjectPickerCatalogGroup = {
   }>;
 };
 
-let pickerCatalogPromise: Promise<SubjectPickerCatalogGroup[]> | null = null;
+const catalogCache = new Map<string, Promise<SubjectCatalogResponse>>();
 
-export function resetSubjectPickerCatalogCache(): void {
-  pickerCatalogPromise = null;
+export function resetSubjectCatalogCache(programId?: string): void {
+  if (programId) catalogCache.delete(programId);
+  else catalogCache.clear();
 }
 
-export async function getSubjectPickerCatalog(
-  options?: { refresh?: boolean }
-): Promise<SubjectPickerCatalogGroup[]> {
-  if (options?.refresh) pickerCatalogPromise = null;
-  if (!pickerCatalogPromise) {
-    pickerCatalogPromise = apiClient
-      .get<{ success: boolean; data: SubjectPickerCatalogGroup[] }>('/subjects/picker-catalog')
-      .then((res) => res.data.data)
-      .catch((err) => {
-        pickerCatalogPromise = null;
-        throw err;
-      });
+/** @deprecated */
+export function resetSubjectPickerCatalogCache(): void {
+  resetSubjectCatalogCache();
+}
+
+/** Một API đọc: nhóm + môn theo chuyên ngành */
+export async function getSubjectCatalog(
+  programId: string,
+  options?: { refresh?: boolean; hideEmptyGroups?: boolean }
+): Promise<SubjectCatalogResponse> {
+  if (options?.refresh) catalogCache.delete(programId);
+  const cacheKey = `${programId}:${options?.hideEmptyGroups ? '1' : '0'}`;
+  if (!catalogCache.has(cacheKey)) {
+    catalogCache.set(
+      cacheKey,
+      apiClient
+        .get<{ success: boolean; data: SubjectCatalogResponse }>('/subjects/catalog', {
+          params: {
+            program_id: programId,
+            hide_empty: options?.hideEmptyGroups ? 'true' : undefined,
+          },
+        })
+        .then((res) => res.data.data)
+        .catch((err) => {
+          catalogCache.delete(cacheKey);
+          throw err;
+        })
+    );
   }
-  return pickerCatalogPromise;
+  return catalogCache.get(cacheKey)!;
+}
+
+/** Picker / dự đoán — alias catalog (ẩn nhóm trống, mặc định CNTT nếu không truyền program) */
+export async function getSubjectPickerCatalog(
+  options?: { refresh?: boolean; programId?: string }
+): Promise<SubjectPickerCatalogGroup[]> {
+  const res = await apiClient.get<{ success: boolean; data: SubjectPickerCatalogGroup[] }>(
+    '/subjects/picker-catalog',
+    {
+      params: options?.programId ? { program_id: options.programId } : undefined,
+    }
+  );
+  if (options?.refresh) {
+    resetSubjectCatalogCache(options.programId);
+  }
+  return res.data.data;
 }
 
 export const SUBJECT_CATEGORY_LABELS: Record<string, string> = {
@@ -135,7 +219,46 @@ const subjectApi = {
     return res.data.data;
   },
 
+  downloadImportTemplate: async (): Promise<Blob> => {
+    const res = await apiClient.get('/subjects/import-template', { responseType: 'blob' });
+    return res.data as Blob;
+  },
+
+  importPreview: async (
+    programId: string,
+    subjectGroupId: string,
+    file: File
+  ): Promise<SubjectImportPreviewRow[]> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('program_id', programId);
+    form.append('subject_group_id', subjectGroupId);
+    const res = await apiClient.post<{ success: boolean; data: { rows: SubjectImportPreviewRow[] } }>(
+      '/subjects/import/preview',
+      form
+    );
+    return res.data.data.rows;
+  },
+
+  importConfirm: async (
+    programId: string,
+    subjectGroupId: string,
+    rows: SubjectImportConfirmRow[]
+  ): Promise<{ created: number; failed: Array<{ name: string; reason: string }> }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { created: number; failed: Array<{ name: string; reason: string }> };
+    }>('/subjects/import/confirm', {
+      program_id: programId,
+      subject_group_id: subjectGroupId,
+      rows,
+    });
+    return res.data.data;
+  },
+
+  getCatalog: getSubjectCatalog,
   getPickerCatalog: getSubjectPickerCatalog,
+  resetCatalogCache: resetSubjectCatalogCache,
   resetPickerCatalogCache: resetSubjectPickerCatalogCache,
 };
 

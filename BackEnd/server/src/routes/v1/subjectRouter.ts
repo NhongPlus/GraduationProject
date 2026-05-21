@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { authMiddleware } from "~/middlewares/auth.middleware";
 import { roleMiddleware } from "~/middlewares/role.middleware";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
@@ -11,22 +12,58 @@ import {
 } from "~/services/subject.service";
 import { deleteSubject, deleteSubjectsByIds } from "~/models/subject.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
-import { getSubjectPickerCatalog } from "~/services/predictionCatalog.service";
+import { getSubjectCatalog, getSubjectPickerCatalog } from "~/services/subjectCatalog.service";
 import { getSubjectIdsForCatalogGroup } from "~/services/subjectCatalogGroup.service";
+import {
+  buildSubjectImportTemplateBuffer,
+  parseSubjectImportExcel,
+  enrichSubjectImportPreview,
+  confirmSubjectImport,
+} from "~/services/subjectImport.service";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(authMiddleware);
 
-/** GET /v1/subjects/picker-catalog — nhóm môn + danh sách môn (picker, dự đoán, admin) */
+/** GET /v1/subjects/catalog — một API đọc: nhóm môn + môn theo chuyên ngành */
+router.get(
+  "/catalog",
+  roleMiddleware(["admin", "teacher", "student"]),
+  async (req, res, next) => {
+    try {
+      const programId = req.query.program_id as string | undefined;
+      const hideEmpty = req.query.hide_empty === "true";
+      const data = await getSubjectCatalog(programId, { hideEmptyGroups: hideEmpty });
+      res.json({ success: true, data });
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status ?? 500;
+      const message = err instanceof Error ? err.message : "Lỗi tải catalog";
+      if (status < 500) {
+        res.status(status).json({ success: false, error: message });
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/** GET /v1/subjects/picker-catalog — alias catalog (ẩn nhóm trống, tương thích cũ) */
 router.get(
   "/picker-catalog",
   roleMiddleware(["admin", "teacher", "student"]),
-  async (_req, res, next) => {
+  async (req, res, next) => {
     try {
-      const data = await getSubjectPickerCatalog();
+      const programId = req.query.program_id as string | undefined;
+      const data = await getSubjectPickerCatalog(programId);
       res.json({ success: true, data });
-    } catch (err) {
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status ?? 500;
+      const message = err instanceof Error ? err.message : "Lỗi tải catalog";
+      if (status < 500) {
+        res.status(status).json({ success: false, error: message });
+        return;
+      }
       next(err);
     }
   }
@@ -74,6 +111,100 @@ router.get("/", async (req, res, next) => {
     next(err);
   }
 });
+
+/** GET /v1/subjects/import-template — file Excel mẫu import môn */
+router.get(
+  "/import-template",
+  roleMiddleware(["admin"]),
+  (_req, res, next) => {
+    try {
+      const buf = buildSubjectImportTemplateBuffer();
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="mau-import-mon-hoc.xlsx"'
+      );
+      res.send(buf);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** POST /v1/subjects/import/preview — xem trước import Excel */
+router.post(
+  "/import/preview",
+  roleMiddleware(["admin"]),
+  upload.single("file"),
+  async (req, res, next) => {
+    try {
+      const file = req.file;
+      if (!file?.buffer) {
+        res.status(400).json({ success: false, error: "Thiếu file Excel" });
+        return;
+      }
+      const programId = String(req.body?.program_id ?? "").trim();
+      const subjectGroupId = String(req.body?.subject_group_id ?? "").trim();
+      if (!programId || !subjectGroupId) {
+        res.status(400).json({
+          success: false,
+          error: "Cần program_id và subject_group_id",
+        });
+        return;
+      }
+      const parsed = parseSubjectImportExcel(file.buffer);
+      const rows = await enrichSubjectImportPreview(parsed, programId, subjectGroupId);
+      res.json({ success: true, data: { rows } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** POST /v1/subjects/import/confirm — tạo hàng loạt môn */
+router.post(
+  "/import/confirm",
+  roleMiddleware(["admin"]),
+  async (req, res, next) => {
+    try {
+      const programId = String(req.body?.program_id ?? "").trim();
+      const subjectGroupId = String(req.body?.subject_group_id ?? "").trim();
+      const rawRows = req.body?.rows;
+      if (!programId || !subjectGroupId) {
+        res.status(400).json({
+          success: false,
+          error: "Cần program_id và subject_group_id",
+        });
+        return;
+      }
+      const rows = Array.isArray(rawRows)
+        ? rawRows.filter(
+            (r): r is { name: string } =>
+              r &&
+              typeof r === "object" &&
+              typeof (r as { name?: unknown }).name === "string" &&
+              (r as { name: string }).name.trim().length > 0
+          )
+        : [];
+      if (rows.length === 0) {
+        res.status(400).json({ success: false, error: "Danh sách môn trống" });
+        return;
+      }
+      if (rows.length > 200) {
+        res.status(400).json({ success: false, error: "Tối đa 200 môn mỗi lần import" });
+        return;
+      }
+      const result = await confirmSubjectImport(programId, subjectGroupId, rows);
+      res.json({ success: true, data: result });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Import thất bại";
+      res.status(400).json({ success: false, error: message });
+    }
+  }
+);
 
 /** POST /v1/subjects/bulk-delete — xóa nhiều môn (admin) */
 router.post(

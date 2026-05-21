@@ -16,15 +16,23 @@ const router = Router();
 router.use(authMiddleware);
 router.use(roleMiddleware(["admin"]));
 
+/** @deprecated Đọc danh sách nhóm qua GET /v1/subjects/catalog?program_id=… */
 router.get("/", async (req, res, next) => {
   try {
     const programId = req.query.program_id as string | undefined;
     if (!programId?.trim()) {
-      res.status(400).json({ success: false, error: "program_id là bắt buộc" });
+      res.status(400).json({
+        success: false,
+        error: "program_id là bắt buộc. Dùng GET /v1/subjects/catalog thay cho endpoint này.",
+      });
       return;
     }
     const data = await getSubjectGroupsByProgram(programId.trim());
-    res.json({ success: true, data });
+    res.json({
+      success: true,
+      data,
+      deprecated: "Dùng GET /v1/subjects/catalog?program_id=… để đồng bộ nhóm + môn.",
+    });
   } catch (err) {
     next(err);
   }

@@ -23,14 +23,16 @@ import {
   Divider,
   Checkbox,
   Tabs,
+  Alert,
+  FileButton,
 } from '@mantine/core';
-import { IconPlus, IconTrash, IconEdit, IconSearch, IconFolders } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconEdit, IconSearch, IconFolders, IconDownload, IconUpload } from '@tabler/icons-react';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
-import subjectApi from '@/services/subjectApi';
+import subjectApi, { type SubjectImportPreviewRow } from '@/services/subjectApi';
 import programApi, { type ProgramDto } from '@/services/programApi';
 import subjectGroupApi, { type SubjectGroupDto } from '@/services/subjectGroupApi';
-import { resetSubjectPickerCatalogCache } from '@/services/subjectApi';
+import { resetSubjectCatalogCache } from '@/services/subjectApi';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
@@ -157,6 +159,10 @@ const SubjectCatalogManagementPage = () => {
   const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState<SubjectImportPreviewRow[]>([]);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadPrograms = useCallback(async () => {
     try {
@@ -180,8 +186,9 @@ const SubjectCatalogManagementPage = () => {
     if (accessToken) void loadPrograms();
   }, [accessToken, loadPrograms]);
 
-  const refreshPickerCatalog = () => {
-    resetSubjectPickerCatalogCache();
+  const refreshCatalog = () => {
+    if (selectedProgramId) resetSubjectCatalogCache(selectedProgramId);
+    else resetSubjectCatalogCache();
   };
 
   const loadGroups = useCallback(async () => {
@@ -191,7 +198,22 @@ const SubjectCatalogManagementPage = () => {
     }
     try {
       setGroupsLoading(true);
-      const list = await subjectGroupApi.listByProgram(selectedProgramId);
+      const catalog = await subjectApi.getCatalog(selectedProgramId);
+      const list = catalog.groups
+        .filter((g) => g.id !== 'other')
+        .map(
+          (g): SubjectGroupDto => ({
+            id: g.id,
+            program_id: catalog.program_id,
+            code: g.code,
+            name: g.name,
+            description: g.description,
+            sort_order: g.sort_order,
+            is_active: true,
+            created_at: '',
+            subject_count: g.subject_count,
+          })
+        );
       setGroups(list);
       setSelectedGroupId((prev) => {
         if (prev && list.some((g) => g.id === prev)) return prev;
@@ -343,12 +365,13 @@ const SubjectCatalogManagementPage = () => {
       });
       setCreateOpen(false);
       setNotice('Đã tạo môn học.');
-      refreshPickerCatalog();
+      refreshCatalog();
       void fetchSubjects();
       void loadPrograms();
       void loadGroups();
-    } catch {
-      setError('Không tạo được môn học.');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Không tạo được môn học.');
     }
   };
 
@@ -368,7 +391,7 @@ const SubjectCatalogManagementPage = () => {
       });
       setEditOpen(false);
       setNotice('Đã cập nhật môn học.');
-      refreshPickerCatalog();
+      refreshCatalog();
       void fetchSubjects();
       void loadGroups();
     } catch {
@@ -396,24 +419,33 @@ const SubjectCatalogManagementPage = () => {
     if (!selectedProgramId || !groupCode.trim() || !groupName.trim()) return;
     try {
       if (editingGroup) {
-        await subjectGroupApi.update(editingGroup.id, {
-          code: groupCode.trim(),
-          name: groupName.trim(),
-          description: groupDesc.trim() || null,
-        });
+        await subjectGroupApi.update(
+          editingGroup.id,
+          {
+            code: groupCode.trim(),
+            name: groupName.trim(),
+            description: groupDesc.trim() || null,
+          },
+          selectedProgramId
+        );
         setNotice('Đã cập nhật nhóm môn.');
       } else {
-        await subjectGroupApi.create({
+        const created = await subjectGroupApi.create({
           program_id: selectedProgramId,
           code: groupCode.trim(),
           name: groupName.trim(),
           description: groupDesc.trim() || null,
         });
-        setNotice('Đã tạo nhóm môn.');
+        setSelectedGroupId(created.id);
+        setActiveTab('subjects');
+        setImportPreview([]);
+        setImportFile(null);
+        setImportOpen(true);
+        setNotice('Đã tạo nhóm môn. Tải file mẫu và import danh sách môn bên dưới.');
       }
       setGroupFormOpen(false);
-      refreshPickerCatalog();
-      void loadGroups();
+      refreshCatalog();
+      await loadGroups();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setError(msg || 'Lưu nhóm môn thất bại.');
@@ -423,10 +455,10 @@ const SubjectCatalogManagementPage = () => {
   const handleDeleteGroup = async (g: SubjectGroupDto) => {
     if (!confirm(`Xóa nhóm «${g.name}»?`)) return;
     try {
-      await subjectGroupApi.delete(g.id);
+      await subjectGroupApi.delete(g.id, selectedProgramId ?? undefined);
       if (selectedGroupId === g.id) setSelectedGroupId(null);
       setNotice('Đã xóa nhóm môn.');
-      refreshPickerCatalog();
+      refreshCatalog();
       void loadGroups();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -456,6 +488,82 @@ const SubjectCatalogManagementPage = () => {
   const selectedGroup = groups.find((g) => g.id === selectedGroupId);
   const canManageSubjects = Boolean(selectedProgramId && selectedGroupId);
 
+  const openImportModal = () => {
+    setImportPreview([]);
+    setImportFile(null);
+    setImportOpen(true);
+  };
+
+  const downloadImportTemplate = async () => {
+    try {
+      const blob = await subjectApi.downloadImportTemplate();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mau-import-mon-hoc.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Không tải được file mẫu.');
+    }
+  };
+
+  const handleImportPreview = async (file: File | null) => {
+    if (!file || !selectedProgramId || !selectedGroupId) return;
+    setImportFile(file);
+    setError('');
+    try {
+      const rows = await subjectApi.importPreview(selectedProgramId, selectedGroupId, file);
+      setImportPreview(rows);
+      if (rows.length === 0) {
+        setError('File không có dòng môn hợp lệ. Kiểm tra cột ten_mon.');
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Đọc file Excel thất bại.');
+      setImportPreview([]);
+    }
+  };
+
+  const importConfirmable = importPreview.filter((r) => r.status === 'ok');
+
+  const handleImportConfirm = async () => {
+    if (!selectedProgramId || !selectedGroupId || importConfirmable.length === 0) return;
+    setImporting(true);
+    setError('');
+    try {
+      const result = await subjectApi.importConfirm(
+        selectedProgramId,
+        selectedGroupId,
+        importConfirmable.map((r) => ({
+          name: r.name,
+          code: r.code,
+          credits: r.credits,
+          semester: r.semester,
+          category: r.category,
+        }))
+      );
+      if (result.failed.length > 0) {
+        setNotice(`Đã thêm ${result.created} môn. ${result.failed.length} dòng lỗi.`);
+        setError(result.failed.slice(0, 3).map((f) => `${f.name}: ${f.reason}`).join(' · '));
+      } else {
+        setNotice(`Đã import ${result.created} môn học.`);
+      }
+      setImportOpen(false);
+      setImportPreview([]);
+      setImportFile(null);
+      refreshCatalog();
+      void fetchSubjects();
+      void loadGroups();
+      void subjectApi.getSubjects().then((list) => setAllSubjects(list as Subject[]));
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Import thất bại.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Box className="min-h-[calc(100vh-80px)] p-4">
       <Stack gap="md" maw={1400} mx="auto">
@@ -463,7 +571,7 @@ const SubjectCatalogManagementPage = () => {
           <Box>
             <Title order={2}>Quản lý nhóm môn & môn học</Title>
             <Text c="dimmed" size="sm" mt={4}>
-              CRUD nhóm môn & môn học — đồng bộ picker qua API /subjects/picker-catalog.
+              CRUD nhóm môn & môn học — đọc đồng bộ qua GET /subjects/catalog.
             </Text>
           </Box>
           {activeTab === 'groups' && selectedProgramId && (
@@ -472,12 +580,22 @@ const SubjectCatalogManagementPage = () => {
             </Button>
           )}
           {activeTab === 'subjects' && (
-            <ButtonFilled
-              label="Thêm môn học"
-              leftSection={<IconPlus size={16} />}
-              disabled={!canManageSubjects}
-              onClick={() => setCreateOpen(true)}
-            />
+            <Group gap="sm">
+              <Button
+                variant="light"
+                leftSection={<IconUpload size={16} />}
+                disabled={!canManageSubjects}
+                onClick={openImportModal}
+              >
+                Import hàng loạt
+              </Button>
+              <ButtonFilled
+                label="Thêm môn học"
+                leftSection={<IconPlus size={16} />}
+                disabled={!canManageSubjects}
+                onClick={() => setCreateOpen(true)}
+              />
+            </Group>
           )}
         </Group>
 
@@ -569,9 +687,11 @@ const SubjectCatalogManagementPage = () => {
                             <ActionIcon
                               variant="light"
                               color="teal"
+                              title="Thêm môn vào nhóm này"
                               onClick={() => {
                                 setSelectedGroupId(g.id);
                                 setActiveTab('subjects');
+                                openImportModal();
                               }}
                             >
                               <IconPlus size={16} />
@@ -817,6 +937,93 @@ const SubjectCatalogManagementPage = () => {
       </Modal>
 
       <Modal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import môn học hàng loạt"
+        size="xl"
+        centered
+      >
+        <Stack gap="md">
+          <Alert color="blue" variant="light">
+            Chọn đúng chuyên ngành và nhóm môn trước khi import. File mẫu có cột:{' '}
+            <strong>ten_mon</strong> (bắt buộc), ma_mon, tin_chi, hoc_ky, loai.
+            {selectedGroup && (
+              <>
+                {' '}
+                Đang import vào nhóm <strong>{selectedGroup.name}</strong>.
+              </>
+            )}
+          </Alert>
+          <Group>
+            <Button
+              variant="light"
+              leftSection={<IconDownload size={16} />}
+              onClick={() => void downloadImportTemplate()}
+            >
+              Tải file mẫu (.xlsx)
+            </Button>
+            <FileButton onChange={(f) => void handleImportPreview(f)} accept=".xlsx,.xls">
+              {(props) => (
+                <Button {...props} leftSection={<IconUpload size={16} />} disabled={!canManageSubjects}>
+                  Chọn file Excel
+                </Button>
+              )}
+            </FileButton>
+          </Group>
+          {importFile && (
+            <Text size="sm" c="dimmed">
+              {importFile.name}
+            </Text>
+          )}
+          {importPreview.length > 0 && (
+            <ScrollArea.Autosize mah={360}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Dòng</Table.Th>
+                    <Table.Th>Tên môn</Table.Th>
+                    <Table.Th>Mã</Table.Th>
+                    <Table.Th>TC</Table.Th>
+                    <Table.Th>HK</Table.Th>
+                    <Table.Th>Trạng thái</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {importPreview.map((r) => (
+                    <Table.Tr key={r.row}>
+                      <Table.Td>{r.row}</Table.Td>
+                      <Table.Td>{r.name || '—'}</Table.Td>
+                      <Table.Td>{r.code || '—'}</Table.Td>
+                      <Table.Td>{r.credits}</Table.Td>
+                      <Table.Td>{r.semester}</Table.Td>
+                      <Table.Td>
+                        <Badge color={r.status === 'ok' ? 'green' : 'red'} size="sm">
+                          {r.message}
+                        </Badge>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea.Autosize>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setImportOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              color="teal"
+              loading={importing}
+              disabled={importConfirmable.length === 0}
+              onClick={() => void handleImportConfirm()}
+            >
+              Xác nhận import ({importConfirmable.length} môn)
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
         opened={groupFormOpen}
         onClose={() => setGroupFormOpen(false)}
         title={editingGroup ? 'Sửa nhóm môn' : 'Thêm nhóm môn'}
@@ -903,9 +1110,27 @@ function SubjectForm({
       setFormGroups([]);
       return;
     }
-    void subjectGroupApi
-      .listByProgram(programId)
-      .then(setFormGroups)
+    void subjectApi
+      .getCatalog(programId)
+      .then((catalog) =>
+        setFormGroups(
+          catalog.groups
+            .filter((g) => g.id !== 'other')
+            .map(
+              (g): SubjectGroupDto => ({
+                id: g.id,
+                program_id: catalog.program_id,
+                code: g.code,
+                name: g.name,
+                description: g.description,
+                sort_order: g.sort_order,
+                is_active: true,
+                created_at: '',
+                subject_count: g.subject_count,
+              })
+            )
+        )
+      )
       .catch(() => setFormGroups([]));
   }, [programId]);
 
@@ -956,7 +1181,7 @@ function SubjectForm({
       />
       <Select
         label="2. Nhóm môn"
-        description="Đồng bộ với picker (/subjects/picker-catalog)"
+        description="Cùng nguồn GET /subjects/catalog"
         required
         data={formGroups.map((g) => ({ value: g.id, label: `${g.code} — ${g.name}` }))}
         value={subjectGroupId}
@@ -1011,6 +1236,13 @@ function SubjectForm({
           </Text>
           <Switch checked={isActive} onChange={(e) => setIsActive(e.currentTarget.checked)} />
         </Group>
+      )}
+      {(!programId || !subjectGroupId || !name.trim()) && (
+        <Alert color="yellow" variant="light">
+          {!programId || !subjectGroupId
+            ? 'Chọn chuyên ngành và nhóm môn để lưu.'
+            : 'Nhập tên môn học (bắt buộc) để bật nút Lưu.'}
+        </Alert>
       )}
       <Group justify="flex-end" mt="xl">
         <Button variant="default" size="md" onClick={onCancel}>
