@@ -59,8 +59,8 @@ export const adminResetPasswordService = async (
 ): Promise<{ email_sent: boolean }> => {
   const user = await getUserById(userId);
   if (!user) throw new Error("Không tìm thấy người dùng");
-  if (user.role !== "student" && user.role !== "teacher") {
-    throw new Error("Chỉ đặt lại mật khẩu cho sinh viên hoặc giảng viên");
+  if (user.role !== "student" && user.role !== "teacher" && user.role !== "admin") {
+    throw new Error("Không hỗ trợ đặt lại mật khẩu cho vai trò này");
   }
 
   const tempPassword = generateRandomPassword(10);

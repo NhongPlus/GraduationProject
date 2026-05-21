@@ -182,7 +182,10 @@ const Profile = () => {
               )}
 
               {isAdmin && (
-                <Text size="xs" c="dimmed">{t('profile.admin_password_note')}</Text>
+                <Alert color="gray" variant="light">
+                  <Text size="sm">{t('profile.admin_password_note')}</Text>
+                  <Text size="sm" mt="xs">{t('profile.admin_forgot_help')}</Text>
+                </Alert>
               )}
             </Stack>
           </Paper>

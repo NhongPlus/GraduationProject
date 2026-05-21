@@ -260,6 +260,7 @@
     "student_forgot_desc": "Nếu không nhớ mật khẩu hiện tại, gửi yêu cầu để quản trị viên cấp mật khẩu tạm qua email.",
     "admin_password_note": "Quản trị viên chỉ đổi mật khẩu trực tiếp tại đây — không gửi yêu cầu qua email.",
     "admin_change_desc": "Nhập mật khẩu hiện tại và mật khẩu mới. Tài khoản quản trị không dùng luồng yêu cầu qua email.",
+    "admin_forgot_help": "Nếu quên mật khẩu: nhờ quản trị viên khác vào Quản lý người dùng → biểu tượng chìa khóa trên tài khoản admin của bạn → gửi mật khẩu tạm qua email. Chỉ còn một admin thì chạy script reset-admin-password trên server.",
     "reset_request_title": "Yêu cầu đặt lại mật khẩu",
     "reset_request_desc": "Yêu cầu sẽ được gửi lên quản trị viên. Sau khi duyệt, mật khẩu tạm sẽ gửi qua email đăng ký của bạn.",
     "reset_request_hint": "Mỗi tài khoản chỉ có một yêu cầu đang chờ tại một thời điểm.",

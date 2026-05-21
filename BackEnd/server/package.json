@@ -7,6 +7,7 @@
     "assign-teacher-class": "ts-node -r tsconfig-paths/register scripts/assign-teacher-admin-class.ts",
     "seed-students": "ts-node -r tsconfig-paths/register scripts/seed-students-cntt1602.ts",
     "reseed-cntt-catalog": "ts-node -r tsconfig-paths/register scripts/reseed-cntt-subject-catalog.ts",
+    "reset-admin-password": "ts-node -r tsconfig-paths/register scripts/reset-admin-password.ts",
     "train-grades": "ts-node -r tsconfig-paths/register scripts/train-grade-predictor.ts",
     "fix-mcq-answers": "ts-node -r tsconfig-paths/register scripts/fix-demo-mcq-format.ts",
     "start": "node dist/server.js",

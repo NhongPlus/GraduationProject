@@ -257,6 +257,7 @@
     "student_forgot_desc": "If you do not remember your current password, submit a request for a temporary password by email.",
     "admin_password_note": "Admins only change password here—no email reset requests.",
     "admin_change_desc": "Enter current and new password. Admin accounts do not use the email request workflow.",
+    "admin_forgot_help": "If you forgot your password: ask another admin to open User management → key icon on your admin row → temporary password by email. If you are the only admin, run reset-admin-password on the server.",
     "reset_request_title": "Request password reset",
     "reset_request_desc": "Your request will be sent to an administrator. After approval, a temporary password will be emailed to you.",
     "reset_request_hint": "Only one pending request is allowed at a time.",

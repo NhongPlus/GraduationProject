@@ -182,10 +182,11 @@ const StudentManagement = () => {
   };
 
   const handleAdminResetPassword = async (s: UserAccount) => {
-    if (s.role !== 'student' && s.role !== 'teacher') return;
+    if (s.role !== 'student' && s.role !== 'teacher' && s.role !== 'admin') return;
     if (
       !window.confirm(
-        `Đặt lại mật khẩu cho ${s.full_name || s.username}? Mật khẩu ngẫu nhiên 10 ký tự sẽ gửi qua email ${s.email}.`
+        `Đặt lại mật khẩu cho ${s.full_name || s.username}? Mật khẩu ngẫu nhiên 10 ký tự sẽ gửi qua email ${s.email}.` +
+          (s.role === 'admin' ? ' (Tài khoản quản trị — dùng khi admin quên mật khẩu.)' : '')
       )
     ) {
       return;
@@ -520,7 +521,7 @@ const StudentManagement = () => {
                             <IconPencil size={16} />
                           </ActionIcon>
                         </Tooltip>
-                        {(s.role === 'student' || s.role === 'teacher') && (
+                        {(s.role === 'student' || s.role === 'teacher' || s.role === 'admin') && (
                           <Tooltip label="Đặt lại mật khẩu & gửi email">
                             <ActionIcon
                               color="orange"
