@@ -25,6 +25,13 @@ export const requestPasswordReset = async (
   const target = await getUserById(targetUserId);
   if (!target) throw httpError(404, "Người dùng không tồn tại");
 
+  if (target.role === "admin") {
+    throw httpError(
+      400,
+      "Tài khoản quản trị không dùng yêu cầu đặt lại qua email. Vui lòng đổi mật khẩu trực tiếp trong Cài đặt."
+    );
+  }
+
   if (requestor.role !== "admin" && requestor.id !== targetUserId) {
     throw httpError(403, "Không có quyền yêu cầu đặt lại mật khẩu cho người này");
   }

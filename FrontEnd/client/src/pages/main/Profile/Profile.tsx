@@ -26,8 +26,8 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const isStaff = role === 'admin' || role === 'teacher';
-  const showResetRequest = role === 'student';
+  const isAdmin = role === 'admin';
+  const showResetRequest = role === 'student' || role === 'teacher';
 
   const handleLogout = async () => {
     await clearSession();
@@ -139,7 +139,9 @@ const Profile = () => {
               )}
 
               <Title order={4}>{t('profile.change_password_title')}</Title>
-              <Text size="sm" c="dimmed">{t('profile.change_password_desc')}</Text>
+              <Text size="sm" c="dimmed">
+                {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
+              </Text>
               <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
               <InputPassword
                 label={t('first_login.current_password')}
@@ -165,9 +167,9 @@ const Profile = () => {
               {showResetRequest && (
                 <>
                   <Divider my="sm" />
-                  <Title order={5}>{t('profile.student_forgot_section')}</Title>
+                  <Title order={5}>{t('profile.reset_request_title')}</Title>
                   <Alert color="blue" variant="light">
-                    {t('profile.student_forgot_desc')}
+                    {t('profile.reset_request_desc')}
                   </Alert>
                   <Text size="sm" c="dimmed">{t('profile.reset_request_hint')}</Text>
                   <ButtonFilled
@@ -179,10 +181,8 @@ const Profile = () => {
                 </>
               )}
 
-              {isStaff && (
-                <Text size="xs" c="dimmed">
-                  {role === 'admin' ? t('profile.admin_password_note') : t('profile.teacher_password_note')}
-                </Text>
+              {isAdmin && (
+                <Text size="xs" c="dimmed">{t('profile.admin_password_note')}</Text>
               )}
             </Stack>
           </Paper>

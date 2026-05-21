@@ -23,9 +23,19 @@ publicRouter.post(
       if (!email) {
         return res.status(400).json({ success: false, message: "email là bắt buộc" });
       }
-      const user = await pool.query("SELECT id FROM accounts WHERE email = $1", [email]);
+      const user = await pool.query(
+        "SELECT id, role FROM accounts WHERE email = $1",
+        [email]
+      );
       if (user.rows.length === 0) {
         return res.status(404).json({ success: false, message: "Không tìm thấy tài khoản với email này" });
+      }
+      if (user.rows[0].role === "admin") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Tài khoản quản trị không hỗ trợ quên mật khẩu qua email. Liên hệ kỹ thuật hoặc đổi mật khẩu khi đã đăng nhập.",
+        });
       }
       const targetUserId = user.rows[0].id;
       const result = await requestPasswordReset(targetUserId, targetUserId);
@@ -67,13 +77,13 @@ authedRouter.post(
 
 authedRouter.get(
   "/me",
-  roleMiddleware(["admin", "teacher", "student"]),
+  roleMiddleware(["teacher", "student"]),
   getMyResetRequestsController
 );
 
 authedRouter.post(
   "/me",
-  roleMiddleware(["admin", "teacher", "student"]),
+  roleMiddleware(["teacher", "student"]),
   submitMyResetRequestController
 );
 

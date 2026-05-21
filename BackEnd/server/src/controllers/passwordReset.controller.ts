@@ -101,6 +101,12 @@ export const submitMyResetRequestController = async (
 ) => {
   try {
     const user = (req as any).user;
+    if (user.role === "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Quản trị viên đổi mật khẩu trực tiếp trong Cài đặt tài khoản.",
+      });
+    }
     const result = await requestPasswordReset(user.userId, user.userId);
     res.json({
       success: true,
