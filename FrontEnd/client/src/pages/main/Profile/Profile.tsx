@@ -5,23 +5,74 @@ import {
   Tabs, Notification, Group, Badge, Divider, Alert,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
-import { clearSession, submitMyPasswordResetRequest } from '@/services/authApi';
+import { clearSession, submitMyPasswordResetRequest, changePassword } from '@/services/authApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
+import InputPassword from '@/components/Input/InputPassword/InputPassword';
 
 const Profile = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const name = localStorage.getItem('user_name') || t('roles.user');
   const role = localStorage.getItem('user_role') || 'user';
+  const userId = localStorage.getItem('user_id') ?? '';
   const roleLabel = t(`roles.${role}`, { defaultValue: role });
   const [email] = useState(localStorage.getItem('user_email') || '');
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const isStaff = role === 'admin' || role === 'teacher';
+  const showResetRequest = role === 'student';
+
   const handleLogout = async () => {
     await clearSession();
     navigate('/login', { replace: true });
+  };
+
+  const handleChangePassword = async () => {
+    setMessage('');
+    setMessageIsError(false);
+    if (!currentPassword || !newPassword) {
+      setMessage(t('profile.change_password_missing'));
+      setMessageIsError(true);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setMessage(t('profile.password_min_length'));
+      setMessageIsError(true);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage(t('profile.change_password_mismatch'));
+      setMessageIsError(true);
+      return;
+    }
+    if (!userId) {
+      setMessage(t('first_login.session_error'));
+      setMessageIsError(true);
+      return;
+    }
+    try {
+      setChangingPassword(true);
+      await changePassword(userId, currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage(t('profile.password_changed'));
+      setMessageIsError(false);
+      localStorage.setItem('first_login', 'false');
+    } catch (e: unknown) {
+      const apiMsg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setMessage(apiMsg || t('profile.change_password_error'));
+      setMessageIsError(true);
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const handleRequestPasswordReset = async () => {
@@ -81,21 +132,58 @@ const Profile = () => {
         <Tabs.Panel value="settings" pt="md">
           <Paper shadow="xs" withBorder p="md">
             <Stack gap="md">
-              <Alert color="blue" variant="light">
-                {t('profile.reset_request_desc')}
-              </Alert>
               {message && (
                 <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
                   {message}
                 </Notification>
               )}
-              <Title order={4}>{t('profile.reset_request_title')}</Title>
-              <Text size="sm" c="dimmed">{t('profile.reset_request_hint')}</Text>
-              <ButtonFilled
-                label={t('profile.reset_request_submit')}
-                disabled={submitting}
-                onClick={() => void handleRequestPasswordReset()}
+
+              <Title order={4}>{t('profile.change_password_title')}</Title>
+              <Text size="sm" c="dimmed">{t('profile.change_password_desc')}</Text>
+              <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
+              <InputPassword
+                label={t('first_login.current_password')}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
               />
+              <InputPassword
+                label={t('first_login.new_password')}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.currentTarget.value)}
+              />
+              <InputPassword
+                label={t('first_login.confirm_password')}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+              />
+              <ButtonFilled
+                label={t('profile.change_password_submit')}
+                disabled={changingPassword}
+                onClick={() => void handleChangePassword()}
+              />
+
+              {showResetRequest && (
+                <>
+                  <Divider my="sm" />
+                  <Title order={5}>{t('profile.student_forgot_section')}</Title>
+                  <Alert color="blue" variant="light">
+                    {t('profile.student_forgot_desc')}
+                  </Alert>
+                  <Text size="sm" c="dimmed">{t('profile.reset_request_hint')}</Text>
+                  <ButtonFilled
+                    label={t('profile.reset_request_submit')}
+                    disabled={submitting}
+                    onClick={() => void handleRequestPasswordReset()}
+                    color="blue"
+                  />
+                </>
+              )}
+
+              {isStaff && (
+                <Text size="xs" c="dimmed">
+                  {role === 'admin' ? t('profile.admin_password_note') : t('profile.teacher_password_note')}
+                </Text>
+              )}
             </Stack>
           </Paper>
         </Tabs.Panel>
