@@ -24,7 +24,7 @@ import {
 
 import { useDisclosure } from '@mantine/hooks';
 
-import { IconChevronDown, IconChevronRight, IconSearch, IconX } from '@tabler/icons-react';
+import { IconChevronRight, IconSearch, IconX } from '@tabler/icons-react';
 
 import type { SubjectDto } from '@/services/subjectApi';
 
@@ -455,47 +455,17 @@ export default function SubjectCategoryPicker({
             onClick={() => !pickerDisabled && toggle()}
 
             rightSection={
-
-              <Box style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-
-                {value && !pickerDisabled ? (
-
-                  <ActionIcon
-
-                    variant="subtle"
-
-                    color="gray"
-
-                    size="sm"
-
-                    onClick={handleClear}
-
-                    aria-label="Xóa lựa chọn"
-
-                  >
-
-                    <IconX size={14} />
-
-                  </ActionIcon>
-
-                ) : null}
-
-                <IconChevronDown
-
-                  size={16}
-
-                  style={{
-
-                    transform: opened ? 'rotate(180deg)' : undefined,
-
-                    transition: 'transform 0.2s',
-
-                  }}
-
-                />
-
-              </Box>
-
+              value && !pickerDisabled ? (
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  onClick={handleClear}
+                  aria-label="Xóa lựa chọn"
+                >
+                  <IconX size={14} />
+                </ActionIcon>
+              ) : null
             }
 
           >
