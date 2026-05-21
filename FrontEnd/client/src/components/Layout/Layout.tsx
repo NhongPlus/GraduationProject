@@ -1,5 +1,4 @@
-import { Suspense, useMemo } from 'react';
-import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
+import { lazy, Suspense, useMemo } from 'react';
 import LoadingScreen from '@/components/LoadingScreen/LoadingScreen';
 import useAuth from '@/hooks/useAuth';
 import useLocale from '@/hooks/useLocale';

@@ -1,4 +1,4 @@
-import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
+import { lazy } from 'react';
 import {
   IconBooks,
   IconCalendarStats,
