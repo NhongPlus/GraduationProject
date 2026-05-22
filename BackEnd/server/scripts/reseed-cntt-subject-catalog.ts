@@ -150,8 +150,7 @@ async function clearCnttCatalog(programId: string): Promise<void> {
 
   await pool.query(`DELETE FROM program_subjects WHERE program_id = $1`, [programId]);
   await pool.query(`DELETE FROM program_subject_groups WHERE program_id = $1`, [programId]);
-  await pool.query(`DELETE FROM subjects`);
-  await pool.query(`DELETE FROM subject_groups`);
+  /** Không xóa toàn bộ kho — chỉ gỡ gán CNTT (môn/nhóm vẫn dùng cho ngành khác). */
 }
 
 async function main() {
