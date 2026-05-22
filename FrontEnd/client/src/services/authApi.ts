@@ -75,7 +75,25 @@ export const saveSession = (token: string, user: UserInfo) => {
   window.dispatchEvent(new Event('auth-change'));
 };
 
-export const clearSession = (): Promise<void> => clearClientSession();
+export const logout = async (): Promise<void> => {
+  try {
+    await apiClient.post('/auth/logout');
+  } catch {
+    /* vẫn xóa client nếu server lỗi hoặc token đã hết hạn */
+  }
+  await clearClientSession();
+};
+
+export const clearSession = (): Promise<void> => logout();
+
+export const checkServerSession = async (): Promise<boolean> => {
+  try {
+    await apiClient.get('/auth/session');
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const changePassword = async (
   userId: string,

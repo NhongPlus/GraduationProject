@@ -1,6 +1,5 @@
 import { Server, Socket } from "socket.io";
-import jwt from "jsonwebtoken";
-import { env } from "~/config/enviroment";
+import { verifyTokenPayload } from "~/services/auth.service";
 import { getExamById } from "~/models/exam.model";
 import { forceSubmitActiveSessionsByExamService } from "~/services/exam.service";
 import { saveExamRuntimeStart, saveExamRuntimeEnd, restoreExamRuntimes, getRuntimeStateByExam } from "~/models/examRuntimeState.model";
@@ -18,11 +17,6 @@ type NotifyKind = "info" | "warning" | "exam";
 function asNotificationType(kind: NotifyKind): NotificationType {
   if (kind === "warning") return "warning";
   return "info";
-}
-
-interface JwtPayloadShape {
-  userId: string;
-  role: string;
 }
 
 function readToken(socket: Socket): string | null {
@@ -223,21 +217,20 @@ function startExamRuntime(io: Server, examId: string, durationMin: number): Exam
  */
 export function registerExamSocket(io: Server): void {
   ioInstance = io;
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = readToken(socket);
     if (!token) {
       return next(new Error("Unauthorized: thiếu token (handshake.auth.token hoặc query.token)"));
     }
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET as string) as JwtPayloadShape;
-      if (!payload.userId || !payload.role) {
-        return next(new Error("Unauthorized: payload không hợp lệ"));
-      }
+      const payload = await verifyTokenPayload(token);
       socket.data.userId = payload.userId;
       socket.data.role = payload.role;
       next();
-    } catch {
-      next(new Error("Unauthorized: token không hợp lệ"));
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Unauthorized: token không hợp lệ";
+      next(new Error(msg));
     }
   });
 

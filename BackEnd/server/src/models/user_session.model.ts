@@ -28,6 +28,37 @@ export const createUserSession = async (
   return result.rows[0];
 };
 
+/** Revoke all active sessions then insert one — transactional, single active session per user. */
+export const replaceUserSession = async (
+  userId: string,
+  deviceId: string,
+  tokenHash: string,
+  deviceInfo: string | null,
+  expiresAt: Date
+): Promise<UserSession> => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true`,
+      [userId]
+    );
+    const result = await client.query(
+      `INSERT INTO user_sessions (user_id, device_id, device_info, token_hash, is_active, expires_at)
+       VALUES ($1, $2, $3, $4, true, $5)
+       RETURNING *`,
+      [userId, deviceId, deviceInfo, tokenHash, expiresAt]
+    );
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export const getActiveSessionByUserId = async (
   userId: string
 ): Promise<UserSession | null> => {

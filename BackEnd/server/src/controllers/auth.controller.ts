@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { registerUser, loginUser } from "~/services/auth.service";
+import { registerUser, loginUser, logoutUser } from "~/services/auth.service";
 import { auditLogin } from "~/services/auditHelpers";
 
 export const registerController = async (req: Request, res: Response, next: NextFunction) => {
@@ -34,4 +34,26 @@ export const loginController = async (req: Request, res: Response, next: NextFun
     }
     next(err);
   }
+};
+
+export const logoutController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = String(req.headers.authorization || "");
+    if (!authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, message: "Token không hợp lệ" });
+    }
+    const token = authHeader.replace("Bearer ", "").trim();
+    await logoutUser(token);
+    return res.status(200).json({ success: true, message: "Đã đăng xuất" });
+  } catch (err: unknown) {
+    next(err);
+  }
+};
+
+export const sessionController = async (req: Request, res: Response) => {
+  const user = (req as Request & { user?: { userId: string; role: string } }).user;
+  return res.status(200).json({
+    success: true,
+    data: { valid: true, userId: user?.userId, role: user?.role },
+  });
 };

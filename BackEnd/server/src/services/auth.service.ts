@@ -11,10 +11,10 @@ import {
   User,
 } from "~/models/user.model";
 import {
-  createUserSession,
-  revokeAllSessionsByUserId,
+  replaceUserSession,
   getActiveSessionByUserId,
   verifySession,
+  revokeSessionByTokenHash,
 } from "~/models/user_session.model";
 
 if (!env.JWT_SECRET) {
@@ -88,9 +88,7 @@ export const loginUser = async (
   const existingSession = await getActiveSessionByUserId(user.id);
   const hasExistingSession = !!existingSession;
 
-  await revokeAllSessionsByUserId(user.id);
-
-  await createUserSession(user.id, deviceId, tokenHash, deviceInfo ?? null, expiresAt);
+  await replaceUserSession(user.id, deviceId, tokenHash, deviceInfo ?? null, expiresAt);
 
   const { hashed_password, ...publicUser } = user;
   return { token, user: publicUser, deviceId, hasExistingSession };
@@ -110,6 +108,11 @@ export const verifyTokenPayload = async (token: string): Promise<TokenPayload> =
   }
 
   return decoded;
+};
+
+export const logoutUser = async (token: string): Promise<void> => {
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  await revokeSessionByTokenHash(tokenHash);
 };
 
 export const changePasswordService = async (

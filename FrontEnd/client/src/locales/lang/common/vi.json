@@ -19,6 +19,7 @@
     "missing_fields": "Vui lòng nhập email và mật khẩu",
     "login_failed": "Đăng nhập thất bại, thử lại sau",
     "session_revoked_warning": "Tài khoản đang đăng nhập ở thiết bị khác. Phiên trên thiết bị đó đã bị kết thúc.",
+    "session_kicked": "Phiên đăng nhập đã kết thúc vì tài khoản được đăng nhập trên trình duyệt hoặc thiết bị khác. Vui lòng đăng nhập lại.",
     "socket_check_title": "Đang kiểm tra",
     "socket_check_desc": "Đang kiểm tra kết nối realtime (Socket.IO) tới API...",
     "socket_ok_title": "Realtime: thành công",

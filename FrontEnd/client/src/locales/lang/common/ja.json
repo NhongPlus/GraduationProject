@@ -19,6 +19,7 @@
     "missing_fields": "メールと パスワードを かいてください",
     "login_failed": "ログインできませんでした。あとで もういちど おねがいします",
     "session_revoked_warning": "このアカウントは きのう ほかの デバイスで ログインしました。その セッションは 終了されました。",
+    "session_kicked": "ほかのブラウザまたはデバイスでログインされたため、このセッションは終了しました。再度ログインしてください。",
     "socket_check_title": "かくにんちゅう",
     "socket_check_desc": "API への realtime (Socket.IO) せつぞくを かくにんちゅう...",
     "socket_ok_title": "Realtime: せいこう",

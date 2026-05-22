@@ -9,10 +9,10 @@ vi.mock("~/config/db", () => ({
 
 // Must mock BEFORE importing auth.service
 vi.mock("~/models/user_session.model", () => ({
-  createUserSession: vi.fn().mockResolvedValue({ id: "sess-1" }),
+  replaceUserSession: vi.fn().mockResolvedValue({ id: "sess-1" }),
   getActiveSessionByUserId: vi.fn().mockResolvedValue(null),
-  revokeAllSessionsByUserId: vi.fn().mockResolvedValue(undefined),
   verifySession: vi.fn().mockResolvedValue(true),
+  revokeSessionByTokenHash: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock env

@@ -19,6 +19,7 @@
     "missing_fields": "Please enter email and password",
     "login_failed": "Login failed, please try again later",
     "session_revoked_warning": "Your account was logged in on another device. The session on that device has been terminated.",
+    "session_kicked": "Your session ended because this account signed in on another browser or device. Please sign in again.",
     "socket_check_title": "Checking",
     "socket_check_desc": "Checking realtime (Socket.IO) connection to the API...",
     "socket_ok_title": "Realtime: connected",

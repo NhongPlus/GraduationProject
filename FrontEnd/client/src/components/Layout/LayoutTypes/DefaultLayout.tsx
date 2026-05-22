@@ -5,8 +5,10 @@ import Sidebar from '@/components/SideBar/SideBar';
 import { NavbarNested } from '@/components/NavBar/NavbarNested';
 import Views from '@/components/Layout/Views';
 import { useState } from 'react';
+import { useSessionGuard } from '@/hooks/useSessionGuard';
 
 const DefaultLayout = () => {
+  useSessionGuard();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isExamMode = pathname.startsWith('/exam/');

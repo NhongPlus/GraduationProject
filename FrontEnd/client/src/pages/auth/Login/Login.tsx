@@ -14,8 +14,8 @@ import {
 } from '@mantine/core';
 import { Carousel } from '@mantine/carousel';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import image from '@/assets/img/login.jpg';
 import classes from './Login.module.scss';
 import appConfig from '@/configs/app.config';
@@ -29,7 +29,14 @@ import { refreshAuthFromStorage } from '@/store/authSlice';
 function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    if (searchParams.get('session') === 'revoked') {
+      setWarning(t('login.session_kicked'));
+    }
+  }, [searchParams, t]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
