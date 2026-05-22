@@ -13,13 +13,13 @@ import {
 } from "~/services/subjectPrerequisite.service";
 import { httpError } from "~/services/exam.service";
 import { linkSubjectToCatalogGroup } from "~/services/subjectCatalogGroup.service";
+import { assignSubjectsToProgram } from "~/models/programCatalog.model";
 
 export async function createSubjectWithPrerequisites(
   input: CreateSubjectInput
 ): Promise<SubjectDetail> {
   const name = input.name?.trim();
   if (!name) throw httpError(400, "Tên môn học là bắt buộc");
-  if (!input.program_id) throw httpError(400, "Vui lòng chọn chuyên ngành cho môn học");
 
   let prerequisiteIds: string[] = [];
   if (input.prerequisite_ids?.length) {
@@ -29,9 +29,14 @@ export async function createSubjectWithPrerequisites(
   const linked = await linkSubjectToCatalogGroup({
     ...input,
     name,
+    program_id: null,
     prerequisite_ids: prerequisiteIds,
   });
   const created = await createSubject(linked);
+  const programId = input.program_id?.trim();
+  if (programId) {
+    await assignSubjectsToProgram(programId, [created.id]);
+  }
   return attachPrerequisites(created);
 }
 

@@ -12,7 +12,11 @@ import {
 } from "~/services/subject.service";
 import { deleteSubject, deleteSubjectsByIds } from "~/models/subject.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
-import { getSubjectCatalog, getSubjectPickerCatalog } from "~/services/subjectCatalog.service";
+import {
+  getSubjectCatalog,
+  getSubjectPickerCatalog,
+  getSubjectWarehouseCatalog,
+} from "~/services/subjectCatalog.service";
 import { getSubjectIdsForCatalogGroup } from "~/services/subjectCatalogGroup.service";
 import {
   buildSubjectImportTemplateBuffer,
@@ -26,7 +30,21 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 router.use(authMiddleware);
 
-/** GET /v1/subjects/catalog — một API đọc: nhóm môn + môn theo chuyên ngành */
+/** GET /v1/subjects/warehouse — kho nhóm môn + môn (master) */
+router.get(
+  "/warehouse",
+  roleMiddleware(["admin"]),
+  async (_req, res, next) => {
+    try {
+      const data = await getSubjectWarehouseCatalog();
+      res.json({ success: true, data });
+    } catch (err: unknown) {
+      next(err);
+    }
+  }
+);
+
+/** GET /v1/subjects/catalog — CTĐT một ngành: nhóm + môn đã gán / kế thừa base */
 router.get(
   "/catalog",
   roleMiddleware(["admin", "teacher", "student"]),

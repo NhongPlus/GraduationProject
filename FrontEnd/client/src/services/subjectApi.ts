@@ -70,6 +70,8 @@ export type SubjectCatalogSubject = {
 };
 
 /** Nhóm môn + môn — GET /subjects/catalog */
+export type GroupScope = 'base' | 'shared' | 'catalog';
+
 export type SubjectCatalogGroup = {
   id: string;
   code: string;
@@ -78,7 +80,15 @@ export type SubjectCatalogGroup = {
   description: string | null;
   sort_order: number;
   subject_count: number;
+  group_scope?: GroupScope;
+  is_inherited_base?: boolean;
+  is_assigned?: boolean;
   subjects: SubjectCatalogSubject[];
+};
+
+export type WarehouseCatalogResponse = {
+  groups: SubjectCatalogGroup[];
+  total_subjects: number;
 };
 
 export type SubjectCatalogResponse = {
@@ -253,6 +263,14 @@ const subjectApi = {
       subject_group_id: subjectGroupId,
       rows,
     });
+    return res.data.data;
+  },
+
+  getWarehouse: async (options?: { refresh?: boolean }): Promise<WarehouseCatalogResponse> => {
+    const res = await apiClient.get<{ success: boolean; data: WarehouseCatalogResponse }>(
+      '/subjects/warehouse',
+      { params: options?.refresh ? { _t: Date.now() } : undefined }
+    );
     return res.data.data;
   },
 

@@ -192,9 +192,9 @@ export async function confirmSubjectImport(
 ): Promise<{ created: number; failed: Array<{ name: string; reason: string }> }> {
   const group = await getSubjectGroupById(subjectGroupId);
   if (!group) throw new Error("Không tìm thấy nhóm môn");
-  if (group.program_id !== programId) {
-    throw new Error("Nhóm môn không thuộc chuyên ngành đã chọn");
-  }
+
+  const { assignGroupsToProgram } = await import("~/models/programCatalog.model");
+  await assignGroupsToProgram(programId, [subjectGroupId]);
 
   let created = 0;
   const failed: Array<{ name: string; reason: string }> = [];
@@ -204,8 +204,8 @@ export async function confirmSubjectImport(
     if (!name) continue;
     try {
       const existing = await getSubjectByName(name);
-      if (existing && existing.program_id === programId) {
-        failed.push({ name, reason: "Tên môn đã tồn tại" });
+      if (existing) {
+        failed.push({ name, reason: "Tên môn đã có trong kho" });
         continue;
       }
       await createSubjectWithPrerequisites({

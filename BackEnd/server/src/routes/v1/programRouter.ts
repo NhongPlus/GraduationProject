@@ -13,6 +13,14 @@ import {
   type UpdateProgramInput,
 } from "~/models/program.model";
 import pool from "~/config/db";
+import {
+  assignProgramGroupsController,
+  unassignProgramGroupController,
+  assignProgramSubjectsController,
+  unassignProgramSubjectController,
+  applyProgramBaseGroupsController,
+} from "~/controllers/programCatalog.controller";
+import { applyBaseGroupsToProgram } from "~/models/programCatalog.model";
 
 const router = Router();
 
@@ -27,6 +35,12 @@ router.get("/", async (_req, res, next) => {
     next(err);
   }
 });
+
+router.post("/:id/catalog/apply-base", applyProgramBaseGroupsController);
+router.post("/:id/catalog/assign-groups", assignProgramGroupsController);
+router.delete("/:id/catalog/groups/:groupId", unassignProgramGroupController);
+router.post("/:id/catalog/assign-subjects", assignProgramSubjectsController);
+router.delete("/:id/catalog/subjects/:subjectId", unassignProgramSubjectController);
 
 router.get("/:id/teachers", async (req, res, next) => {
   try {
@@ -71,6 +85,7 @@ router.post("/", async (req, res, next) => {
       return;
     }
     const program = await createProgram(body);
+    await applyBaseGroupsToProgram(program.id);
     res.status(201).json({ success: true, data: program });
   } catch (err: unknown) {
     const pg = err as { code?: string };
@@ -103,7 +118,18 @@ router.patch("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const count = await pool.query<{ c: number }>(
-      "SELECT COUNT(*)::int AS c FROM subjects WHERE program_id = $1",
+      `SELECT COUNT(DISTINCT s.id)::int AS c
+       FROM subjects s
+       LEFT JOIN subject_groups sg ON sg.id = s.subject_group_id
+       LEFT JOIN program_subject_groups psg
+         ON psg.subject_group_id = sg.id AND psg.program_id = $1
+       LEFT JOIN program_subjects ps ON ps.subject_id = s.id AND ps.program_id = $1
+       WHERE s.is_active = true
+         AND (
+           sg.group_scope = 'base'
+           OR psg.program_id IS NOT NULL
+           OR ps.program_id IS NOT NULL
+         )`,
       [req.params.id]
     );
     if ((count.rows[0]?.c ?? 0) > 0) {

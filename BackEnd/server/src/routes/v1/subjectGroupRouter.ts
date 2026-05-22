@@ -53,12 +53,18 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const body = req.body as CreateSubjectGroupInput;
-    if (!body.program_id || !body.code?.trim() || !body.name?.trim()) {
-      res.status(400).json({ success: false, error: "program_id, code, name là bắt buộc" });
+    const body = req.body as CreateSubjectGroupInput & { program_id?: string };
+    if (!body.code?.trim() || !body.name?.trim()) {
+      res.status(400).json({ success: false, error: "code, name là bắt buộc" });
       return;
     }
-    const group = await createSubjectGroup(body);
+    const group = await createSubjectGroup({
+      code: body.code,
+      name: body.name,
+      description: body.description,
+      sort_order: body.sort_order,
+      group_scope: body.group_scope,
+    });
     res.status(201).json({ success: true, data: group });
   } catch (err: unknown) {
     const pg = err as { code?: string };

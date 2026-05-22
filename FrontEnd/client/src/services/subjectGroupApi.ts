@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
-import subjectApi, { getSubjectCatalog, type SubjectCatalogGroup } from './subjectApi';
+import programApi from './programApi';
+import subjectApi, { getSubjectCatalog, type GroupScope, type SubjectCatalogGroup } from './subjectApi';
 
 export interface SubjectGroupDto {
   id: string;
@@ -38,18 +39,32 @@ const subjectGroupApi = {
   },
 
   create: async (payload: {
-    program_id: string;
     code: string;
     name: string;
     description?: string | null;
     sort_order?: number;
+    group_scope?: GroupScope;
+    /** Gán ngay vào CTĐT ngành sau khi tạo trong kho */
+    assign_to_program_id?: string;
   }): Promise<SubjectGroupDto> => {
     const res = await apiClient.post<{ success: boolean; data: SubjectGroupDto }>(
       '/subject-groups',
-      payload
+      {
+        code: payload.code,
+        name: payload.name,
+        description: payload.description,
+        sort_order: payload.sort_order,
+        group_scope: payload.group_scope,
+      }
     );
-    subjectApi.resetCatalogCache(payload.program_id);
-    return res.data.data;
+    const group = res.data.data;
+    if (payload.assign_to_program_id) {
+      await programApi.assignGroups(payload.assign_to_program_id, [group.id]);
+      subjectApi.resetCatalogCache(payload.assign_to_program_id);
+    } else {
+      subjectApi.resetCatalogCache();
+    }
+    return group;
   },
 
   update: async (

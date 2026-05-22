@@ -1,5 +1,5 @@
 import pool from "~/config/db";
-import { getSubjectGroupById, getSubjectGroupByProgramAndCode } from "~/models/subjectGroup.model";
+import { getSubjectGroupById, getSubjectGroupByCode } from "~/models/subjectGroup.model";
 import type { CreateSubjectInput, UpdateSubjectInput } from "~/models/subject.model";
 
 const UUID_RE =
@@ -39,14 +39,18 @@ export async function getSubjectIdsForCatalogGroup(
 export async function linkSubjectToCatalogGroup<T extends CreateSubjectInput | UpdateSubjectInput>(
   input: T
 ): Promise<T> {
-  const programId = input.program_id;
-  const code =
-    input.sub_category?.trim() ||
-    (input.subject_group_id
-      ? (await getSubjectGroupById(input.subject_group_id))?.code
-      : undefined);
-  if (!programId || !code) return input;
-  const row = await getSubjectGroupByProgramAndCode(programId, code);
+  if (input.subject_group_id) {
+    const row = await getSubjectGroupById(input.subject_group_id);
+    if (row) {
+      return {
+        ...input,
+        sub_category: row.code,
+      };
+    }
+  }
+  const code = input.sub_category?.trim();
+  if (!code) return input;
+  const row = await getSubjectGroupByCode(code);
   if (!row) return input;
   return {
     ...input,

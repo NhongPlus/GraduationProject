@@ -21,10 +21,22 @@ export interface ProgramTeacherRef {
 export async function getAllPrograms(): Promise<Program[]> {
   const r = await pool.query<Program & { subject_count: string; teacher_count: string }>(
     `SELECT p.*,
-            COUNT(DISTINCT s.id)::int AS subject_count,
+            (
+              SELECT COUNT(DISTINCT s.id)::int
+              FROM subjects s
+              LEFT JOIN subject_groups sg ON sg.id = s.subject_group_id
+              LEFT JOIN program_subject_groups psg
+                ON psg.subject_group_id = sg.id AND psg.program_id = p.id
+              LEFT JOIN program_subjects ps ON ps.subject_id = s.id AND ps.program_id = p.id
+              WHERE s.is_active = true
+                AND (
+                  sg.group_scope = 'base'
+                  OR psg.program_id IS NOT NULL
+                  OR ps.program_id IS NOT NULL
+                )
+            ) AS subject_count,
             COUNT(DISTINCT pt.teacher_id)::int AS teacher_count
      FROM programs p
-     LEFT JOIN subjects s ON s.program_id = p.id
      LEFT JOIN program_teachers pt ON pt.program_id = p.id
      GROUP BY p.id
      ORDER BY p.name ASC`

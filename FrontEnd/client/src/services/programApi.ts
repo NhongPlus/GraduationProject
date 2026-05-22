@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import type { SubjectCatalogResponse } from './subjectApi';
 
 export interface ProgramDto {
   id: string;
@@ -63,6 +64,40 @@ const programApi = {
       { teacher_ids: teacherIds }
     );
     return res.data.data;
+  },
+
+  applyBaseGroups: async (programId: string): Promise<SubjectCatalogResponse> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { catalog: SubjectCatalogResponse };
+    }>(`/programs/${programId}/catalog/apply-base`);
+    return res.data.data.catalog;
+  },
+
+  assignGroups: async (
+    programId: string,
+    groupIds: string[]
+  ): Promise<SubjectCatalogResponse> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { catalog: SubjectCatalogResponse };
+    }>(`/programs/${programId}/catalog/assign-groups`, { group_ids: groupIds });
+    return res.data.data.catalog;
+  },
+
+  assignSubjects: async (
+    programId: string,
+    subjectIds: string[]
+  ): Promise<SubjectCatalogResponse> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { catalog: SubjectCatalogResponse };
+    }>(`/programs/${programId}/catalog/assign-subjects`, { subject_ids: subjectIds });
+    return res.data.data.catalog;
+  },
+
+  unassignGroup: async (programId: string, groupId: string): Promise<void> => {
+    await apiClient.delete(`/programs/${programId}/catalog/groups/${groupId}`);
   },
 };
 

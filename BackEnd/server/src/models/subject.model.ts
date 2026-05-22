@@ -56,8 +56,21 @@ export const querySubjectsPaginated = async (
   let idx = 1;
 
   if (programId) {
-    conditions.push(`program_id = $${idx++}`);
+    conditions.push(`(
+      EXISTS (
+        SELECT 1 FROM subject_groups sg
+        LEFT JOIN program_subject_groups psg
+          ON psg.subject_group_id = sg.id AND psg.program_id = $${idx}
+        WHERE sg.id = subjects.subject_group_id
+          AND (sg.group_scope = 'base' OR psg.program_id IS NOT NULL)
+      )
+      OR EXISTS (
+        SELECT 1 FROM program_subjects ps
+        WHERE ps.subject_id = subjects.id AND ps.program_id = $${idx}
+      )
+    )`);
     values.push(programId);
+    idx++;
   }
 
   if (catalogGroup && (catalogGroup.subjectIds.length > 0 || catalogGroup.code)) {

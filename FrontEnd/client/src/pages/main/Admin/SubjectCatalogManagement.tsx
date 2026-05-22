@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Title,
@@ -29,10 +29,13 @@ import {
 import { IconPlus, IconTrash, IconEdit, IconSearch, IconFolders, IconDownload, IconUpload } from '@tabler/icons-react';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
-import subjectApi, { type SubjectImportPreviewRow } from '@/services/subjectApi';
+import subjectApi, {
+  type SubjectImportPreviewRow,
+  resetSubjectCatalogCache,
+} from '@/services/subjectApi';
 import programApi, { type ProgramDto } from '@/services/programApi';
 import subjectGroupApi, { type SubjectGroupDto } from '@/services/subjectGroupApi';
-import { resetSubjectCatalogCache } from '@/services/subjectApi';
+import AssignFromWarehouseModal from './AssignFromWarehouseModal';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 
@@ -163,6 +166,8 @@ const SubjectCatalogManagementPage = () => {
   const [importPreview, setImportPreview] = useState<SubjectImportPreviewRow[]>([]);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [programSubjects, setProgramSubjects] = useState<Subject[]>([]);
 
   const loadPrograms = useCallback(async () => {
     try {
@@ -215,6 +220,25 @@ const SubjectCatalogManagementPage = () => {
           })
         );
       setGroups(list);
+      const flat: Subject[] = [];
+      for (const g of catalog.groups) {
+        for (const s of g.subjects) {
+          flat.push({
+            id: s.id,
+            name: s.name,
+            code: s.code,
+            credits: s.credits,
+            semester: s.semester,
+            category: s.category,
+            sub_category: s.sub_category,
+            subject_group_id: s.subject_group_id,
+            program_id: catalog.program_id,
+            is_active: true,
+            created_at: '',
+          });
+        }
+      }
+      setProgramSubjects(flat);
       setSelectedGroupId((prev) => {
         if (prev && list.some((g) => g.id === prev)) return prev;
         return null;
@@ -431,10 +455,10 @@ const SubjectCatalogManagementPage = () => {
         setNotice('Đã cập nhật nhóm môn.');
       } else {
         const created = await subjectGroupApi.create({
-          program_id: selectedProgramId,
           code: groupCode.trim(),
           name: groupName.trim(),
           description: groupDesc.trim() || null,
+          assign_to_program_id: selectedProgramId,
         });
         setSelectedGroupId(created.id);
         setActiveTab('subjects');
@@ -453,11 +477,12 @@ const SubjectCatalogManagementPage = () => {
   };
 
   const handleDeleteGroup = async (g: SubjectGroupDto) => {
-    if (!confirm(`Xóa nhóm «${g.name}»?`)) return;
+    if (!selectedProgramId) return;
+    if (!confirm(`Gỡ nhóm «${g.name}» khỏi chương trình ngành này? (Môn vẫn còn trong kho trường)`)) return;
     try {
-      await subjectGroupApi.delete(g.id, selectedProgramId ?? undefined);
+      await programApi.unassignGroup(selectedProgramId, g.id);
       if (selectedGroupId === g.id) setSelectedGroupId(null);
-      setNotice('Đã xóa nhóm môn.');
+      setNotice('Đã gỡ nhóm khỏi ngành.');
       refreshCatalog();
       void loadGroups();
     } catch (e: unknown) {
@@ -471,13 +496,16 @@ const SubjectCatalogManagementPage = () => {
     label: `${p.code} — ${p.name} (${p.subject_count ?? 0} môn)`,
   }));
 
-  const subjectsInProgram = selectedProgramId
-    ? allSubjects.filter((s) => s.program_id === selectedProgramId)
-    : [];
+  const subjectsInProgram = programSubjects;
 
   const subjectsInGroup = selectedGroupId
     ? subjectsInProgram.filter((s) => s.subject_group_id === selectedGroupId)
     : subjectsInProgram;
+
+  const assignedGroupIds = useMemo(
+    () => new Set(groups.map((g) => g.id)),
+    [groups]
+  );
 
   const groupOptions = groups.map((g) => ({
     value: g.id,
@@ -571,13 +599,20 @@ const SubjectCatalogManagementPage = () => {
           <Box>
             <Title order={2}>Quản lý nhóm môn & môn học</Title>
             <Text c="dimmed" size="sm" mt={4}>
-              CRUD nhóm môn & môn học — đọc đồng bộ qua GET /subjects/catalog.
+              Kho trường (nhóm + môn) — ngành chỉ gán từ kho qua GET /subjects/catalog.
             </Text>
           </Box>
-          {activeTab === 'groups' && selectedProgramId && (
-            <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
-              Thêm nhóm môn
-            </Button>
+          {selectedProgramId && (
+            <Group gap="sm">
+              <Button variant="light" onClick={() => setAssignOpen(true)}>
+                Chọn từ kho
+              </Button>
+              {activeTab === 'groups' && (
+                <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
+                  Thêm nhóm (kho + gán ngành)
+                </Button>
+              )}
+            </Group>
           )}
           {activeTab === 'subjects' && (
             <Group gap="sm">
@@ -1067,6 +1102,22 @@ const SubjectCatalogManagementPage = () => {
           </Group>
         </Stack>
       </Modal>
+
+      {selectedProgramId && selectedProgram && (
+        <AssignFromWarehouseModal
+          opened={assignOpen}
+          onClose={() => setAssignOpen(false)}
+          programId={selectedProgramId}
+          programName={selectedProgram.name}
+          assignedGroupIds={assignedGroupIds}
+          onAssigned={() => {
+            refreshCatalog();
+            void loadGroups();
+            void loadPrograms();
+            void fetchSubjects();
+          }}
+        />
+      )}
     </Box>
   );
 };
@@ -1137,7 +1188,7 @@ function SubjectForm({
   const selectedFormGroup = formGroups.find((g) => g.id === subjectGroupId);
 
   const prereqOptions = allSubjects
-    .filter((s) => s.id !== initial?.id && s.program_id === programId)
+    .filter((s) => s.id !== initial?.id)
     .filter((s) => !subjectGroupId || s.subject_group_id === subjectGroupId)
     .map((s) => ({
       value: s.id,

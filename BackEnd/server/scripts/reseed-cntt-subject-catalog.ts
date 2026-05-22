@@ -115,27 +115,43 @@ const SUBJECTS: SubjectSeed[] = [
   },
 ];
 
+const BASE_GROUP_CODES = new Set(["pe", "defense", "english", "philosophy"]);
+
+function scopeForGroup(code: string): "base" | "shared" | "catalog" {
+  if (BASE_GROUP_CODES.has(code)) return "base";
+  if (["math", "programming", "software", "ai_iot", "network", "software_eng"].includes(code)) {
+    return "shared";
+  }
+  return "catalog";
+}
+
 async function clearCnttCatalog(programId: string): Promise<void> {
   const subjRes = await pool.query<{ id: string }>(
-    `SELECT id FROM subjects WHERE program_id = $1 OR program_id IS NULL`,
+    `SELECT s.id FROM subjects s
+     LEFT JOIN program_subjects ps ON ps.subject_id = s.id AND ps.program_id = $1
+     LEFT JOIN subject_groups sg ON sg.id = s.subject_group_id
+     LEFT JOIN program_subject_groups psg
+       ON psg.subject_group_id = sg.id AND psg.program_id = $1
+     WHERE ps.program_id IS NOT NULL OR psg.program_id IS NOT NULL`,
     [programId]
   );
   const subjectIds = subjRes.rows.map((r) => r.id);
-  if (subjectIds.length === 0) {
-    await pool.query(`DELETE FROM subject_groups WHERE program_id = $1`, [programId]);
-    return;
+
+  if (subjectIds.length > 0) {
+    await pool.query(
+      `DELETE FROM exams
+       WHERE subject_id = ANY($1::uuid[])
+          OR class_id IN (SELECT id FROM classes WHERE subject_id = ANY($1::uuid[]))`,
+      [subjectIds]
+    );
+    await pool.query(`DELETE FROM question_bank WHERE subject_id = ANY($1::uuid[])`, [subjectIds]);
+    await pool.query(`DELETE FROM classes WHERE subject_id = ANY($1::uuid[])`, [subjectIds]);
   }
 
-  await pool.query(
-    `DELETE FROM exams
-     WHERE subject_id = ANY($1::uuid[])
-        OR class_id IN (SELECT id FROM classes WHERE subject_id = ANY($1::uuid[]))`,
-    [subjectIds]
-  );
-  await pool.query(`DELETE FROM question_bank WHERE subject_id = ANY($1::uuid[])`, [subjectIds]);
-  await pool.query(`DELETE FROM classes WHERE subject_id = ANY($1::uuid[])`, [subjectIds]);
-  await pool.query(`DELETE FROM subjects WHERE id = ANY($1::uuid[])`, [subjectIds]);
-  await pool.query(`DELETE FROM subject_groups WHERE program_id = $1`, [programId]);
+  await pool.query(`DELETE FROM program_subjects WHERE program_id = $1`, [programId]);
+  await pool.query(`DELETE FROM program_subject_groups WHERE program_id = $1`, [programId]);
+  await pool.query(`DELETE FROM subjects`);
+  await pool.query(`DELETE FROM subject_groups`);
 }
 
 async function main() {
@@ -157,14 +173,15 @@ async function main() {
 
     const groupIdByCode = new Map<string, string>();
     for (const g of GROUPS) {
+      const scope = scopeForGroup(g.code);
       const ins = await client.query<{ id: string }>(
-        `INSERT INTO subject_groups (program_id, code, name, description, sort_order)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO subject_groups (program_id, code, name, description, sort_order, group_scope)
+         VALUES (NULL, $1, $2, $3, $4, $5)
          RETURNING id`,
-        [programId, g.code, g.name, g.description ?? null, g.sort_order]
+        [g.code, g.name, g.description ?? null, g.sort_order, scope]
       );
       groupIdByCode.set(g.code, ins.rows[0].id);
-      console.log(`  + Nhóm: ${g.name} (${g.code})`);
+      console.log(`  + Kho nhóm: ${g.name} (${g.code}, ${scope})`);
     }
 
     let subjectCount = 0;
@@ -173,7 +190,7 @@ async function main() {
       if (!groupId) throw new Error(`Missing group ${s.groupCode}`);
       await client.query(
         `INSERT INTO subjects (name, code, credits, semester, category, sub_category, subject_group_id, program_id, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, true)`,
         [
           s.name,
           s.code,
@@ -182,14 +199,29 @@ async function main() {
           s.category,
           s.groupCode,
           groupId,
-          programId,
         ]
       );
       subjectCount += 1;
     }
 
+    for (const [, groupId] of groupIdByCode) {
+      await client.query(
+        `INSERT INTO program_subject_groups (program_id, subject_group_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [programId, groupId]
+      );
+    }
+
+    await client.query(
+      `INSERT INTO program_subjects (program_id, subject_id)
+       SELECT $1, s.id FROM subjects s
+       ON CONFLICT DO NOTHING`,
+      [programId]
+    );
+
     await client.query("COMMIT");
-    console.log(`\nĐã seed ${GROUPS.length} nhóm, ${subjectCount} môn cho CNTT.`);
+    console.log(`\nĐã seed kho: ${GROUPS.length} nhóm, ${subjectCount} môn; gán toàn bộ cho CNTT.`);
     console.log("Lưu ý: Đề thi / ngân hàng câu hỏi gắn môn cũ đã bị xóa theo môn CNTT.");
   } catch (e) {
     await client.query("ROLLBACK");

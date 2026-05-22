@@ -190,14 +190,36 @@ async function main() {
   console.log("   ✓ Đã xóa exams, questions, sessions cũ");
 
   console.log("2. Tạo/cập nhật 6 môn học...");
+  const progR = await pool.query<{ id: string }>(
+    `SELECT id FROM programs WHERE code = 'CNTT' LIMIT 1`
+  );
+  const programId: string | null = progR.rows[0]?.id ?? null;
+
   const subjectIds = new Map<string, string>();
   for (const s of SUBJECTS) {
-    const r = await pool.query(
-      `INSERT INTO subjects (name, code, credits, category)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (name) DO UPDATE SET code = $2, credits = $3, category = $4
+    const byCode = await pool.query<{ id: string }>(
+      `SELECT id FROM subjects WHERE code = $1 LIMIT 1`,
+      [s.code]
+    );
+    if (byCode.rows[0]) {
+      subjectIds.set(s.code, byCode.rows[0].id);
+      continue;
+    }
+    const byName = await pool.query<{ id: string }>(
+      programId
+        ? `SELECT id FROM subjects WHERE program_id = $1 AND name = $2 LIMIT 1`
+        : `SELECT id FROM subjects WHERE name = $1 LIMIT 1`,
+      programId ? [programId, s.name] : [s.name]
+    );
+    if (byName.rows[0]) {
+      subjectIds.set(s.code, byName.rows[0].id);
+      continue;
+    }
+    const r = await pool.query<{ id: string }>(
+      `INSERT INTO subjects (name, code, credits, category, program_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [s.name, s.code, s.credits, s.category]
+      [s.name, s.code, s.credits, s.category, programId]
     );
     subjectIds.set(s.code, r.rows[0].id);
   }
