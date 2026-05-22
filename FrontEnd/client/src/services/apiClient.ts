@@ -1,6 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import appConfig from '@/configs/app.config';
-import { clearClientSession } from '@/services/clearClientSession';
+import { kickToLogin } from '@/services/kickToLogin';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
@@ -22,25 +22,17 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-function shouldRedirectOn401(url: string | undefined): boolean {
-  if (!url) return true;
-  if (url.includes('/auth/login')) return false;
-  const path = window.location.pathname;
-  return !path.startsWith('/login');
-}
-
 // Xử lý 401 → xóa session đầy đủ (kể cả redux-persist) và về trang đăng nhập
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
+      const url = error.config?.url ?? '';
       const message =
         (error.response?.data as { message?: string } | undefined)?.message ?? '';
       const revokedElsewhere = message.includes('thiết bị khác');
-      await clearClientSession();
-      if (shouldRedirectOn401(error.config?.url)) {
-        const qs = revokedElsewhere ? '?session=revoked' : '';
-        window.location.replace(`/login${qs}`);
+      if (!url.includes('/auth/login')) {
+        await kickToLogin(revokedElsewhere);
       }
     }
     return Promise.reject(error);

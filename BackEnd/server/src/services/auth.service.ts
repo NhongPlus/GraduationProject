@@ -16,6 +16,7 @@ import {
   verifySession,
   revokeSessionByTokenHash,
 } from "~/models/user_session.model";
+import { notifySessionRevoked } from "~/socket/sessionNotify";
 
 if (!env.JWT_SECRET) {
   throw new Error("JWT_SECRET is required in environment variables");
@@ -89,6 +90,7 @@ export const loginUser = async (
   const hasExistingSession = !!existingSession;
 
   await replaceUserSession(user.id, deviceId, tokenHash, deviceInfo ?? null, expiresAt);
+  notifySessionRevoked(user.id);
 
   const { hashed_password, ...publicUser } = user;
   return { token, user: publicUser, deviceId, hasExistingSession };

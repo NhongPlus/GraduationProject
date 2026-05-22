@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { verifyTokenPayload } from "~/services/auth.service";
+import { bindSessionNotifyServer, userRoom } from "~/socket/sessionNotify";
 import { getExamById } from "~/models/exam.model";
 import { forceSubmitActiveSessionsByExamService } from "~/services/exam.service";
 import { saveExamRuntimeStart, saveExamRuntimeEnd, restoreExamRuntimes, getRuntimeStateByExam } from "~/models/examRuntimeState.model";
@@ -217,6 +218,7 @@ function startExamRuntime(io: Server, examId: string, durationMin: number): Exam
  */
 export function registerExamSocket(io: Server): void {
   ioInstance = io;
+  bindSessionNotifyServer(io);
   io.use(async (socket, next) => {
     const token = readToken(socket);
     if (!token) {
@@ -239,6 +241,8 @@ export function registerExamSocket(io: Server): void {
     const ipAddress = socket.handshake.address;
     const userAgent = socket.handshake.headers["user-agent"] ?? undefined;
     console.log(`[socket] connect id=${socket.id} user=${userId} role=${role} ip=${ipAddress}`);
+
+    void socket.join(userRoom(userId));
 
     socket.emit("exam:welcome", {
       socketId: socket.id,
