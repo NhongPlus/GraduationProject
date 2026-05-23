@@ -111,6 +111,9 @@ export const updateUserService = async (
   if (fields.password !== undefined && String(fields.password).length > 0) {
     patch.hashed_password = await bcrypt.hash(String(fields.password), 12);
     patch.password_plain = String(fields.password);
+    if (existing.role === "student" || existing.role === "teacher") {
+      patch.first_login = true;
+    }
   }
 
   const user = await updateUser(id, patch);

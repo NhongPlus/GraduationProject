@@ -108,8 +108,8 @@ export const addStudentController = async (req: Request, res: Response, next: Ne
 
     const hashed = await bcrypt.hash(password, 12);
     const r = await pool.query<StudentRow>(
-      `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, admin_class_id)
-       VALUES ($1, $2, $3, $4, 'student', $5, $6)
+      `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, admin_class_id, first_login)
+       VALUES ($1, $2, $3, $4, 'student', $5, $6, true)
        RETURNING ${STUDENT_RETURN_COLS}`,
       [email, username, hashed, password, full_name ?? null, adminClassId]
     );
@@ -163,6 +163,8 @@ export const updateStudentController = async (req: Request, res: Response, next:
       vals.push(await bcrypt.hash(String(password), 12));
       sets.push(`password_plain = $${i++}`);
       vals.push(String(password));
+      sets.push(`first_login = $${i++}`);
+      vals.push(true);
     }
     if (sets.length === 0) {
       return res.status(400).json({ success: false, message: "Không có gì để cập nhật" });

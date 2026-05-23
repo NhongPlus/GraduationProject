@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Stack, Text, Title, Alert } from '@mantine/core';
+import { Modal, Stack, Text, Alert } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import appConfig from '@/configs/app.config';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
@@ -51,42 +51,52 @@ const ChangePasswordRequired = () => {
   };
 
   return (
-    <Box className="min-h-[calc(100vh-80px)] flex items-center justify-center p-4">
-      <Paper withBorder radius="md" p="xl" maw={440} w="100%">
-        <Stack gap="md">
-          <Title order={3}>{t('first_login.title')}</Title>
-          <Text size="sm" c="dimmed">
-            {t('first_login.description')}
-          </Text>
-          {error && (
-            <Alert color="red" variant="light">
-              {error}
-            </Alert>
-          )}
-          <InputPassword
-            label={t('first_login.current_password')}
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-          />
-          <InputPassword
-            label={t('first_login.new_password')}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.currentTarget.value)}
-          />
-          <InputPassword
-            label={t('first_login.confirm_password')}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.currentTarget.value)}
-          />
-          <ButtonFilled
-            label={t('first_login.submit')}
-            disabled={loading}
-            onClick={() => void handleSubmit()}
-            color="teal"
-          />
-        </Stack>
-      </Paper>
-    </Box>
+    <Modal
+      opened
+      onClose={() => {}}
+      centered
+      size={440}
+      radius="md"
+      padding="xl"
+      title={t('first_login.title')}
+      withCloseButton={false}
+      closeOnClickOutside={false}
+      closeOnEscape={false}
+      overlayProps={{ backgroundOpacity: 0.9 }}
+      zIndex={1000}
+    >
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          {t('first_login.description')}
+        </Text>
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
+        <InputPassword
+          label={t('first_login.current_password')}
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+        />
+        <InputPassword
+          label={t('first_login.new_password')}
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.currentTarget.value)}
+        />
+        <InputPassword
+          label={t('first_login.confirm_password')}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+        />
+        <ButtonFilled
+          label={t('first_login.submit')}
+          disabled={loading}
+          onClick={() => void handleSubmit()}
+          color="teal"
+        />
+      </Stack>
+    </Modal>
   );
 };
 

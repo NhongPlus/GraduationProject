@@ -68,16 +68,17 @@ async function main() {
     );
     if (existing.rows.length > 0) {
       await pool.query(
-        `UPDATE accounts SET admin_class_id = $1, password_plain = COALESCE(password_plain, 'Test@123')
-         WHERE (email = $2 OR username = $3)`,
+        `UPDATE accounts SET admin_class_id = $1, password_plain = COALESCE(password_plain, 'Test@123'),
+                first_login = true
+         WHERE (email = $2 OR username = $3) AND role = 'student'`,
         [adminClassId, email, username]
       );
       skipped++;
       continue;
     }
     await pool.query(
-      `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, admin_class_id)
-       VALUES ($1, $2, $3, 'Test@123', 'student', $4, $5)`,
+      `INSERT INTO accounts (email, username, hashed_password, password_plain, role, full_name, admin_class_id, first_login)
+       VALUES ($1, $2, $3, 'Test@123', 'student', $4, $5, true)`,
       [email, username, defaultHash, s.name, adminClassId]
     );
     created++;

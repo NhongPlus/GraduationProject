@@ -182,6 +182,7 @@ export const updateUser = async (
     "email",
     "hashed_password",
     "password_plain",
+    "first_login",
   ];
   const keys = allowed.filter((k) => fields[k] !== undefined);
   if (keys.length === 0) return null;
