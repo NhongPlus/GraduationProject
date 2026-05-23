@@ -65,7 +65,6 @@ const Profile = () => {
       setConfirmPassword('');
       setMessage(t('profile.password_changed'));
       setMessageIsError(false);
-      localStorage.setItem('first_login', 'false');
     } catch (e: unknown) {
       const apiMsg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setMessage(apiMsg || t('profile.change_password_error'));

@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
 import apiClient from '@/services/apiClient';
+import { fetchSession } from '@/services/authApi';
 import useAuth from '@/hooks/useAuth';
 import { connectAuthSessionSocket } from '@/services/authSessionSocket';
+import { redirectToPasswordChange } from '@/services/redirectToPasswordChange';
 
 /** Dự phòng nếu socket chưa kết nối — vẫn phát hiện phiên bị thu hồi trong vài giây. */
 const SESSION_CHECK_MS = 5_000;
@@ -19,9 +21,15 @@ export function useSessionGuard(): void {
     let socket: Socket | null = connectAuthSessionSocket(accessToken);
 
     const check = () => {
-      void apiClient.get('/auth/session').catch(() => {
-        /* 401 → apiClient interceptor */
-      });
+      void fetchSession()
+        .then((session) => {
+          if (session.requires_password_change) {
+            redirectToPasswordChange();
+          }
+        })
+        .catch(() => {
+          /* 401 → apiClient interceptor */
+        });
     };
 
     check();

@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import appConfig from '@/configs/app.config';
 import { kickToLogin } from '@/services/kickToLogin';
+import { redirectToPasswordChange } from '@/services/redirectToPasswordChange';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 
@@ -26,10 +27,16 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    const url = error.config?.url ?? '';
+    const body = error.response?.data as { code?: string; message?: string } | undefined;
+
+    if (error.response?.status === 403 && body?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      redirectToPasswordChange();
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401) {
-      const url = error.config?.url ?? '';
-      const message =
-        (error.response?.data as { message?: string } | undefined)?.message ?? '';
+      const message = body?.message ?? '';
       const revokedElsewhere = message.includes('thiết bị khác');
       if (!url.includes('/auth/login')) {
         await kickToLogin(revokedElsewhere);

@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import { registerUser, loginUser, logoutUser } from "~/services/auth.service";
+import {
+  loginUser,
+  logoutUser,
+  registerUser,
+  type TokenPayload,
+} from "~/services/auth.service";
+import { mustChangePassword } from "~/middlewares/firstLogin.middleware";
 import { auditLogin } from "~/services/auditHelpers";
 
 export const registerController = async (req: Request, res: Response, next: NextFunction) => {
@@ -51,9 +57,19 @@ export const logoutController = async (req: Request, res: Response, next: NextFu
 };
 
 export const sessionController = async (req: Request, res: Response) => {
-  const user = (req as Request & { user?: { userId: string; role: string } }).user;
+  const payload = (req as Request & { user?: TokenPayload }).user;
+  if (!payload?.userId) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+  const requires_password_change = mustChangePassword(payload);
   return res.status(200).json({
     success: true,
-    data: { valid: true, userId: user?.userId, role: user?.role },
+    data: {
+      valid: true,
+      userId: payload.userId,
+      role: payload.role,
+      first_login: payload.first_login,
+      requires_password_change,
+    },
   });
 };

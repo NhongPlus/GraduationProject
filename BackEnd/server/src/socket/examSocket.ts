@@ -226,6 +226,11 @@ export function registerExamSocket(io: Server): void {
     }
     try {
       const payload = await verifyTokenPayload(token);
+      if (payload.first_login && payload.role !== "admin") {
+        return next(
+          new Error("PASSWORD_CHANGE_REQUIRED: Bạn phải đổi mật khẩu trước khi thi")
+        );
+      }
       socket.data.userId = payload.userId;
       socket.data.role = payload.role;
       next();

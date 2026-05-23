@@ -7,8 +7,6 @@ import InputPassword from '@/components/Input/InputPassword/InputPassword';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { changePassword } from '@/services/authApi';
 
-const FIRST_LOGIN_KEY = 'first_login';
-
 const ChangePasswordRequired = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -40,7 +38,6 @@ const ChangePasswordRequired = () => {
     try {
       setLoading(true);
       await changePassword(userId, currentPassword, newPassword);
-      localStorage.setItem(FIRST_LOGIN_KEY, 'false');
       navigate(appConfig.authenticatedEntryPath, { replace: true });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;

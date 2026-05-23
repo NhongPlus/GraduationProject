@@ -35,6 +35,7 @@ function parseExpiryToDate(exp: string): Date {
 export interface TokenPayload {
   userId: string;
   role: User["role"];
+  first_login: boolean;
 }
 
 export interface LoginResult {
@@ -78,7 +79,11 @@ export const loginUser = async (
   const valid = await bcrypt.compare(password, user.hashed_password);
   if (!valid) throw new Error("Email hoặc mật khẩu không đúng");
 
-  const payload: TokenPayload = { userId: user.id, role: user.role };
+  const payload: TokenPayload = {
+    userId: user.id,
+    role: user.role,
+    first_login: user.first_login,
+  };
   const token = jwt.sign(payload, env.JWT_SECRET as jwt.Secret, {
     expiresIn: DEFAULT_JWT_EXP,
   } as jwt.SignOptions);
@@ -109,7 +114,11 @@ export const verifyTokenPayload = async (token: string): Promise<TokenPayload> =
     throw new Error("Session đã hết hạn hoặc bị thu hồi từ thiết bị khác");
   }
 
-  return decoded;
+  return {
+    userId: user.id,
+    role: user.role,
+    first_login: user.first_login,
+  };
 };
 
 export const logoutUser = async (token: string): Promise<void> => {

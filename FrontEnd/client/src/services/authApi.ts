@@ -65,14 +65,27 @@ export const registerUserAsAdmin = async (
   return res.data.data;
 };
 
+export interface SessionInfo {
+  valid: boolean;
+  userId: string;
+  role: UserRole;
+  first_login?: boolean;
+  requires_password_change?: boolean;
+}
+
 export const saveSession = (token: string, user: UserInfo) => {
   localStorage.setItem(ACCESS_TOKEN_KEY, token);
   localStorage.setItem('user_id', user.id);
   localStorage.setItem('user_role', user.role);
   localStorage.setItem('user_name', user.full_name || user.username);
   localStorage.setItem('user_email', user.email);
-  localStorage.setItem('first_login', user.first_login ? 'true' : 'false');
   window.dispatchEvent(new Event('auth-change'));
+};
+
+/** Trạng thái phiên từ server — không tin localStorage cho first_login. */
+export const fetchSession = async (): Promise<SessionInfo> => {
+  const res = await apiClient.get<{ success: boolean; data: SessionInfo }>('/auth/session');
+  return res.data.data;
 };
 
 export const logout = async (): Promise<void> => {
