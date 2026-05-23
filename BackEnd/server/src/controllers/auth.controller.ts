@@ -1,10 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import {
-  loginUser,
-  logoutUser,
-  registerUser,
-  type TokenPayload,
-} from "~/services/auth.service";
+import { loginUser, logoutUser, registerUser } from "~/services/auth.service";
+import type { TokenPayload } from "~/services/authToken.service";
 import { mustChangePassword } from "~/middlewares/firstLogin.middleware";
 import { auditLogin } from "~/services/auditHelpers";
 

@@ -5,6 +5,7 @@ import { getAdminClassByManager, teacherManagesClass } from "~/models/adminClass
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 import { isEmailConfigured, sendEmail } from "~/services/email.service";
 import { buildTranscriptCourses, calcCumulativeGpa } from "~/utils/gradeScale";
+import { invalidateAllUserTokens } from "~/services/authToken.service";
 
 interface StudentRow {
   id: string;
@@ -175,6 +176,9 @@ export const updateStudentController = async (req: Request, res: Response, next:
        WHERE id = $1 RETURNING ${STUDENT_RETURN_COLS}`,
       vals
     );
+    if (password !== undefined && String(password).length > 0) {
+      await invalidateAllUserTokens(id);
+    }
     res.json({ success: true, data: r.rows[0] });
   } catch (err) { next(err); }
 };

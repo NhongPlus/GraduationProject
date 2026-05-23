@@ -11,6 +11,7 @@ export interface User {
   full_name: string | null;
   is_active: boolean;
   first_login: boolean;
+  token_version: number;
   admin_class_id?: string | null;
   created_at: string;
   updated_at: string;

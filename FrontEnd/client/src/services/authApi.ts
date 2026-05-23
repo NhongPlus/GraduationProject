@@ -112,11 +112,21 @@ export const changePassword = async (
   userId: string,
   currentPassword: string,
   newPassword: string
-): Promise<void> => {
-  await apiClient.patch(`/users/${userId}/password`, {
+): Promise<{ token?: string; user?: UserInfo }> => {
+  const res = await apiClient.patch<{
+    success: boolean;
+    data: { token?: string; user?: UserInfo; first_login?: boolean };
+  }>(`/users/${userId}/password`, {
     current_password: currentPassword,
     new_password: newPassword,
+    device_id: getDeviceId(),
+    device_info: navigator.userAgent,
   });
+  const data = res.data.data;
+  if (data.token && data.user) {
+    saveSession(data.token, data.user);
+  }
+  return data;
 };
 
 export interface PasswordResetRequestItem {

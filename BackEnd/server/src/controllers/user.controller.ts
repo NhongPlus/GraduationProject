@@ -138,7 +138,7 @@ export const adminResetPasswordController = async (
 
 export const changePasswordController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { current_password, new_password } = req.body;
+    const { current_password, new_password, device_id, device_info } = req.body;
     if (!current_password || !new_password) {
       return res.status(400).json({ success: false, message: "current_password và new_password là bắt buộc" });
     }
@@ -151,11 +151,22 @@ export const changePasswordController = async (req: Request, res: Response, next
       return res.status(403).json({ success: false, message: "Không có quyền đổi password này" });
     }
 
-    await changePasswordService(targetId, current_password, new_password);
+    const deviceId =
+      (typeof device_id === "string" && device_id.trim()) ||
+      (typeof req.headers["x-device-id"] === "string" && req.headers["x-device-id"].trim()) ||
+      "web";
+
+    const result = await changePasswordService(
+      targetId,
+      current_password,
+      new_password,
+      deviceId,
+      typeof device_info === "string" ? device_info : null
+    );
     res.json({
       success: true,
       message: "Đã đổi mật khẩu thành công",
-      data: { first_login: false },
+      data: { token: result.token, user: result.user, first_login: false },
     });
   } catch (err: any) {
     if (err.message?.includes("hiện tại không đúng") || err.message?.includes("ít nhất 8")) {

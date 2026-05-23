@@ -13,6 +13,7 @@ vi.mock("~/models/user_session.model", () => ({
   getActiveSessionByUserId: vi.fn().mockResolvedValue(null),
   verifySession: vi.fn().mockResolvedValue(true),
   revokeSessionByTokenHash: vi.fn().mockResolvedValue(undefined),
+  revokeAllSessionsByUserId: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock env
@@ -25,6 +26,7 @@ vi.mock("~/config/enviroment", () => ({
 
 import { registerUser, loginUser, verifyTokenPayload } from "./auth.service";
 import pool from "~/config/db";
+import { verifySession } from "~/models/user_session.model";
 
 const mockedPool = pool as any;
 
@@ -95,6 +97,8 @@ describe("auth.service", () => {
       role: "student" as const,
       full_name: "Student One",
       is_active: true,
+      first_login: false,
+      token_version: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -152,9 +156,13 @@ describe("auth.service", () => {
   });
 
   describe("verifyTokenPayload", () => {
+    beforeEach(() => {
+      vi.mocked(verifySession).mockResolvedValue(true);
+    });
+
     it("throws if user not found", async () => {
       const token = jwt.sign(
-        { userId: "nonexistent", role: "student" },
+        { userId: "nonexistent", role: "student", first_login: false, tv: 0 },
         "test-secret-key-for-unit-tests"
       );
       mockedPool.query.mockResolvedValueOnce({ rows: [] });
@@ -166,11 +174,11 @@ describe("auth.service", () => {
 
     it("throws if account is inactive", async () => {
       const token = jwt.sign(
-        { userId: "user-1", role: "student" },
+        { userId: "user-1", role: "student", first_login: false, tv: 0 },
         "test-secret-key-for-unit-tests"
       );
       mockedPool.query.mockResolvedValueOnce({
-        rows: [{ id: "user-1", is_active: false }],
+        rows: [{ is_active: false, token_version: 0 }],
       });
 
       await expect(verifyTokenPayload(token)).rejects.toThrow(
@@ -178,22 +186,17 @@ describe("auth.service", () => {
       );
     });
 
-    it("returns decoded payload on success", async () => {
+    it("throws if token_version mismatch", async () => {
       const token = jwt.sign(
-        { userId: "user-1", role: "teacher" },
+        { userId: "user-1", role: "teacher", first_login: false, tv: 0 },
         "test-secret-key-for-unit-tests"
       );
-      mockedPool.query
-        .mockResolvedValueOnce({
-          rows: [{ id: "user-1", is_active: true }],
-        })
-        .mockResolvedValueOnce({
-          rows: [],
-          rowCount: 0,
-        });
+      mockedPool.query.mockResolvedValueOnce({
+        rows: [{ is_active: true, token_version: 2 }],
+      });
 
       await expect(verifyTokenPayload(token)).rejects.toThrow(
-        "Session đã hết hạn hoặc bị thu hồi từ thiết bị khác"
+        "Phiên đăng nhập đã hết hạn"
       );
     });
   });

@@ -15,6 +15,7 @@ import {
 } from "~/models/user.model";
 import { generateRandomPassword } from "~/utils/randomPassword";
 import { sendPasswordReset } from "~/services/email.service";
+import { invalidateAllUserTokens } from "~/services/authToken.service";
 
 export const getUsers = async (): Promise<PublicUser[]> => {
   return getAllUsers();
@@ -70,6 +71,7 @@ export const adminResetPasswordService = async (
     password_plain: tempPassword,
     first_login: true,
   });
+  await invalidateAllUserTokens(userId);
 
   let email_sent = false;
   try {
@@ -118,6 +120,9 @@ export const updateUserService = async (
 
   const user = await updateUser(id, patch);
   if (!user) return null;
+  if (fields.password !== undefined && String(fields.password).length > 0) {
+    await invalidateAllUserTokens(id);
+  }
   const { hashed_password, ...publicUser } = user;
   return publicUser;
 };

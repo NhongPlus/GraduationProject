@@ -29,7 +29,8 @@ export const env = {
   APP_HOST: process.env.APP_HOST || "localhost",
   DATABASE_URL: process.env.DATABASE_URL,
   JWT_SECRET: process.env.JWT_SECRET || "change_this_to_strong_secret",
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "1d",
+  /** Thời hạn phiên đăng nhập (JWT + user_sessions.expires_at). Mặc định 24 giờ. */
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "24h",
   AUTHOR: process.env.AUTHOR || "NhongPlus",
   /** Dùng chung cho Express `cors` và Socket.IO */
   CORS_ORIGINS: parseCorsOrigins(),

@@ -1,8 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { createHash } from "crypto";
-import { env } from "~/config/enviroment";
 import pool from "~/config/db";
+import { env } from "~/config/enviroment";
 import {
   createUser,
   getUserByEmail,
@@ -11,32 +10,21 @@ import {
   User,
 } from "~/models/user.model";
 import {
-  replaceUserSession,
   getActiveSessionByUserId,
   verifySession,
   revokeSessionByTokenHash,
 } from "~/models/user_session.model";
 import { notifySessionRevoked } from "~/socket/sessionNotify";
+import {
+  type TokenPayload,
+  buildTokenPayload,
+  signAccessToken,
+  tokenHash,
+  issueAuthToken,
+  invalidateAllUserTokens,
+} from "~/services/authToken.service";
 
-if (!env.JWT_SECRET) {
-  throw new Error("JWT_SECRET is required in environment variables");
-}
-
-const DEFAULT_JWT_EXP = env.JWT_EXPIRES_IN || "1d";
-
-function parseExpiryToDate(exp: string): Date {
-  const match = exp.match(/^(\d+)([dhms])$/);
-  if (!match) return new Date(Date.now() + 86400000);
-  const [, value, unit] = match;
-  const msMap: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
-  return new Date(Date.now() + Number(value) * (msMap[unit] || 86400000));
-}
-
-export interface TokenPayload {
-  userId: string;
-  role: User["role"];
-  first_login: boolean;
-}
+export type { TokenPayload };
 
 export interface LoginResult {
   token: string;
@@ -79,58 +67,73 @@ export const loginUser = async (
   const valid = await bcrypt.compare(password, user.hashed_password);
   if (!valid) throw new Error("Email hoặc mật khẩu không đúng");
 
-  const payload: TokenPayload = {
-    userId: user.id,
-    role: user.role,
-    first_login: user.first_login,
-  };
-  const token = jwt.sign(payload, env.JWT_SECRET as jwt.Secret, {
-    expiresIn: DEFAULT_JWT_EXP,
-  } as jwt.SignOptions);
-
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = parseExpiryToDate(DEFAULT_JWT_EXP);
-
   const existingSession = await getActiveSessionByUserId(user.id);
   const hasExistingSession = !!existingSession;
 
-  await replaceUserSession(user.id, deviceId, tokenHash, deviceInfo ?? null, expiresAt);
+  const token = await issueAuthToken(user, deviceId, deviceInfo ?? null);
   notifySessionRevoked(user.id);
 
   const { hashed_password, ...publicUser } = user;
   return { token, user: publicUser, deviceId, hasExistingSession };
 };
 
+/** Xác thực JWT + session; `first_login` lấy từ claim (không query full user). */
 export const verifyTokenPayload = async (token: string): Promise<TokenPayload> => {
-  const decoded = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+  const decoded = jwtVerifyPayload(token);
 
-  const user = await getUserById(decoded.userId);
-  if (!user) throw new Error("Người dùng không tồn tại");
-  if (!user.is_active) throw new Error("Tài khoản đã bị vô hiệu hóa");
-
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const sessionValid = await verifySession(decoded.userId, tokenHash);
+  const sessionValid = await verifySession(decoded.userId, tokenHash(token));
   if (!sessionValid) {
     throw new Error("Session đã hết hạn hoặc bị thu hồi từ thiết bị khác");
   }
 
-  return {
-    userId: user.id,
-    role: user.role,
-    first_login: user.first_login,
-  };
+  const account = await pool.query<{ is_active: boolean; token_version: number }>(
+    `SELECT is_active, COALESCE(token_version, 0)::int AS token_version
+     FROM accounts WHERE id = $1`,
+    [decoded.userId]
+  );
+  const row = account.rows[0];
+  if (!row) throw new Error("Người dùng không tồn tại");
+  if (!row.is_active) throw new Error("Tài khoản đã bị vô hiệu hóa");
+  if (row.token_version !== decoded.tv) {
+    throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+  }
+
+  return decoded;
 };
 
+function jwtVerifyPayload(token: string): TokenPayload {
+  const raw = jwt.verify(token, env.JWT_SECRET) as Partial<TokenPayload>;
+  if (
+    typeof raw.userId !== "string" ||
+    typeof raw.role !== "string" ||
+    typeof raw.tv !== "number"
+  ) {
+    throw new Error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+  }
+  return {
+    userId: raw.userId,
+    role: raw.role as User["role"],
+    first_login: Boolean(raw.first_login),
+    tv: raw.tv,
+  };
+}
+
 export const logoutUser = async (token: string): Promise<void> => {
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  await revokeSessionByTokenHash(tokenHash);
+  await revokeSessionByTokenHash(tokenHash(token));
 };
+
+export interface ChangePasswordResult {
+  token: string;
+  user: Omit<User, "hashed_password">;
+}
 
 export const changePasswordService = async (
   userId: string,
   currentPassword: string,
-  newPassword: string
-): Promise<void> => {
+  newPassword: string,
+  deviceId: string,
+  deviceInfo?: string | null
+): Promise<ChangePasswordResult> => {
   const user = await getUserById(userId);
   if (!user) throw new Error("Người dùng không tồn tại");
 
@@ -148,4 +151,18 @@ export const changePasswordService = async (
      WHERE id = $3`,
     [hashed, newPassword, userId]
   );
+
+  await invalidateAllUserTokens(userId);
+
+  const refreshed = await getUserById(userId);
+  if (!refreshed) throw new Error("Người dùng không tồn tại");
+
+  const token = await issueAuthToken(
+    { ...refreshed, first_login: false },
+    deviceId,
+    deviceInfo ?? null
+  );
+
+  const { hashed_password, ...publicUser } = refreshed;
+  return { token, user: { ...publicUser, first_login: false } };
 };

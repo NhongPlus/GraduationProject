@@ -6,10 +6,13 @@ import appConfig from '@/configs/app.config';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import { changePassword } from '@/services/authApi';
+import { useAppDispatch } from '@/hooks/useAppStore';
+import { refreshAuthFromStorage } from '@/store/authSlice';
 
 const ChangePasswordRequired = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const userId = localStorage.getItem('user_id') ?? '';
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -38,6 +41,7 @@ const ChangePasswordRequired = () => {
     try {
       setLoading(true);
       await changePassword(userId, currentPassword, newPassword);
+      dispatch(refreshAuthFromStorage());
       navigate(appConfig.authenticatedEntryPath, { replace: true });
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;

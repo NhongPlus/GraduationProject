@@ -1,5 +1,5 @@
 import { Request } from "express";
-import type { TokenPayload } from "~/services/auth.service";
+import type { TokenPayload } from "~/services/authToken.service";
 
 /** Các endpoint vẫn cho phép khi tài khoản chưa đổi mật khẩu lần đầu. */
 export function isPasswordChangeExempt(req: Request, userId: string): boolean {
