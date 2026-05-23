@@ -158,9 +158,11 @@ export async function getSubjectCatalog(
   for (const row of r.rows) {
     const item = toCatalogSubject(row, allById);
 
-    if (row.subject_group_id && buckets.has(row.subject_group_id)) {
-      const list = buckets.get(row.subject_group_id)!;
-      if (!list.some((s) => s.id === item.id)) list.push(item);
+    if (row.subject_group_id) {
+      if (buckets.has(row.subject_group_id)) {
+        const list = buckets.get(row.subject_group_id)!;
+        if (!list.some((s) => s.id === item.id)) list.push(item);
+      }
       continue;
     }
 

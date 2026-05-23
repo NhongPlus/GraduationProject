@@ -602,36 +602,38 @@ const SubjectCatalogManagementPage = () => {
               Kho trường (nhóm + môn) — ngành chỉ gán từ kho qua GET /subjects/catalog.
             </Text>
           </Box>
-          {selectedProgramId && (
-            <Group gap="sm">
-              <Button variant="light" onClick={() => setAssignOpen(true)}>
-                Chọn từ kho
-              </Button>
-              {activeTab === 'groups' && (
-                <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
-                  Thêm nhóm (kho + gán ngành)
+          <Box>
+            {selectedProgramId && (
+              <Group gap="sm">
+                <Button variant="light" onClick={() => setAssignOpen(true)}>
+                  Chọn từ kho
                 </Button>
-              )}
-            </Group>
-          )}
-          {activeTab === 'subjects' && (
-            <Group gap="sm">
-              <Button
-                variant="light"
-                leftSection={<IconUpload size={16} />}
-                disabled={!canManageSubjects}
-                onClick={openImportModal}
-              >
-                Import hàng loạt
-              </Button>
-              <ButtonFilled
-                label="Thêm môn học"
-                leftSection={<IconPlus size={16} />}
-                disabled={!canManageSubjects}
-                onClick={() => setCreateOpen(true)}
-              />
-            </Group>
-          )}
+                {activeTab === 'groups' && (
+                  <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
+                    Thêm nhóm (kho + gán ngành)
+                  </Button>
+                )}
+              </Group>
+            )}
+            {activeTab === 'subjects' && (
+              <Group gap="sm">
+                <Button
+                  variant="light"
+                  leftSection={<IconUpload size={16} />}
+                  disabled={!canManageSubjects}
+                  onClick={openImportModal}
+                >
+                  Import hàng loạt
+                </Button>
+                <ButtonFilled
+                  label="Thêm môn học"
+                  leftSection={<IconPlus size={16} />}
+                  disabled={!canManageSubjects}
+                  onClick={() => setCreateOpen(true)}
+                />
+              </Group>
+            )}
+          </Box>
         </Group>
 
         {error && (

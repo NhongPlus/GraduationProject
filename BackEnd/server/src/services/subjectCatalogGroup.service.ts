@@ -30,7 +30,10 @@ export async function getSubjectIdsForCatalogGroup(
   const r = await pool.query<{ id: string }>(
     `SELECT id FROM subjects
      WHERE is_active = true
-       AND (subject_group_id = $1 OR sub_category = $2)`,
+       AND (
+         subject_group_id = $1
+         OR (subject_group_id IS NULL AND sub_category = $2)
+       )`,
     [row.id, row.code]
   );
   return r.rows.map((x) => x.id);

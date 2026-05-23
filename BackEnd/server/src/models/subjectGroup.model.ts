@@ -27,9 +27,13 @@ export async function getSubjectGroupsByProgram(programId: string): Promise<Subj
                 WHERE psg.program_id = $1 AND psg.subject_group_id = sg.id
               )
             ) AS is_assigned,
-            COUNT(s.id)::int AS subject_count
+            (
+              SELECT COUNT(*)::int
+              FROM program_subjects ps
+              JOIN subjects s ON s.id = ps.subject_id AND s.is_active = true
+              WHERE ps.program_id = $1 AND s.subject_group_id = sg.id
+            ) AS subject_count
      FROM subject_groups sg
-     LEFT JOIN subjects s ON s.subject_group_id = sg.id AND s.is_active = true
      WHERE sg.is_active = true
        AND (
          sg.group_scope = 'base'
