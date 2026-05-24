@@ -822,7 +822,7 @@ const ExamTake = () => {
     void poll();
     const id = window.setInterval(() => {
       void poll();
-    }, 15000);
+    }, 5000);
     return () => window.clearInterval(id);
   }, [
     activeExamId,

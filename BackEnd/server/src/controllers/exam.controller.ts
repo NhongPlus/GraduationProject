@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Request, Response, NextFunction } from "express";
+import { tryStartScheduledExamById } from "~/jobs/examScheduledRuntime.job";
 import {
   listExamsPaginated,
   getExam,
@@ -60,6 +61,7 @@ export const getExamListController = async (req: Request, res: Response, next: N
 
 export const getExamController = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await tryStartScheduledExamById(req.params.id);
     const exam = await getExam(req.params.id);
     if (!exam) return res.status(404).json({ success: false, message: "Không tìm thấy bài thi" });
     res.json({ success: true, data: exam });
@@ -327,6 +329,7 @@ export const deleteQuestionController = async (req: Request, res: Response, next
 export const startSessionController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
+    await tryStartScheduledExamById(req.params.examId);
     const data = await startSessionWithMeta(req.params.examId, user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
