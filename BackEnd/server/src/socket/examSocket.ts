@@ -182,15 +182,17 @@ function startExamRuntime(
   io: Server,
   examId: string,
   durationMin: number,
-  fixedEndsAtMs?: number
+  opts?: { fixedStartedAtMs?: number; fixedEndsAtMs?: number }
 ): ExamRuntimeState {
   const old = examStateStore.get(examId);
   clearExamTimers(old);
 
-  const startedAtMs = Date.now();
+  const startedAtMs = opts?.fixedStartedAtMs ?? Date.now();
   const endsAtMs =
-    fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs) && fixedEndsAtMs > startedAtMs
-      ? fixedEndsAtMs
+    opts?.fixedEndsAtMs != null &&
+    Number.isFinite(opts.fixedEndsAtMs) &&
+    opts.fixedEndsAtMs > startedAtMs
+      ? opts.fixedEndsAtMs
       : startedAtMs + durationMin * 60_000;
   const effectiveDurationMin = Math.max(1, Math.ceil((endsAtMs - startedAtMs) / 60_000));
   const state: ExamRuntimeState = {
@@ -606,11 +608,17 @@ export function emitProctoringIntegrityUpdate(
   });
 }
 
-export async function startExamRuntimeFromServer(examId: string): Promise<{
+export type ExamRuntimeStartMode = "manual" | "scheduled";
+
+export async function startExamRuntimeFromServer(
+  examId: string,
+  mode: ExamRuntimeStartMode = "manual"
+): Promise<{
   examId: string;
   startedAt: string;
   endsAt: string;
   durationMin: number;
+  mode: ExamRuntimeStartMode;
 }> {
   if (!ioInstance) {
     throw new Error("Socket.IO server is not ready");
@@ -622,23 +630,44 @@ export async function startExamRuntimeFromServer(examId: string): Promise<{
   }
 
   const durationMin = sanitizeDuration(exam.duration_min);
-  const fixedEndsAtMs = exam.ends_at ? new Date(exam.ends_at).getTime() : undefined;
-  if (fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs) && fixedEndsAtMs <= Date.now()) {
-    throw new Error("Bai thi da het gio ket thuc");
+  const nowMs = Date.now();
+
+  let state: ExamRuntimeState;
+
+  if (mode === "scheduled") {
+    if (!exam.opens_at || !exam.ends_at) {
+      throw new Error("Bai thi chua dat lich opens_at/ends_at");
+    }
+    const opensMs = new Date(exam.opens_at).getTime();
+    const endsMs = new Date(exam.ends_at).getTime();
+    if (!Number.isFinite(opensMs) || !Number.isFinite(endsMs) || opensMs >= endsMs) {
+      throw new Error("Lich thi khong hop le");
+    }
+    if (endsMs <= nowMs) {
+      throw new Error("Bai thi da het gio ket thuc");
+    }
+    const windowMin = Math.max(1, Math.ceil((endsMs - opensMs) / 60_000));
+    state = startExamRuntime(ioInstance, examId, windowMin, {
+      fixedStartedAtMs: opensMs,
+      fixedEndsAtMs: endsMs,
+    });
+  } else {
+    const endAt = exam.ends_at ? new Date(exam.ends_at).getTime() : null;
+    if (endAt != null && Number.isFinite(endAt) && endAt <= nowMs) {
+      throw new Error("Bai thi da het gio ket thuc");
+    }
+    state = startExamRuntime(ioInstance, examId, durationMin);
   }
-  const runtimeDuration =
-    fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs)
-      ? Math.max(1, Math.ceil((fixedEndsAtMs - Date.now()) / 60_000))
-      : durationMin;
-  const state = startExamRuntime(ioInstance, examId, runtimeDuration, fixedEndsAtMs);
+
   console.log(
-    `[exam-runtime] started exam=${examId} duration=${durationMin}m endsAt=${new Date(state.endsAtMs).toISOString()}`
+    `[exam-runtime] started exam=${examId} mode=${mode} duration=${state.durationMin}m endsAt=${new Date(state.endsAtMs).toISOString()}`
   );
   const payload = {
     examId,
     startedAt: new Date(state.startedAtMs).toISOString(),
     endsAt: new Date(state.endsAtMs).toISOString(),
     durationMin: state.durationMin,
+    mode,
   };
 
   ioInstance.to(roomForExam(examId)).emit("exam:started", {

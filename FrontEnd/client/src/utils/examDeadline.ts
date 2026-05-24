@@ -41,6 +41,18 @@ export function isPastExamStartDeadline(
   return isPastExamEnd(exam, latest, nowMs);
 }
 
+export function canStudentEnterExam(
+  exam: Pick<Exam, 'opens_at' | 'ends_at' | 'closes_at' | 'runtime_is_active'>,
+  latest: Pick<ExamSession, 'status'> | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (isPastExamEnd(exam, latest, nowMs)) return false;
+  if (isBeforeExamOpens(exam, nowMs)) {
+    return Boolean(exam.runtime_is_active);
+  }
+  return true;
+}
+
 export function formatExamScheduleRange(exam: Pick<Exam, 'opens_at' | 'ends_at' | 'closes_at'>): string {
   const open = exam.opens_at ? new Date(exam.opens_at).toLocaleString() : null;
   const end = effectiveExamEndsAt(exam);

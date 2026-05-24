@@ -8,19 +8,28 @@ async function autoStartScheduledExams(): Promise<void> {
     `
     SELECT e.id
     FROM exams e
-    LEFT JOIN exam_runtime_state rs
-      ON rs.exam_id = e.id AND rs.is_active = true AND rs.ends_at > NOW()
     WHERE e.opens_at IS NOT NULL
+      AND e.ends_at IS NOT NULL
       AND e.opens_at <= NOW()
-      AND (e.ends_at IS NULL OR e.ends_at > NOW())
-      AND rs.exam_id IS NULL
+      AND e.ends_at > NOW()
+      AND NOT EXISTS (
+        SELECT 1 FROM exam_runtime_state rs
+        WHERE rs.exam_id = e.id
+          AND rs.is_active = true
+          AND rs.ends_at > NOW()
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM exam_runtime_state rs2
+        WHERE rs2.exam_id = e.id
+          AND rs2.started_at < e.opens_at
+      )
     `
   );
 
   for (const row of r.rows) {
     try {
-      await startExamRuntimeFromServer(row.id);
-      console.log(`[exam-schedule] auto-started exam=${row.id}`);
+      await startExamRuntimeFromServer(row.id, "scheduled");
+      console.log(`[exam-schedule] auto-started exam=${row.id} (opens_at→ends_at)`);
     } catch (err) {
       console.error(`[exam-schedule] auto-start failed exam=${row.id}`, err);
     }
@@ -32,10 +41,8 @@ async function autoEndScheduledExams(): Promise<void> {
     `
     SELECT rs.exam_id
     FROM exam_runtime_state rs
-    INNER JOIN exams e ON e.id = rs.exam_id
     WHERE rs.is_active = true
-      AND e.ends_at IS NOT NULL
-      AND e.ends_at <= NOW()
+      AND rs.ends_at <= NOW()
     `
   );
 

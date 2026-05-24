@@ -32,7 +32,7 @@ import useAuth from '@/hooks/useAuth';
 import { useExamListState } from '@/hooks/useExamListState';
 import InputText from '@/components/Input/InputText/InputText';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange } from '@/utils/examDeadline';
+import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange, canStudentEnterExam } from '@/utils/examDeadline';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import { enterExamRoom } from '@/utils/enterExamRoom';
@@ -239,7 +239,8 @@ const ExamList = () => {
                   const staffEnded =
                     isStaff && !examInProgress && Boolean(item.ends_at ?? item.closes_at) && pastDeadline;
                   const pastDeadline = isPastExamEnd(item, latest);
-                  const beforeOpens = !isStaff && isBeforeExamOpens(item);
+                  const beforeOpens = !isStaff && isBeforeExamOpens(item) && !item.runtime_is_active;
+                  const canEnter = canStudentEnterExam(item, latest);
                   const scheduleLabel = formatExamScheduleRange(item);
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
@@ -326,12 +327,12 @@ const ExamList = () => {
                                 variant="light"
                                 leftSection={<IconPlayerPlay size={13} />}
                                 loading={startingExamId === item.id}
-                                disabled={startingExamId === item.id || staffScheduled || staffEnded}
+                                disabled={startingExamId === item.id || staffEnded}
                                 title={
-                                  staffScheduled
-                                    ? t('exam_list.start_scheduled_hint')
-                                    : staffEnded
-                                      ? t('exam_list.start_ended_hint')
+                                  staffEnded
+                                    ? t('exam_list.start_ended_hint')
+                                    : staffScheduled
+                                      ? t('exam_list.start_early_hint')
                                       : t('exam_list.start_runtime_hint')
                                 }
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
@@ -368,7 +369,7 @@ const ExamList = () => {
                               size="xs"
                               color="blue"
                               label={t('exam_list.action_take')}
-                              disabled={pastDeadline || beforeOpens || (studentSubmitted && !canRetake)}
+                              disabled={!canEnter || (studentSubmitted && !canRetake)}
                               title={
                                 beforeOpens
                                   ? t('exam_list.take_disabled_not_open')
@@ -382,7 +383,7 @@ const ExamList = () => {
                               }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (beforeOpens || (studentSubmitted && !canRetake)) return;
+                                if (!canEnter || (studentSubmitted && !canRetake)) return;
                                 void enterExamRoom(navigate, item.id);
                               }}
                             />

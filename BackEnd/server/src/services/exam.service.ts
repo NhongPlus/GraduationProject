@@ -529,7 +529,11 @@ export const startSessionWithMeta = async (
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");
   const nowMs = Date.now();
   if (exam.opens_at && isBeforeOpensAt(exam.opens_at, nowMs)) {
-    throw httpError(400, "Chưa đến giờ mở thi");
+    const runtimeState = await getRuntimeStateByExam(examId);
+    const earlyManualOpen = runtimeState?.is_active && new Date(runtimeState.ends_at).getTime() > nowMs;
+    if (!earlyManualOpen) {
+      throw httpError(400, "Chưa đến giờ mở thi");
+    }
   }
   const endAt = effectiveEndsAt(exam);
   if (endAt && isPastEndsAt(endAt, nowMs)) {

@@ -328,6 +328,7 @@
     "action_open_runtime": "Mở phiên thi",
     "start_runtime_hint": "Mở cửa sổ thi cho lớp. SV đã nộp bài cần được Cho thi lại tại Quản lý phiên thi.",
     "start_scheduled_hint": "Bài thi sẽ tự mở đúng giờ bắt đầu đã đặt.",
+    "start_early_hint": "Mở sớm: thời gian tính theo phút làm bài, không theo khung giờ kết thúc.",
     "start_ended_hint": "Bài thi đã qua giờ kết thúc."
   },
   "exam_retake": {
@@ -814,9 +815,9 @@
     "duration_label": "Thời gian làm bài (phút)",
     "duration_desc": "Thời lượng tối đa mỗi sinh viên (nếu có lịch thi thì không vượt quá khung giờ).",
     "opens_at_label": "Giờ bắt đầu",
-    "opens_at_desc": "Đến giờ này hệ thống tự mở phiên thi.",
+    "opens_at_desc": "Đến giờ này hệ thống tự mở phiên (opens_at→ends_at) nếu GV chưa mở sớm.",
     "ends_at_label": "Giờ kết thúc",
-    "ends_at_desc": "Đến giờ này hệ thống tự nộp bài cho mọi sinh viên.",
+    "ends_at_desc": "Áp dụng khi tự mở theo lịch. Nếu GV mở sớm trước giờ bắt đầu thì hết giờ theo thời lượng làm bài.",
     "deadline_label": "Hạn nộp",
     "error_schedule_order": "Giờ bắt đầu phải trước giờ kết thúc.",
     "num_versions_label": "Số mã đề",

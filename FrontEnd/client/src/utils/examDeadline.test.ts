@@ -5,6 +5,7 @@ import {
   isBeforeExamOpens,
   isPastExamEnd,
   isPastExamStartDeadline,
+  canStudentEnterExam,
 } from './examDeadline';
 
 const t0 = new Date('2026-05-24T10:00:00.000Z').getTime();
@@ -38,7 +39,20 @@ describe('examDeadline schedule', () => {
     expect(s).toContain('→');
   });
 
-  it('legacy isPastExamStartDeadline alias', () => {
-    expect(isPastExamStartDeadline({ closes_at: '2026-05-24T09:00:00.000Z' }, undefined, t0)).toBe(true);
+  it('canStudentEnterExam before opens when runtime active', () => {
+    expect(
+      canStudentEnterExam(
+        { opens_at: '2026-05-24T12:00:00.000Z', ends_at: null, closes_at: null, runtime_is_active: true },
+        undefined,
+        t0
+      )
+    ).toBe(true);
+    expect(
+      canStudentEnterExam(
+        { opens_at: '2026-05-24T12:00:00.000Z', ends_at: null, closes_at: null, runtime_is_active: false },
+        undefined,
+        t0
+      )
+    ).toBe(false);
   });
 });
