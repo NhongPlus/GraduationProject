@@ -12,6 +12,8 @@ export interface Exam {
   duration_min: number;
   num_versions: number;
   closes_at: string | null;
+  opens_at: string | null;
+  ends_at: string | null;
   created_at: string;
 }
 
@@ -131,12 +133,14 @@ export const createExam = async (
     subjectId?: string | null;
     description?: string;
     closesAt?: string | null;
+    opensAt?: string | null;
+    endsAt?: string | null;
     numVersions?: number;
   }
 ): Promise<Exam> => {
   const result = await pool.query(
-    `INSERT INTO exams (title, description, class_id, admin_class_id, subject_id, created_by, duration_min, num_versions, closes_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    `INSERT INTO exams (title, description, class_id, admin_class_id, subject_id, created_by, duration_min, num_versions, closes_at, opens_at, ends_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
     [
       title,
       opts.description ?? null,
@@ -147,6 +151,8 @@ export const createExam = async (
       durationMin,
       opts.numVersions ?? 2,
       opts.closesAt ?? null,
+      opts.opensAt ?? null,
+      opts.endsAt ?? null,
     ]
   );
   const exam = result.rows[0] as Exam;
@@ -159,7 +165,7 @@ export const updateExam = async (
   fields: Partial<
     Pick<
       Exam,
-      "title" | "description" | "duration_min" | "closes_at" | "admin_class_id" | "subject_id" | "num_versions"
+      "title" | "description" | "duration_min" | "closes_at" | "opens_at" | "ends_at" | "admin_class_id" | "subject_id" | "num_versions"
     >
   >
 ): Promise<Exam | null> => {

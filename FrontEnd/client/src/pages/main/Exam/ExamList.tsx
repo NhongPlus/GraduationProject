@@ -32,7 +32,7 @@ import useAuth from '@/hooks/useAuth';
 import { useExamListState } from '@/hooks/useExamListState';
 import InputText from '@/components/Input/InputText/InputText';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import { isPastExamStartDeadline } from '@/utils/examDeadline';
+import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange } from '@/utils/examDeadline';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import { enterExamRoom } from '@/utils/enterExamRoom';
@@ -216,7 +216,7 @@ const ExamList = () => {
                   <Table.Th>{t('common.exam')}</Table.Th>
                   <Table.Th>{t('common.subject')}</Table.Th>
                   <Table.Th>{t('common.time_minutes')}</Table.Th>
-                  <Table.Th>{t('exam_list.deadline_column')}</Table.Th>
+                  <Table.Th>{t('exam_list.schedule_column')}</Table.Th>
                   {isStaff && <Table.Th>{t('exam_list.active_sessions')}</Table.Th>}
                   <Table.Th>{t('common.status')}</Table.Th>
                   <Table.Th>{t('common.actions')}</Table.Th>
@@ -234,11 +234,13 @@ const ExamList = () => {
                     ? !examInProgress
                     : studentSubmitted && !canRetake;
                   const staffRunning = isStaff && examInProgress;
-                  const pastDeadline = isPastExamStartDeadline(item, latest);
-                  const deadlineLabel =
-                    item.closes_at != null && item.closes_at !== ''
-                      ? new Date(item.closes_at).toLocaleString()
-                      : t('exam_list.deadline_none');
+                  const staffScheduled =
+                    isStaff && !examInProgress && Boolean(item.opens_at) && isBeforeExamOpens(item);
+                  const staffEnded =
+                    isStaff && !examInProgress && Boolean(item.ends_at ?? item.closes_at) && pastDeadline;
+                  const pastDeadline = isPastExamEnd(item, latest);
+                  const beforeOpens = !isStaff && isBeforeExamOpens(item);
+                  const scheduleLabel = formatExamScheduleRange(item);
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
                     : () => {
@@ -261,7 +263,7 @@ const ExamList = () => {
                       <Table.Td>{item.subject_name || '—'}</Table.Td>
                       <Table.Td>{item.duration_min}</Table.Td>
                       <Table.Td>
-                        <Text size="sm">{deadlineLabel}</Text>
+                        <Text size="sm">{scheduleLabel}</Text>
                       </Table.Td>
                       {isStaff && (
                         <Table.Td>
@@ -276,7 +278,11 @@ const ExamList = () => {
                             isStaff
                               ? staffRunning
                                 ? 'orange'
-                                : 'gray'
+                                : staffScheduled
+                                  ? 'blue'
+                                  : staffEnded
+                                    ? 'gray'
+                                    : 'gray'
                               : canRetake
                                 ? 'orange'
                                 : done
@@ -287,7 +293,11 @@ const ExamList = () => {
                           {isStaff
                             ? staffRunning
                               ? t('exam_list.status_staff_running')
-                              : t('exam_list.status_staff_stopped')
+                              : staffScheduled
+                                ? t('exam_list.status_staff_scheduled')
+                                : staffEnded
+                                  ? t('exam_list.status_staff_ended')
+                                  : t('exam_list.status_staff_stopped')
                             : canRetake
                               ? t('exam_list.status_retake_granted')
                               : done
@@ -316,8 +326,14 @@ const ExamList = () => {
                                 variant="light"
                                 leftSection={<IconPlayerPlay size={13} />}
                                 loading={startingExamId === item.id}
-                                disabled={startingExamId === item.id}
-                                title={t('exam_list.start_runtime_hint')}
+                                disabled={startingExamId === item.id || staffScheduled || staffEnded}
+                                title={
+                                  staffScheduled
+                                    ? t('exam_list.start_scheduled_hint')
+                                    : staffEnded
+                                      ? t('exam_list.start_ended_hint')
+                                      : t('exam_list.start_runtime_hint')
+                                }
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
                               >
                                 {t('exam_list.action_open_runtime', 'Mở phiên thi')}
@@ -352,9 +368,11 @@ const ExamList = () => {
                               size="xs"
                               color="blue"
                               label={t('exam_list.action_take')}
-                              disabled={pastDeadline || (studentSubmitted && !canRetake)}
+                              disabled={pastDeadline || beforeOpens || (studentSubmitted && !canRetake)}
                               title={
-                                studentSubmitted && !canRetake
+                                beforeOpens
+                                  ? t('exam_list.take_disabled_not_open')
+                                  : studentSubmitted && !canRetake
                                   ? t('exam_list.take_disabled_submitted', 'Bạn đã nộp bài thi này')
                                   : pastDeadline
                                     ? t('exam_list.take_disabled_deadline')
@@ -364,7 +382,7 @@ const ExamList = () => {
                               }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (studentSubmitted && !canRetake) return;
+                                if (beforeOpens || (studentSubmitted && !canRetake)) return;
                                 void enterExamRoom(navigate, item.id);
                               }}
                             />

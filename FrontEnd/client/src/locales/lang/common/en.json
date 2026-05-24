@@ -311,7 +311,14 @@
     "staff_running_exams": "In progress",
     "staff_stopped_exams": "Not open",
     "action_open_runtime": "Open exam window",
-    "start_runtime_hint": "Opens the exam window for the class. Students who already submitted need an individual retake grant in Session management."
+    "start_runtime_hint": "Opens the exam window for the class. Students who already submitted need an individual retake grant in Session management.",
+    "start_scheduled_hint": "This exam will open automatically at the scheduled start time.",
+    "start_ended_hint": "This exam is past the scheduled end time.",
+    "schedule_column": "Schedule",
+    "take_disabled_not_open": "Exam has not opened yet",
+    "take_disabled_deadline": "Submission deadline has passed",
+    "status_staff_scheduled": "Scheduled",
+    "status_staff_ended": "Ended"
   },
   "exam_retake": {
     "grant_btn": "Allow retake",

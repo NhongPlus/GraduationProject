@@ -82,6 +82,14 @@ import {
   isPastClosesAt,
   normalizeClosesAtInput,
 } from "~/utils/examStartDeadline";
+import {
+  assertValidExamSchedule,
+  effectiveEndsAt,
+  isBeforeOpensAt,
+  isMalformedScheduleAt,
+  isPastEndsAt,
+  normalizeScheduleAtInput,
+} from "~/utils/examSchedule";
 import { formatScoreScale10Pair } from "~/utils/gradeScale";
 import type { ImportedQuestionDraft } from "~/services/examImport.service";
 
@@ -125,6 +133,24 @@ async function assertExamScope(
   return scope;
 }
 
+function validateScheduleFields(payload: {
+  opens_at?: string | null;
+  ends_at?: string | null;
+  closes_at?: string | null;
+}): void {
+  if (isMalformedScheduleAt(payload.opens_at)) throw httpError(400, "opens_at không hợp lệ");
+  if (isMalformedScheduleAt(payload.ends_at)) throw httpError(400, "ends_at không hợp lệ");
+  if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
+  try {
+    assertValidExamSchedule(
+      normalizeScheduleAtInput(payload.opens_at),
+      normalizeScheduleAtInput(payload.ends_at ?? payload.closes_at)
+    );
+  } catch (e) {
+    throw httpError(400, e instanceof Error ? e.message : "Lịch thi không hợp lệ");
+  }
+}
+
 export const createExamService = async (
   title: string,
   createdBy: string,
@@ -133,14 +159,18 @@ export const createExamService = async (
   role: string,
   description?: string,
   closesAt?: string | null,
-  numVersions?: number
+  numVersions?: number,
+  opensAt?: string | null,
+  endsAt?: string | null
 ): Promise<Exam> => {
-  if (isMalformedClosesAt(closesAt)) throw httpError(400, "closes_at không hợp lệ");
+  validateScheduleFields({ opens_at: opensAt, ends_at: endsAt, closes_at: closesAt });
   const normalized = normalizeClosesAtInput(closesAt);
   const validated = await assertExamScope(scope, createdBy, role);
   return createExam(title, createdBy, durationMin, {
     description,
     closesAt: normalized,
+    opensAt: normalizeScheduleAtInput(opensAt),
+    endsAt: normalizeScheduleAtInput(endsAt ?? closesAt),
     adminClassId: validated.admin_class_id,
     subjectId: validated.subject_id,
     classId: validated.class_id ?? null,
@@ -155,10 +185,15 @@ export const updateExamService = async (
     description?: string | null;
     duration_min?: number;
     closes_at?: string | null;
+    opens_at?: string | null;
+    ends_at?: string | null;
     num_versions?: number;
   }
 ): Promise<Exam | null> => {
-  const fields: Partial<Pick<Exam, "title" | "description" | "duration_min" | "closes_at" | "num_versions">> = {};
+  validateScheduleFields(payload);
+  const fields: Partial<
+    Pick<Exam, "title" | "description" | "duration_min" | "closes_at" | "opens_at" | "ends_at" | "num_versions">
+  > = {};
 
   if (payload.title !== undefined) {
     const title = payload.title.trim();
@@ -176,8 +211,13 @@ export const updateExamService = async (
     fields.duration_min = Math.floor(duration);
   }
   if (payload.closes_at !== undefined) {
-    if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
     fields.closes_at = normalizeClosesAtInput(payload.closes_at);
+  }
+  if (payload.opens_at !== undefined) {
+    fields.opens_at = normalizeScheduleAtInput(payload.opens_at);
+  }
+  if (payload.ends_at !== undefined) {
+    fields.ends_at = normalizeScheduleAtInput(payload.ends_at);
   }
   if (payload.num_versions !== undefined) {
     const n = Number(payload.num_versions);
@@ -185,6 +225,20 @@ export const updateExamService = async (
       throw httpError(400, "num_versions phải từ 1 đến 4");
     }
     fields.num_versions = Math.floor(n);
+  }
+
+  if (
+    fields.opens_at !== undefined ||
+    fields.ends_at !== undefined ||
+    fields.closes_at !== undefined
+  ) {
+    const current = await getExamById(id);
+    if (!current) return null;
+    validateScheduleFields({
+      opens_at: fields.opens_at ?? current.opens_at,
+      ends_at: fields.ends_at ?? current.ends_at ?? current.closes_at,
+      closes_at: fields.closes_at ?? current.closes_at,
+    });
   }
 
   return updateExam(id, fields);
@@ -280,6 +334,8 @@ export interface CreateExamWithQuestionsPayload {
   num_versions?: number;
   description?: string | null;
   closes_at?: string | null;
+  opens_at?: string | null;
+  ends_at?: string | null;
   questions: ImportedQuestionDraft[];
 }
 
@@ -321,7 +377,7 @@ export const createExamWithQuestionsService = async (
   if (!Number.isFinite(payload.duration_min) || payload.duration_min <= 0 || payload.duration_min > 300) {
     throw httpError(400, "duration_min phải từ 1 đến 300 phút");
   }
-  if (isMalformedClosesAt(payload.closes_at)) throw httpError(400, "closes_at không hợp lệ");
+  validateScheduleFields(payload);
   if (!Array.isArray(payload.questions) || payload.questions.length === 0) {
     throw httpError(400, "questions là mảng bắt buộc");
   }
@@ -338,8 +394,8 @@ export const createExamWithQuestionsService = async (
   try {
     await client.query("BEGIN");
     const examResult = await client.query(
-      `INSERT INTO exams (title, description, class_id, admin_class_id, subject_id, created_by, duration_min, num_versions, closes_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO exams (title, description, class_id, admin_class_id, subject_id, created_by, duration_min, num_versions, closes_at, opens_at, ends_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         payload.title.trim(),
         payload.description ?? null,
@@ -350,6 +406,8 @@ export const createExamWithQuestionsService = async (
         Math.floor(payload.duration_min),
         numVersions,
         normalizeClosesAtInput(payload.closes_at),
+        normalizeScheduleAtInput(payload.opens_at),
+        normalizeScheduleAtInput(payload.ends_at ?? payload.closes_at),
       ]
     );
     const exam = examResult.rows[0] as Exam;
@@ -469,7 +527,15 @@ export const startSessionWithMeta = async (
 ): Promise<StartSessionPayload> => {
   const exam = await getExamById(examId);
   if (!exam) throw httpError(404, "Không tìm thấy bài thi");
-  if (exam.closes_at && isPastClosesAt(exam.closes_at, Date.now())) {
+  const nowMs = Date.now();
+  if (exam.opens_at && isBeforeOpensAt(exam.opens_at, nowMs)) {
+    throw httpError(400, "Chưa đến giờ mở thi");
+  }
+  const endAt = effectiveEndsAt(exam);
+  if (endAt && isPastEndsAt(endAt, nowMs)) {
+    throw httpError(400, "Đã quá hạn nộp bài thi");
+  }
+  if (!endAt && exam.closes_at && isPastClosesAt(exam.closes_at, nowMs)) {
     throw httpError(400, "Đã quá hạn bắt đầu bài thi");
   }
 

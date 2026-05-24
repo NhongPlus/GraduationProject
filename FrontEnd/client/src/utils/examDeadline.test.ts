@@ -1,33 +1,44 @@
-import { describe, it, expect } from 'vitest';
-import { isPastExamStartDeadline } from './examDeadline';
+import { describe, expect, it } from 'vitest';
+import {
+  effectiveExamEndsAt,
+  formatExamScheduleRange,
+  isBeforeExamOpens,
+  isPastExamEnd,
+  isPastExamStartDeadline,
+} from './examDeadline';
 
-describe('isPastExamStartDeadline', () => {
-  const t0 = Date.UTC(2026, 3, 18, 12, 0, 0);
+const t0 = new Date('2026-05-24T10:00:00.000Z').getTime();
 
-  it('returns false when no closes_at', () => {
-    expect(isPastExamStartDeadline({ closes_at: null }, undefined, t0)).toBe(false);
-    expect(isPastExamStartDeadline({ closes_at: undefined }, undefined, t0)).toBe(false);
+describe('examDeadline schedule', () => {
+  it('isBeforeExamOpens when now before opens_at', () => {
+    expect(isBeforeExamOpens({ opens_at: '2026-05-24T12:00:00.000Z' }, t0)).toBe(true);
   });
 
-  it('returns false when deadline is in the future', () => {
-    const future = new Date(t0 + 60_000).toISOString();
-    expect(isPastExamStartDeadline({ closes_at: future }, undefined, t0)).toBe(false);
+  it('isPastExamEnd uses ends_at', () => {
+    expect(isPastExamEnd({ ends_at: '2026-05-24T09:00:00.000Z', closes_at: null }, undefined, t0)).toBe(true);
   });
 
-  it('returns true when deadline is in the past and no active session', () => {
-    const past = new Date(t0 - 60_000).toISOString();
-    expect(isPastExamStartDeadline({ closes_at: past }, undefined, t0)).toBe(true);
+  it('active session bypasses past end', () => {
     expect(
-      isPastExamStartDeadline({ closes_at: past }, { status: 'submitted' }, t0)
-    ).toBe(true);
+      isPastExamEnd({ ends_at: '2026-05-24T09:00:00.000Z' }, { status: 'active' }, t0)
+    ).toBe(false);
   });
 
-  it('returns false when session is active even if closes_at passed', () => {
-    const past = new Date(t0 - 60_000).toISOString();
-    expect(isPastExamStartDeadline({ closes_at: past }, { status: 'active' }, t0)).toBe(false);
+  it('effectiveExamEndsAt prefers ends_at', () => {
+    expect(effectiveExamEndsAt({ ends_at: 'a', closes_at: 'b' })).toBe('a');
+    expect(effectiveExamEndsAt({ ends_at: null, closes_at: 'b' })).toBe('b');
   });
 
-  it('treats invalid closes_at as not past (no block)', () => {
-    expect(isPastExamStartDeadline({ closes_at: 'not-a-date' }, undefined, t0)).toBe(false);
+  it('formatExamScheduleRange', () => {
+    const s = formatExamScheduleRange({
+      opens_at: '2026-05-24T08:00:00.000Z',
+      ends_at: '2026-05-24T10:00:00.000Z',
+      closes_at: null,
+    });
+    expect(s).toContain('→');
+  });
+
+  it('legacy isPastExamStartDeadline alias', () => {
+    expect(isPastExamStartDeadline({ closes_at: '2026-05-24T09:00:00.000Z' }, undefined, t0)).toBe(true);
   });
 });

@@ -70,7 +70,7 @@ export const getExamController = async (req: Request, res: Response, next: NextF
 
 export const createExamController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, num_versions } =
+    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, opens_at, ends_at, num_versions } =
       req.body;
     if (!title || !admin_class_id || !subject_id || !duration_min) {
       return res.status(400).json({
@@ -87,7 +87,9 @@ export const createExamController = async (req: Request, res: Response, next: Ne
       user.role,
       description,
       closes_at,
-      num_versions ? Number(num_versions) : 2
+      num_versions ? Number(num_versions) : 2,
+      opens_at,
+      ends_at
     );
     res.status(201).json({ success: true, data: exam });
   } catch (err) {
@@ -140,7 +142,7 @@ export const commitWordImportController = async (
 ) => {
   try {
     const user = (req as any).user;
-    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, num_versions, questions } =
+    const { title, admin_class_id, subject_id, class_id, duration_min, description, closes_at, opens_at, ends_at, num_versions, questions } =
       req.body;
     const data = await createExamWithQuestionsService({
       title,
@@ -150,6 +152,8 @@ export const commitWordImportController = async (
       duration_min: Number(duration_min),
       description,
       closes_at,
+      opens_at,
+      ends_at,
       num_versions: num_versions ? Number(num_versions) : 2,
       questions,
       created_by: user.userId,

@@ -63,7 +63,8 @@ type ExamMetaFormValues = {
   title: string;
   description: string;
   durationMin: number | '';
-  closesAt: string;
+  opensAt: string;
+  endsAt: string;
   adminClassId: string | null;
   subjectId: string | null;
   numVersions: string;
@@ -126,7 +127,8 @@ export default function ExamAuthoring() {
       title: '',
       description: '',
       durationMin: 60,
-      closesAt: '',
+      opensAt: '',
+      endsAt: '',
       adminClassId: null,
       subjectId: null,
       numVersions: '2',
@@ -200,7 +202,10 @@ export default function ExamAuthoring() {
             title: existingExam.title,
             description: existingExam.description ?? '',
             durationMin: existingExam.duration_min,
-            closesAt: existingExam.closes_at ? existingExam.closes_at.slice(0, 16) : '',
+            opensAt: existingExam.opens_at ? existingExam.opens_at.slice(0, 16) : '',
+            endsAt: (existingExam.ends_at ?? existingExam.closes_at)
+              ? (existingExam.ends_at ?? existingExam.closes_at)!.slice(0, 16)
+              : '',
             numVersions: String(Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))),
           };
         });
@@ -520,7 +525,7 @@ export default function ExamAuthoring() {
   };
 
   const saveExam = async () => {
-    const { title, description, durationMin, closesAt, adminClassId, subjectId } = examForm.getValues();
+    const { title, description, durationMin, opensAt, endsAt, adminClassId, subjectId } = examForm.getValues();
     const duration = Number(durationMin);
     if (
       !title.trim() ||
@@ -544,7 +549,15 @@ export default function ExamAuthoring() {
         return;
       }
     }
+    if (opensAt && endsAt && new Date(opensAt).getTime() >= new Date(endsAt).getTime()) {
+      setError(t('exam_authoring.error_schedule_order'));
+      return;
+    }
 
+    const schedulePayload = {
+      opens_at: opensAt ? new Date(opensAt).toISOString() : null,
+      ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+    };
     setSaving(true);
     setError('');
     setNotice('');
@@ -554,7 +567,7 @@ export default function ExamAuthoring() {
           title: title.trim(),
           duration_min: Math.floor(duration),
           description: description.trim() || null,
-          closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+          ...schedulePayload,
           num_versions: numVersions,
         });
         const ordered = normalizeQuestions(questions);
@@ -597,7 +610,7 @@ export default function ExamAuthoring() {
         subject_id: subjectId,
         duration_min: Math.floor(duration),
         description: description.trim() || null,
-        closes_at: closesAt ? new Date(closesAt).toISOString() : null,
+        ...schedulePayload,
         num_versions: numVersions,
         questions: normalizeQuestions(questions).map((q) => ({
           ...q,
@@ -695,22 +708,32 @@ export default function ExamAuthoring() {
                   error={examForm.errors.subjectId as string | undefined}
                 />
                 <Group grow>
-                  <NumberInput
-                    label={t('exam_authoring.duration_label')}
-                    size="sm"
-                    min={1}
-                    max={300}
-                    key={examForm.key('durationMin')}
-                    {...examForm.getInputProps('durationMin')}
-                  />
                   <TextInput
-                    label={t('exam_authoring.deadline_label')}
+                    label={t('exam_authoring.opens_at_label')}
+                    description={t('exam_authoring.opens_at_desc')}
                     size="sm"
                     type="datetime-local"
-                    key={examForm.key('closesAt')}
-                    {...examForm.getInputProps('closesAt')}
+                    key={examForm.key('opensAt')}
+                    {...examForm.getInputProps('opensAt')}
+                  />
+                  <TextInput
+                    label={t('exam_authoring.ends_at_label')}
+                    description={t('exam_authoring.ends_at_desc')}
+                    size="sm"
+                    type="datetime-local"
+                    key={examForm.key('endsAt')}
+                    {...examForm.getInputProps('endsAt')}
                   />
                 </Group>
+                <NumberInput
+                  label={t('exam_authoring.duration_label')}
+                  description={t('exam_authoring.duration_desc')}
+                  size="sm"
+                  min={1}
+                  max={300}
+                  key={examForm.key('durationMin')}
+                  {...examForm.getInputProps('durationMin')}
+                />
                 <Select
                   label={t('exam_authoring.num_versions_label')}
                   description={t('exam_authoring.num_versions_desc')}

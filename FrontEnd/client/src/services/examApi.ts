@@ -19,8 +19,12 @@ export interface Exam {
   subject_id?: string | null;
   created_by: string;
   duration_min: number;
-  /** Hạn chót được phép bắt đầu phiên (ISO), null nếu không đặt */
+  /** @deprecated dùng ends_at */
   closes_at?: string | null;
+  /** Giờ mở thi (ISO) — hệ thống tự mở phiên */
+  opens_at?: string | null;
+  /** Giờ kết thúc / tự nộp (ISO) */
+  ends_at?: string | null;
   created_at: string;
   subject_name?: string;
   subject_code?: string | null;
@@ -339,6 +343,8 @@ const examApi = {
     duration_min: number;
     description?: string;
     closes_at?: string | null;
+    opens_at?: string | null;
+    ends_at?: string | null;
   }): Promise<Exam> => {
     const res = await apiClient.post<{ success: boolean; data: Exam }>('/exams', payload);
     return res.data.data;
@@ -346,7 +352,7 @@ const examApi = {
 
   updateExam: async (
     id: string,
-    payload: Partial<Pick<Exam, 'title' | 'description' | 'duration_min' | 'closes_at' | 'num_versions'>>
+    payload: Partial<Pick<Exam, 'title' | 'description' | 'duration_min' | 'closes_at' | 'opens_at' | 'ends_at' | 'num_versions'>>
   ): Promise<Exam> => {
     const res = await apiClient.patch<{ success: boolean; data: Exam }>(`/exams/${id}`, payload);
     return res.data.data;
@@ -432,6 +438,8 @@ const examApi = {
     duration_min: number;
     description?: string | null;
     closes_at?: string | null;
+    opens_at?: string | null;
+    ends_at?: string | null;
     num_versions?: number;
     questions: ImportedQuestionDraft[];
   }): Promise<{ exam: Exam; questions: Question[] }> => {

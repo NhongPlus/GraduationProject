@@ -178,20 +178,29 @@ async function finalizeExamRuntime(io: Server, state: ExamRuntimeState): Promise
   }
 }
 
-function startExamRuntime(io: Server, examId: string, durationMin: number): ExamRuntimeState {
+function startExamRuntime(
+  io: Server,
+  examId: string,
+  durationMin: number,
+  fixedEndsAtMs?: number
+): ExamRuntimeState {
   const old = examStateStore.get(examId);
   clearExamTimers(old);
 
   const startedAtMs = Date.now();
-  const endsAtMs = startedAtMs + durationMin * 60_000;
+  const endsAtMs =
+    fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs) && fixedEndsAtMs > startedAtMs
+      ? fixedEndsAtMs
+      : startedAtMs + durationMin * 60_000;
+  const effectiveDurationMin = Math.max(1, Math.ceil((endsAtMs - startedAtMs) / 60_000));
   const state: ExamRuntimeState = {
     examId,
     startedAtMs,
     endsAtMs,
-    durationMin,
+    durationMin: effectiveDurationMin,
   };
 
-  const msUntilFinal15 = Math.max(0, (durationMin - 15) * 60_000);
+  const msUntilFinal15 = Math.max(0, (effectiveDurationMin - 15) * 60_000);
   state.final15Timer = setTimeout(() => {
     io.to(roomForExam(examId)).emit("exam:final_15m", {
       examId,
@@ -207,7 +216,7 @@ function startExamRuntime(io: Server, examId: string, durationMin: number): Exam
   }, msUntilEnd);
 
   examStateStore.set(examId, state);
-  void saveExamRuntimeStart(examId, new Date(startedAtMs), new Date(endsAtMs), durationMin).catch(console.error);
+  void saveExamRuntimeStart(examId, new Date(startedAtMs), new Date(endsAtMs), effectiveDurationMin).catch(console.error);
   emitExamState(io, examId);
   return state;
 }
@@ -613,7 +622,15 @@ export async function startExamRuntimeFromServer(examId: string): Promise<{
   }
 
   const durationMin = sanitizeDuration(exam.duration_min);
-  const state = startExamRuntime(ioInstance, examId, durationMin);
+  const fixedEndsAtMs = exam.ends_at ? new Date(exam.ends_at).getTime() : undefined;
+  if (fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs) && fixedEndsAtMs <= Date.now()) {
+    throw new Error("Bai thi da het gio ket thuc");
+  }
+  const runtimeDuration =
+    fixedEndsAtMs != null && Number.isFinite(fixedEndsAtMs)
+      ? Math.max(1, Math.ceil((fixedEndsAtMs - Date.now()) / 60_000))
+      : durationMin;
+  const state = startExamRuntime(ioInstance, examId, runtimeDuration, fixedEndsAtMs);
   console.log(
     `[exam-runtime] started exam=${examId} duration=${durationMin}m endsAt=${new Date(state.endsAtMs).toISOString()}`
   );
@@ -630,6 +647,29 @@ export async function startExamRuntimeFromServer(examId: string): Promise<{
   });
 
   return payload;
+}
+
+/** Force-submit and end runtime (scheduled end or manual cleanup). */
+export async function finalizeExamRuntimeByExamId(examId: string): Promise<void> {
+  if (!ioInstance) {
+    throw new Error("Socket.IO server is not ready");
+  }
+  const state = examStateStore.get(examId);
+  if (state) {
+    await finalizeExamRuntime(ioInstance, state);
+    return;
+  }
+  const { getRuntimeStateByExam } = await import("~/models/examRuntimeState.model");
+  const dbState = await getRuntimeStateByExam(examId);
+  if (dbState?.is_active) {
+    const synthetic: ExamRuntimeState = {
+      examId,
+      startedAtMs: new Date(dbState.started_at).getTime(),
+      endsAtMs: new Date(dbState.ends_at).getTime(),
+      durationMin: dbState.duration_min,
+    };
+    await finalizeExamRuntime(ioInstance, synthetic);
+  }
 }
 
 /** Called by server.ts on startup to restore active exam runtimes from DB */

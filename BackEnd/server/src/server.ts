@@ -10,6 +10,7 @@ import { errorHandler } from "~/middlewares/error.middleware";
 import { registerExamSocket, restoreExamRuntimesOnStartup } from "~/socket/examSocket";
 import { setupSwaggerDocs } from "./docs/swagger";
 import { startExamDeadlineReminderScheduler } from "~/jobs/examDeadlineReminders.job";
+import { startExamScheduleScheduler } from "~/jobs/examScheduledRuntime.job";
 import { runPendingMigrations } from "~/db/runMigrations";
 
 const START_SERVER = () => {
@@ -48,6 +49,7 @@ const START_SERVER = () => {
   void restoreExamRuntimesOnStartup(io);
 
   startExamDeadlineReminderScheduler();
+  startExamScheduleScheduler();
 
   httpServer.listen(Number(env.APP_PORT), () => {
     console.log(
