@@ -12,10 +12,17 @@ import { isQuestionAnswered } from '@/components/ExamTake/isQuestionAnswered';
 import type { MockExamQuestion } from '@/components/ExamTake/types';
 import appConfig from '@/configs/app.config';
 import examApi, {
+  type Exam,
   type Question as ApiQuestion,
   type StartSessionData,
   type SubmitResult,
 } from '@/services/examApi';
+import {
+  formatCountdownHms,
+  getExamScheduleParts,
+  isBeforeExamOpens,
+  msUntilOpensAt,
+} from '@/utils/examDeadline';
 import { useExamTakeState } from '@/hooks/useExamTakeState';
 import useAuth from '@/hooks/useAuth';
 import {
@@ -209,6 +216,10 @@ const ExamTake = () => {
   const [fsRevision, setFsRevision] = useState(0);
   /** GV đã bật thi (socket) — có thể trước khi startSession API xong */
   const [teacherRuntimeLive, setTeacherRuntimeLive] = useState(false);
+  const [examSchedule, setExamSchedule] =
+    useState<Pick<Exam, 'opens_at' | 'ends_at' | 'runtime_is_active'> | null>(null);
+  const examScheduleRef = useRef(examSchedule);
+  const [waitNowMs, setWaitNowMs] = useState(() => Date.now());
   const rootRef = useRef<HTMLDivElement>(null);
   /** P0 Fix: Grace period timer ref for fullscreen exit */
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -282,6 +293,25 @@ const ExamTake = () => {
     integrity: { violationLocked, setViolationLocked, lockReason, setLockReason },
     refs: { remainingRef, sessionStartingRef, violationTriggeredRef, lastViolationAtRef },
   } = useExamTakeState(activeExamId);
+
+  useEffect(() => {
+    examScheduleRef.current = examSchedule;
+  }, [examSchedule]);
+
+  /** Đếm giờ mở theo lịch khi chờ vào đề */
+  useEffect(() => {
+    if (
+      !examSchedule?.opens_at ||
+      teacherRuntimeLive ||
+      examStarted ||
+      autoSubmitted ||
+      violationLocked
+    ) {
+      return;
+    }
+    const id = window.setInterval(() => setWaitNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [examSchedule?.opens_at, teacherRuntimeLive, examStarted, autoSubmitted, violationLocked]);
 
   const inBrowserFullscreen = isFullscreen || Boolean(document.fullscreenElement);
 
@@ -495,7 +525,12 @@ const ExamTake = () => {
       } else if (payload.status === 'not_started') {
         setTeacherRuntimeLive(false);
         setExamStarted(false);
-        setRealtimeMessage(t('exam_take.waiting_teacher_desc'));
+        const sch = examScheduleRef.current;
+        if (sch?.opens_at && !isBeforeExamOpens(sch)) {
+          setRealtimeMessage(t('exam_take.waiting_scheduled_desc'));
+        } else {
+          setRealtimeMessage(t('exam_take.waiting_teacher_desc'));
+        }
       } else if (payload.status === 'ended') {
         setTeacherRuntimeLive(false);
         setExamStarted(false);
@@ -741,7 +776,12 @@ const ExamTake = () => {
         setCurrentNumber(1);
         setRemainingSeconds(0);
         setExamStarted(false);
-        setTeacherRuntimeLive(false);
+        setExamSchedule({
+          opens_at: examData.opens_at ?? null,
+          ends_at: examData.ends_at ?? null,
+          runtime_is_active: examData.runtime_is_active ?? false,
+        });
+        setTeacherRuntimeLive(Boolean(examData.runtime_is_active));
       } catch {
         if (canceled) return;
         setBootError(t('exam_take.boot_error_load'));
@@ -756,6 +796,43 @@ const ExamTake = () => {
       canceled = true;
     };
   }, [activeExamId, examId]);
+
+  useEffect(() => {
+    if (
+      !examId ||
+      !examSchedule?.opens_at ||
+      teacherRuntimeLive ||
+      examStarted ||
+      autoSubmitted
+    )
+      return;
+    const poll = async () => {
+      try {
+        const e = await examApi.getExam(activeExamId);
+        setExamSchedule({
+          opens_at: e.opens_at ?? null,
+          ends_at: e.ends_at ?? null,
+          runtime_is_active: e.runtime_is_active ?? false,
+        });
+        if (e.runtime_is_active) markTeacherRuntimeLive();
+      } catch {
+        /* ignore transient poll failures */
+      }
+    };
+    void poll();
+    const id = window.setInterval(() => {
+      void poll();
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [
+    activeExamId,
+    autoSubmitted,
+    examId,
+    examSchedule?.opens_at,
+    examStarted,
+    markTeacherRuntimeLive,
+    teacherRuntimeLive,
+  ]);
 
   useEffect(() => {
     if (currentNumber > maxQuestionIndex) {
@@ -1124,6 +1201,14 @@ const ExamTake = () => {
     });
   };
 
+  const waitingScheduleParts = useMemo(
+    () =>
+      examSchedule
+        ? getExamScheduleParts({ ...examSchedule, closes_at: null })
+        : { start: null as string | null, end: null as string | null },
+    [examSchedule]
+  );
+
   if (bootLoading) {
     return (
       <Box className={`${classes.root} ${classes.rootCentered}`}>
@@ -1153,6 +1238,21 @@ const ExamTake = () => {
   }
 
   void fsRevision;
+
+  const beforeOpensGate =
+    Boolean(examSchedule?.opens_at) &&
+    !teacherRuntimeLive &&
+    isBeforeExamOpens({ opens_at: examSchedule!.opens_at! }, waitNowMs);
+
+  const scheduledAutoPendingGate =
+    Boolean(examSchedule?.opens_at) && !beforeOpensGate && !teacherRuntimeLive;
+
+  const scheduleOpensCountdown =
+    examSchedule?.opens_at != null && examSchedule.opens_at !== ''
+      ? formatCountdownHms(
+          msUntilOpensAt({ opens_at: examSchedule.opens_at }, waitNowMs) ?? 0
+        )
+      : '';
 
   const showFullscreenRequired =
     !integrityDisabled &&
@@ -1320,10 +1420,24 @@ const ExamTake = () => {
             </Stack>
           )}
           <Text fw={700} size="lg" mb={8}>
-            {t('exam_take.waiting_teacher_title')}
+            {beforeOpensGate
+              ? t('exam_take.waiting_before_schedule_title')
+              : scheduledAutoPendingGate
+                ? t('exam_take.waiting_scheduled_title')
+                : t('exam_take.waiting_teacher_title')}
           </Text>
           <Text c="dimmed" size="sm" mb="md">
-            {t('exam_take.waiting_teacher_desc')}
+            {beforeOpensGate
+              ? t('exam_take.waiting_before_schedule_desc', {
+                  start: waitingScheduleParts.start ?? '—',
+                  end: waitingScheduleParts.end ?? '—',
+                  countdown: scheduleOpensCountdown,
+                })
+              : scheduledAutoPendingGate
+                ? t('exam_take.waiting_scheduled_desc', {
+                    end: waitingScheduleParts.end ?? '—',
+                  })
+                : t('exam_take.waiting_teacher_desc')}
           </Text>
           <Button
             variant="subtle"

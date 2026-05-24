@@ -44,7 +44,7 @@ import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPrevi
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
 import { formatSubjectLabel } from '@/components/Input/SubjectCategoryPicker/subjectGrouping';
 import ExamQuestionBankPicker, { type BankPickTarget } from '@/pages/main/Exam/ExamQuestionBankPicker';
-import { scheduleDurationMin } from '@/utils/examDeadline';
+import { isoToDatetimeLocalInput, scheduleDurationMin } from '@/utils/examDeadline';
 
 const MAX_EXAM_VERSIONS = 4;
 
@@ -218,9 +218,11 @@ export default function ExamAuthoring() {
             title: existingExam.title,
             description: existingExam.description ?? '',
             durationMin: existingExam.duration_min,
-            opensAt: existingExam.opens_at ? existingExam.opens_at.slice(0, 16) : '',
+            opensAt: existingExam.opens_at ? isoToDatetimeLocalInput(existingExam.opens_at) : '',
             endsAt: (existingExam.ends_at ?? existingExam.closes_at)
-              ? (existingExam.ends_at ?? existingExam.closes_at)!.slice(0, 16)
+              ? isoToDatetimeLocalInput(
+                  (existingExam.ends_at ?? existingExam.closes_at) as string
+                )
               : '',
             numVersions: String(Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))),
           };
@@ -229,9 +231,13 @@ export default function ExamAuthoring() {
           setNumVersionsCount(
             Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))
           );
-          const opens = existingExam.opens_at ? existingExam.opens_at.slice(0, 16) : '';
+          const opens = existingExam.opens_at
+            ? isoToDatetimeLocalInput(existingExam.opens_at)
+            : '';
           const ends = (existingExam.ends_at ?? existingExam.closes_at)
-            ? (existingExam.ends_at ?? existingExam.closes_at)!.slice(0, 16)
+            ? isoToDatetimeLocalInput(
+                (existingExam.ends_at ?? existingExam.closes_at) as string
+              )
             : '';
           if (opens && ends) {
             const mins = scheduleDurationMin(opens, ends);

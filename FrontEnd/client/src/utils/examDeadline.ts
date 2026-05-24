@@ -101,3 +101,29 @@ export function canTeacherManualOpenExam(
   if (!exam.opens_at) return true;
   return isBeforeExamOpens(exam, nowMs);
 }
+
+export function msUntilOpensAt(
+  exam: Pick<Exam, 'opens_at'>,
+  nowMs: number = Date.now()
+): number | null {
+  const t = toMs(exam.opens_at);
+  if (t == null) return null;
+  return Math.max(0, t - nowMs);
+}
+
+export function formatCountdownHms(totalMs: number): string {
+  const totalSec = Math.max(0, Math.floor(totalMs / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+/** Giá trị cho input datetime-local từ ISO (giờ máy người dùng). */
+export function isoToDatetimeLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
