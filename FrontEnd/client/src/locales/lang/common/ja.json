@@ -290,7 +290,15 @@
     "force_submit_confirm": "このしけんの active セッションを ぜんぶ force-submit しますか？",
     "force_submit_done": "Force-submit が おわりました。active: {{active}}, submitted: {{submitted}}, failed: {{failed}}。",
     "status_retake_granted": "再試験可",
-    "take_retake_hint": "教員が再試験を許可しました"
+    "take_retake_hint": "教員が再試験を許可しました",
+    "status_staff_running": "実施中",
+    "status_staff_stopped": "未開始",
+    "status_filter_staff_running": "実施中",
+    "status_filter_staff_stopped": "未開始",
+    "staff_running_exams": "実施中",
+    "staff_stopped_exams": "未開始",
+    "action_open_runtime": "試験枠を開く",
+    "start_runtime_hint": "クラス向けに試験枠を開きます。提出済みの学生はセッション管理で個別に再試験を許可する必要があります。"
   },
   "exam_retake": {
     "grant_btn": "再試験を許可",

@@ -303,7 +303,15 @@
     "force_submit_confirm": "Are you sure you want to force-submit all active sessions for this exam?",
     "force_submit_done": "Force-submit completed. Active: {{active}}, submitted: {{submitted}}, failed: {{failed}}.",
     "status_retake_granted": "Retake allowed",
-    "take_retake_hint": "Your teacher allowed a retake for this exam"
+    "take_retake_hint": "Your teacher allowed a retake for this exam",
+    "status_staff_running": "In progress",
+    "status_staff_stopped": "Not open",
+    "status_filter_staff_running": "In progress",
+    "status_filter_staff_stopped": "Not open",
+    "staff_running_exams": "In progress",
+    "staff_stopped_exams": "Not open",
+    "action_open_runtime": "Open exam window",
+    "start_runtime_hint": "Opens the exam window for the class. Students who already submitted need an individual retake grant in Session management."
   },
   "exam_retake": {
     "grant_btn": "Allow retake",

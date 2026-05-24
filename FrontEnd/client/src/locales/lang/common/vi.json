@@ -314,7 +314,15 @@
     "force_submit_confirm": "Bạn có chắc muốn force-submit toàn bộ phiên đang active của đề thi này?",
     "force_submit_done": "Đã xử lý force-submit. Active: {{active}}, nộp thành công: {{submitted}}, lỗi: {{failed}}.",
     "status_retake_granted": "Được thi lại",
-    "take_retake_hint": "Giáo viên đã cho phép thi lại bài này"
+    "take_retake_hint": "Giáo viên đã cho phép thi lại bài này",
+    "status_staff_running": "Đang diễn ra",
+    "status_staff_stopped": "Chưa mở",
+    "status_filter_staff_running": "Đang diễn ra",
+    "status_filter_staff_stopped": "Chưa mở",
+    "staff_running_exams": "Đang diễn ra",
+    "staff_stopped_exams": "Chưa mở",
+    "action_open_runtime": "Mở phiên thi",
+    "start_runtime_hint": "Mở cửa sổ thi cho lớp. SV đã nộp bài cần được Cho thi lại tại Quản lý phiên thi."
   },
   "exam_retake": {
     "grant_btn": "Cho thi lại",

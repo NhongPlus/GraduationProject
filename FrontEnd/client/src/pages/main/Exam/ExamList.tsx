@@ -147,13 +147,17 @@ const ExamList = () => {
             <Text fw={700} size="xl">{exams.length}</Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">{t('exam_list.done_exams')}</Text>
+            <Text size="sm" c="dimmed">
+              {isStaff ? t('exam_list.staff_stopped_exams') : t('exam_list.done_exams')}
+            </Text>
             <Text fw={700} size="xl">
               {doneCount}
             </Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">{t('exam_list.not_done_exams')}</Text>
+            <Text size="sm" c="dimmed">
+              {isStaff ? t('exam_list.staff_running_exams') : t('exam_list.not_done_exams')}
+            </Text>
             <Text fw={700} size="xl">
               {Math.max(0, exams.length - doneCount)}
             </Text>
@@ -175,11 +179,19 @@ const ExamList = () => {
               setStatusFilter((value as 'all' | 'not_done' | 'done') ?? 'all');
               setListPage(1);
             }}
-            data={[
-              { value: 'all', label: t('exam_list.status_all') },
-              { value: 'not_done', label: t('exam_list.status_not_done') },
-              { value: 'done', label: t('exam_list.status_done') },
-            ]}
+            data={
+              isStaff
+                ? [
+                    { value: 'all', label: t('exam_list.status_all') },
+                    { value: 'not_done', label: t('exam_list.status_filter_staff_running') },
+                    { value: 'done', label: t('exam_list.status_filter_staff_stopped') },
+                  ]
+                : [
+                    { value: 'all', label: t('exam_list.status_all') },
+                    { value: 'not_done', label: t('exam_list.status_not_done') },
+                    { value: 'done', label: t('exam_list.status_done') },
+                  ]
+            }
           />
         </Stack>
 
@@ -221,6 +233,7 @@ const ExamList = () => {
                   const done = isStaff
                     ? !examInProgress
                     : studentSubmitted && !canRetake;
+                  const staffRunning = isStaff && examInProgress;
                   const pastDeadline = isPastExamStartDeadline(item, latest);
                   const deadlineLabel =
                     item.closes_at != null && item.closes_at !== ''
@@ -260,14 +273,26 @@ const ExamList = () => {
                       <Table.Td>
                         <Badge
                           color={
-                            canRetake ? 'orange' : done ? 'green' : 'gray'
+                            isStaff
+                              ? staffRunning
+                                ? 'orange'
+                                : 'gray'
+                              : canRetake
+                                ? 'orange'
+                                : done
+                                  ? 'green'
+                                  : 'gray'
                           }
                         >
-                          {canRetake
-                            ? t('exam_list.status_retake_granted')
-                            : done
-                              ? t('exam_list.status_done')
-                              : t('exam_list.status_not_done')}
+                          {isStaff
+                            ? staffRunning
+                              ? t('exam_list.status_staff_running')
+                              : t('exam_list.status_staff_stopped')
+                            : canRetake
+                              ? t('exam_list.status_retake_granted')
+                              : done
+                                ? t('exam_list.status_done')
+                                : t('exam_list.status_not_done')}
                         </Badge>
                       </Table.Td>
                       <Table.Td>
@@ -292,9 +317,10 @@ const ExamList = () => {
                                 leftSection={<IconPlayerPlay size={13} />}
                                 loading={startingExamId === item.id}
                                 disabled={startingExamId === item.id}
+                                title={t('exam_list.start_runtime_hint')}
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
                               >
-                                {t('exam_list.action_start', 'Bắt đầu thi')}
+                                {t('exam_list.action_open_runtime', 'Mở phiên thi')}
                               </Button>
                             )}
                             <Menu shadow="md" width={170} position="bottom-end">
