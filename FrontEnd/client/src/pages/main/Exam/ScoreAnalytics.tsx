@@ -1,141 +1,170 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Box, Text, Loader, Paper, Group, Stack, Alert, SegmentedControl, Badge, SimpleGrid,
+  Box, Text, Loader, Paper, Group, Stack, Alert, SimpleGrid, Select, Table, Badge,
 } from '@mantine/core';
 import '@mantine/core/styles.css';
-import '@mantine/dates/styles.css';
 import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import adminClassApi, { type AdminClassDto } from '@/services/adminClassApi';
 import scoreAnalyticsApi, {
-  type AdminClassScoreDistribution,
-  type SubjectScoreDistribution,
+  type SubjectOption,
+  type SubjectScoreAnalytics,
 } from '@/services/scoreAnalyticsApi';
 import EmptyState from '@/components/EmptyState/EmptyState';
 import PageHeader from '@/components/PageHeader/PageHeader';
-import InputMultiSelect from '@/components/Input/InputMultiSelect/InputMultiSelect';
+import useAuth from '@/hooks/useAuth';
+import { formatExamScore } from '@/utils/formatExamScore';
 
-const PALETTE = ['teal.6', 'blue.6', 'grape.6', 'orange.6', 'pink.6', 'cyan.6'];
+const ALL_CLASSES = '__all__';
 
-type DistributionRow = SubjectScoreDistribution | AdminClassScoreDistribution;
-
-function getRowLabel(row: DistributionRow): string {
-  return 'subject_name' in row ? row.subject_name : row.class_label;
+function formatGrade10(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return `${formatExamScore(value)}/10`;
 }
 
-function buildChartPayload(
-  rows: DistributionRow[],
-  selectedLabels: string[],
-  mode: 'count' | 'percent'
-) {
-  const active = rows.filter((r) => selectedLabels.includes(getRowLabel(r)));
-  if (!active.length) return { data: [] as Record<string, string | number>[], series: [] as { name: string; color: string }[] };
-
-  const bucketLabels = active[0].buckets.map((b) => b.range_label);
-  const data = bucketLabels.map((bucket) => {
-    const point: Record<string, string | number> = { bucket };
-    active.forEach((row) => {
-      const label = getRowLabel(row);
-      const bucketRow = row.buckets.find((b) => b.range_label === bucket);
-      const count = bucketRow?.count ?? 0;
-      point[label] =
-        mode === 'count'
-          ? count
-          : row.total_students > 0
-            ? Number(((count / row.total_students) * 100).toFixed(1))
-            : 0;
-    });
-    return point;
-  });
-
-  const series = active.map((row, idx) => ({
-    name: getRowLabel(row),
-    color: PALETTE[idx % PALETTE.length],
-  }));
-
-  return { data, series };
+function formatPercent(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return `${formatExamScore(value)}%`;
 }
 
 const ScoreAnalytics = () => {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
-  const [loading, setLoading] = useState(true);
+  const { userRole } = useAuth();
+  const isAdmin = userRole === 'admin';
+
+  const [classesLoading, setClassesLoading] = useState(true);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [bySubject, setBySubject] = useState<SubjectScoreDistribution[]>([]);
-  const [byClass, setByClass] = useState<AdminClassScoreDistribution[]>([]);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [chartMode, setChartMode] = useState<'count' | 'percent'>('count');
+
+  const [classes, setClasses] = useState<AdminClassDto[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<SubjectScoreAnalytics | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    const loadClasses = async () => {
       try {
-        setLoading(true);
+        setClassesLoading(true);
         setError('');
-        const [subjects, classes] = await Promise.all([
-          scoreAnalyticsApi.getBySubjects(),
-          scoreAnalyticsApi.getByAdminClasses(),
-        ]);
-        setBySubject(subjects);
-        setByClass(classes);
-
-        const subjectNames = subjects.map((s) => s.subject_name);
-        const classLabels = classes.map((c) => c.class_label);
-        const fromUrl = searchParams.get('subject');
-
-        setSelectedSubjects(
-          fromUrl && subjectNames.includes(fromUrl) ? [fromUrl] : subjectNames
-        );
-        setSelectedClasses(classLabels);
+        const list = await adminClassApi.getClasses();
+        setClasses(list);
+        if (isAdmin) {
+          setSelectedClassId(ALL_CLASSES);
+        } else if (list.length === 1) {
+          setSelectedClassId(list[0].id);
+        } else {
+          setSelectedClassId(null);
+        }
       } catch {
         setError(t('score_analytics.load_failed'));
       } finally {
-        setLoading(false);
+        setClassesLoading(false);
       }
     };
-    void load();
-  }, [searchParams, t]);
+    void loadClasses();
+  }, [isAdmin, t]);
 
-  const totalSessions = useMemo(
-    () => bySubject.reduce((sum, s) => sum + s.total_students, 0),
-    [bySubject]
-  );
+  const resolvedClassId = useMemo(() => {
+    if (selectedClassId === ALL_CLASSES) return null;
+    return selectedClassId;
+  }, [selectedClassId]);
 
-  const subjectChart = useMemo(
-    () => buildChartPayload(bySubject, selectedSubjects, chartMode),
-    [bySubject, selectedSubjects, chartMode]
-  );
-  const classChart = useMemo(
-    () => buildChartPayload(byClass, selectedClasses, chartMode),
-    [byClass, selectedClasses, chartMode]
-  );
+  useEffect(() => {
+    setSelectedSubjectId(null);
+    setAnalytics(null);
+  }, [selectedClassId]);
+
+  const loadSubjects = useCallback(async () => {
+    if (!isAdmin && !resolvedClassId) {
+      setSubjects([]);
+      setSelectedSubjectId(null);
+      return;
+    }
+    try {
+      setSubjectsLoading(true);
+      setError('');
+      const list = await scoreAnalyticsApi.getSubjects(resolvedClassId);
+      setSubjects(list);
+      setSelectedSubjectId((prev) =>
+        prev && list.some((s) => s.subject_id === prev) ? prev : list[0]?.subject_id ?? null
+      );
+    } catch {
+      setError(t('score_analytics.load_failed'));
+      setSubjects([]);
+      setSelectedSubjectId(null);
+    } finally {
+      setSubjectsLoading(false);
+    }
+  }, [isAdmin, resolvedClassId, t]);
+
+  useEffect(() => {
+    void loadSubjects();
+  }, [loadSubjects]);
+
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      if (!selectedSubjectId) {
+        setAnalytics(null);
+        return;
+      }
+      if (!isAdmin && !resolvedClassId) {
+        setAnalytics(null);
+        return;
+      }
+      try {
+        setAnalyticsLoading(true);
+        setError('');
+        const data = await scoreAnalyticsApi.getBySubject(selectedSubjectId, resolvedClassId);
+        setAnalytics(data);
+      } catch {
+        setError(t('score_analytics.load_failed'));
+        setAnalytics(null);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+    void loadAnalytics();
+  }, [selectedSubjectId, resolvedClassId, isAdmin, t]);
+
+  const classOptions = useMemo(() => {
+    const opts = classes.map((c) => ({ value: c.id, label: c.display_name }));
+    if (isAdmin) {
+      return [{ value: ALL_CLASSES, label: t('score_analytics.all_classes') }, ...opts];
+    }
+    return opts;
+  }, [classes, isAdmin, t]);
 
   const subjectOptions = useMemo(
-    () => bySubject.map((s) => s.subject_name).sort(),
-    [bySubject]
-  );
-  const classOptions = useMemo(
-    () => byClass.map((c) => c.class_label).sort(),
-    [byClass]
+    () =>
+      subjects.map((s) => ({
+        value: s.subject_id,
+        label: `${s.subject_name} (${s.session_count})`,
+      })),
+    [subjects]
   );
 
-  if (loading) {
+  const chartData = useMemo(
+    () =>
+      analytics?.buckets.map((b) => ({
+        bucket: b.range_label,
+        count: b.count,
+      })) ?? [],
+    [analytics]
+  );
+
+  const noManagedClass = !isAdmin && classes.length === 0;
+  const needsClassPick = !isAdmin && classes.length > 1 && !selectedClassId;
+  const isLoading = classesLoading || subjectsLoading || analyticsLoading;
+
+  if (classesLoading) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Loader />
       </Box>
     );
   }
-
-  if (error) {
-    return (
-      <Box className="max-w-[1100px] mx-auto p-4">
-        <Alert color="red" variant="light">{error}</Alert>
-      </Box>
-    );
-  }
-
-  const hasData = totalSessions > 0;
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
@@ -146,126 +175,145 @@ const ScoreAnalytics = () => {
           accent="teal"
         />
 
-        {hasData && (
-          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-            <Paper withBorder p="sm" radius="md">
-              <Text size="xs" c="dimmed">{t('score_analytics.students_total', { count: totalSessions })}</Text>
-              <Text fw={700} size="xl">{totalSessions}</Text>
-            </Paper>
-            <Paper withBorder p="sm" radius="md">
-              <Text size="xs" c="dimmed">{t('score_analytics.by_subject')}</Text>
-              <Text fw={700} size="xl">{bySubject.length}</Text>
-            </Paper>
-            <Paper withBorder p="sm" radius="md">
-              <Text size="xs" c="dimmed">{t('score_analytics.by_class')}</Text>
-              <Text fw={700} size="xl">{byClass.length}</Text>
-            </Paper>
-          </SimpleGrid>
+        {error && (
+          <Alert color="red" variant="light">{error}</Alert>
         )}
 
-        <Group grow align="end">
-          <InputMultiSelect
-            label={t('score_analytics.filter_subject')}
-            placeholder={t('score_analytics.select_subject')}
-            value={selectedSubjects}
-            onChange={setSelectedSubjects}
-            data={subjectOptions}
-            maxVisiblePills={2}
-            clearAllLabel={t('score_analytics.hide_all')}
-          />
-          <InputMultiSelect
-            label={t('score_analytics.filter_class')}
-            placeholder={t('score_analytics.select_class')}
-            value={selectedClasses}
-            onChange={setSelectedClasses}
-            data={classOptions}
-            maxVisiblePills={2}
-            clearAllLabel={t('score_analytics.hide_all')}
-          />
-          <Box>
-            <Text size="sm" fw={500} mb={6}>{t('score_analytics.chart_mode')}</Text>
-            <SegmentedControl
-              fullWidth
-              value={chartMode}
-              onChange={(v) => setChartMode(v as 'count' | 'percent')}
-              data={[
-                { value: 'count', label: t('score_analytics.students_count') },
-                { value: 'percent', label: t('score_analytics.distribution_percent') },
-              ]}
+        {noManagedClass ? (
+          <Alert color="yellow" variant="light">
+            {t('score_analytics.no_managed_class')}
+          </Alert>
+        ) : (
+          <Group grow align="end">
+            <Select
+              label={isAdmin ? t('score_analytics.filter_class') : t('score_analytics.my_class')}
+              placeholder={t('score_analytics.select_class')}
+              data={classOptions}
+              value={selectedClassId}
+              onChange={setSelectedClassId}
+              disabled={!isAdmin && classes.length <= 1}
+              searchable
             />
-          </Box>
-        </Group>
+            <Select
+              label={t('score_analytics.filter_subject')}
+              placeholder={t('score_analytics.select_subject')}
+              data={subjectOptions}
+              value={selectedSubjectId}
+              onChange={setSelectedSubjectId}
+              disabled={needsClassPick || subjects.length === 0}
+              searchable
+            />
+          </Group>
+        )}
 
-        {!hasData ? (
+        {needsClassPick && (
+          <Alert color="blue" variant="light">
+            {t('score_analytics.pick_class_first')}
+          </Alert>
+        )}
+
+        {isLoading && !classesLoading && (
+          <Group justify="center" py="md">
+            <Loader size="sm" />
+          </Group>
+        )}
+
+        {!isLoading && analytics && analytics.summary.total_sessions > 0 && (
+          <Stack gap="md">
+            <Group gap="xs">
+              <Badge variant="light" color="teal">{analytics.class_name}</Badge>
+              <Badge variant="light" color="blue">{analytics.subject_name}</Badge>
+            </Group>
+
+            <SimpleGrid cols={{ base: 2, sm: 5 }} spacing="sm">
+              <Paper withBorder p="sm" radius="md">
+                <Text size="xs" c="dimmed">{t('score_analytics.sessions_total')}</Text>
+                <Text fw={700} size="xl">{analytics.summary.total_sessions}</Text>
+              </Paper>
+              <Paper withBorder p="sm" radius="md">
+                <Text size="xs" c="dimmed">{t('score_analytics.avg')}</Text>
+                <Text fw={700} size="xl">{formatGrade10(analytics.summary.avg_grade10)}</Text>
+              </Paper>
+              <Paper withBorder p="sm" radius="md">
+                <Text size="xs" c="dimmed">{t('score_analytics.min')}</Text>
+                <Text fw={700} size="xl">{formatGrade10(analytics.summary.min_grade10)}</Text>
+              </Paper>
+              <Paper withBorder p="sm" radius="md">
+                <Text size="xs" c="dimmed">{t('score_analytics.max')}</Text>
+                <Text fw={700} size="xl">{formatGrade10(analytics.summary.max_grade10)}</Text>
+              </Paper>
+              <Paper withBorder p="sm" radius="md">
+                <Text size="xs" c="dimmed">{t('score_analytics.pass_rate')}</Text>
+                <Text fw={700} size="xl">{formatPercent(analytics.summary.pass_rate)}</Text>
+              </Paper>
+            </SimpleGrid>
+
+            <Paper withBorder radius="md" p="md">
+              <Text fw={600} mb="sm">{t('score_analytics.histogram_title')}</Text>
+              {chartData.some((d) => d.count > 0) ? (
+                <BarChart
+                  h={320}
+                  data={chartData}
+                  dataKey="bucket"
+                  series={[{ name: 'count', color: 'teal.6' }]}
+                  tickLine="xy"
+                  gridAxis="xy"
+                  xAxisLabel={t('score_analytics.grade10_bucket')}
+                  yAxisLabel={t('score_analytics.sessions_count')}
+                />
+              ) : (
+                <Text size="sm" c="dimmed">{t('score_analytics.no_data')}</Text>
+              )}
+            </Paper>
+
+            <Paper withBorder radius="md" p="md">
+              <Text fw={600} mb="sm">{t('score_analytics.exam_breakdown')}</Text>
+              {analytics.exams.length === 0 ? (
+                <Text size="sm" c="dimmed">{t('score_analytics.no_exam_data')}</Text>
+              ) : (
+                <Table striped highlightOnHover withTableBorder>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>{t('score_analytics.exam_title')}</Table.Th>
+                      <Table.Th>{t('score_analytics.sessions_count')}</Table.Th>
+                      <Table.Th>{t('score_analytics.avg')}</Table.Th>
+                      <Table.Th>{t('score_analytics.min')}</Table.Th>
+                      <Table.Th>{t('score_analytics.max')}</Table.Th>
+                      <Table.Th>{t('score_analytics.pass_rate')}</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {analytics.exams.map((exam) => (
+                      <Table.Tr key={exam.exam_id}>
+                        <Table.Td>{exam.exam_title}</Table.Td>
+                        <Table.Td>{exam.submitted_count}</Table.Td>
+                        <Table.Td>{formatGrade10(exam.avg_grade10)}</Table.Td>
+                        <Table.Td>{formatGrade10(exam.min_grade10)}</Table.Td>
+                        <Table.Td>{formatGrade10(exam.max_grade10)}</Table.Td>
+                        <Table.Td>{formatPercent(exam.pass_rate)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              )}
+            </Paper>
+          </Stack>
+        )}
+
+        {!isLoading && !noManagedClass && !needsClassPick && selectedSubjectId && analytics?.summary.total_sessions === 0 && (
           <EmptyState
             icon={<Text style={{ fontSize: 36 }}>📊</Text>}
             title={t('score_analytics.empty_title')}
             description={t('score_analytics.empty_desc')}
           />
-        ) : (
-          <Stack gap="lg">
-            <Paper withBorder radius="md" p="md">
-              <Group justify="space-between" mb="sm">
-                <Text fw={600}>{t('score_analytics.by_subject')}</Text>
-                {selectedSubjects.length > 0 && (
-                  <Badge variant="light" color="teal">
-                    {selectedSubjects.length} {t('score_analytics.filter_subject').toLowerCase()}
-                  </Badge>
-                )}
-              </Group>
-              {subjectChart.data.length === 0 || subjectChart.series.length === 0 ? (
-                <Text size="sm" c="dimmed">{t('score_analytics.filter_no_match')}</Text>
-              ) : (
-                <BarChart
-                  h={360}
-                  data={subjectChart.data}
-                  dataKey="bucket"
-                  series={subjectChart.series}
-                  tickLine="xy"
-                  gridAxis="xy"
-                  withLegend
-                  legendProps={{ verticalAlign: 'bottom' }}
-                  xAxisLabel={t('score_analytics.score_bucket')}
-                  yAxisLabel={
-                    chartMode === 'count'
-                      ? t('score_analytics.students_count')
-                      : t('score_analytics.distribution_percent')
-                  }
-                />
-              )}
-            </Paper>
+        )}
 
-            <Paper withBorder radius="md" p="md">
-              <Group justify="space-between" mb="sm">
-                <Text fw={600}>{t('score_analytics.by_class')}</Text>
-                {selectedClasses.length > 0 && (
-                  <Badge variant="light" color="blue">
-                    {selectedClasses.length} {t('score_analytics.filter_class').toLowerCase()}
-                  </Badge>
-                )}
-              </Group>
-              {classChart.data.length === 0 || classChart.series.length === 0 ? (
-                <Text size="sm" c="dimmed">{t('score_analytics.filter_no_match')}</Text>
-              ) : (
-                <BarChart
-                  h={360}
-                  data={classChart.data}
-                  dataKey="bucket"
-                  series={classChart.series}
-                  tickLine="xy"
-                  gridAxis="xy"
-                  withLegend
-                  legendProps={{ verticalAlign: 'bottom' }}
-                  xAxisLabel={t('score_analytics.score_bucket')}
-                  yAxisLabel={
-                    chartMode === 'count'
-                      ? t('score_analytics.students_count')
-                      : t('score_analytics.distribution_percent')
-                  }
-                />
-              )}
-            </Paper>
-          </Stack>
+        {!isLoading && !noManagedClass && subjects.length === 0 && !needsClassPick && (
+          <EmptyState
+            icon={<Text style={{ fontSize: 36 }}>📊</Text>}
+            title={t('score_analytics.no_subjects_title')}
+            description={t('score_analytics.no_subjects_desc')}
+          />
         )}
       </Stack>
     </Box>
