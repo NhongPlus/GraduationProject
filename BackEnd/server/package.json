@@ -10,6 +10,7 @@
     "import-majors-catalog": "ts-node -r tsconfig-paths/register scripts/import-nhom-mon-theo-nganh.ts",
     "sync-cntt-catalog": "ts-node -r tsconfig-paths/register scripts/sync-cntt-subject-groups.ts",
     "reset-admin-password": "ts-node -r tsconfig-paths/register scripts/reset-admin-password.ts",
+    "clear-exam-data": "ts-node -r tsconfig-paths/register scripts/clear-exam-test-data.ts",
     "train-grades": "ts-node -r tsconfig-paths/register scripts/train-grade-predictor.ts",
     "fix-mcq-answers": "ts-node -r tsconfig-paths/register scripts/fix-demo-mcq-format.ts",
     "start": "node dist/server.js",
