@@ -40,6 +40,7 @@ import {
   registerStrike,
 } from '@/services/examIntegrityStrikes';
 import { createExamRealtimeSocket, type ForceSubmitPayload, type ViolationConfirmedPayload } from '@/services/examRealtimeSocket';
+import { shouldForceSocketPolling } from '@/utils/socketTransport';
 import classes from '@/components/ExamTake/ExamTake.module.scss';
 
 function formatHms(totalSeconds: number) {
@@ -1069,7 +1070,7 @@ const ExamTake = () => {
       baseUrl: appConfig.apiURL,
       token,
       examId: activeExamId,
-      forcePolling: import.meta.env.VITE_SOCKET_FORCE_POLLING === 'true',
+      forcePolling: shouldForceSocketPolling(),
       handlers: {
         onState: (payload) => handlersRef.current.onState?.(payload),
         onStarted: (payload) => handlersRef.current.onStarted?.(payload),

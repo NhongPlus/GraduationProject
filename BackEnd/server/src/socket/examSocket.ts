@@ -431,6 +431,13 @@ export function registerExamSocket(io: Server): void {
         return;
       }
       const room = roomForExam(examId);
+      const alertPayload = {
+        examId,
+        message: message.trim(),
+        fromRole: role,
+        at: new Date().toISOString(),
+      };
+      io.to(room).emit("exam:alert", alertPayload);
       io.to(room).emit("proctor:group_alert", {
         examId,
         group: group!,

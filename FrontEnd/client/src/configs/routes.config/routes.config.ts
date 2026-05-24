@@ -312,7 +312,7 @@ export const protectedRoutes: Routes = [
     key: 'proctoring-dashboard',
     path: '/proctoring/:examId',
     component: lazy(() => import('@/pages/main/Proctoring/ProctoringDashboard')),
-    authority: ['teacher'],
+    authority: ['admin', 'teacher'],
   },
   {
     key: 'audit-log',

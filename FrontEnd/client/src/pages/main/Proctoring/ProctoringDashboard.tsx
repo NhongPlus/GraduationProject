@@ -10,6 +10,7 @@ import examApi from '@/services/examApi';
 import type { ExamProctoringData } from '@/services/examApi';
 import appConfig from '@/configs/app.config';
 import { createProctoringSocket, requestPresence, sendGroupBroadcast, leaveProctoring, type PresencePayload } from '@/services/proctoringSocket';
+import { shouldForceSocketPolling } from '@/utils/socketTransport';
 import useAuth from '@/hooks/useAuth';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
@@ -42,6 +43,8 @@ const ProctoringDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [socketError, setSocketError] = useState('');
+  const [examTitle, setExamTitle] = useState('');
   const [alertingSession, setAlertingSession] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [presence, setPresence] = useState<PresencePayload | null>(null);
@@ -59,8 +62,12 @@ const ProctoringDashboard = () => {
     const silent = opts?.silent ?? false;
     try {
       if (!silent) setRefreshing(true);
-      const d = await examApi.getExamProctoring(examId);
+      const [d, examMeta] = await Promise.all([
+        examApi.getExamProctoring(examId),
+        examApi.getExam(examId).catch(() => null),
+      ]);
       setData(d);
+      if (examMeta?.title) setExamTitle(examMeta.title);
       setError('');
     } catch {
       if (!silent) setError(t('proctoring.load_failed'));
@@ -79,9 +86,9 @@ const ProctoringDashboard = () => {
     void load();
   }, [examId, refreshProctoring]);
 
-  // Poll khi còn phiên active; socket integrity_update cũng kích hoạt refresh
+  // Poll định kỳ để cập nhật phiên / vi phạm (kể cả khi chưa có SV active)
   useEffect(() => {
-    if (!examId || !data?.active_sessions) return;
+    if (!examId) return;
     refreshTimerRef.current = window.setInterval(() => {
       void refreshProctoring({ silent: true });
     }, POLL_INTERVAL_MS);
@@ -91,7 +98,7 @@ const ProctoringDashboard = () => {
         refreshTimerRef.current = null;
       }
     };
-  }, [data?.active_sessions, examId, refreshProctoring]);
+  }, [examId, refreshProctoring]);
 
   // Proctoring socket
   useEffect(() => {
@@ -101,9 +108,13 @@ const ProctoringDashboard = () => {
       baseUrl: appConfig.apiURL,
       token: accessToken,
       examId,
-      forcePolling: import.meta.env.VITE_SOCKET_FORCE_POLLING === 'true',
+      forcePolling: shouldForceSocketPolling(),
       handlers: {
-        onConnect: () => setConnectionStatus('connected'),
+        onConnect: () => {
+          setConnectionStatus('connected');
+          setSocketError('');
+          requestPresence(socket, examId);
+        },
         onDisconnect: () => setConnectionStatus('disconnected'),
         onReconnecting: () => setConnectionStatus('reconnecting'),
         onPresenceUpdate: (p) => setPresence(p),
@@ -118,7 +129,7 @@ const ProctoringDashboard = () => {
           setBroadcastOpen(false);
           setBroadcastMessage('');
         },
-        onError: (msg) => setError(`${t('proctoring.socket_error')}: ${msg}`),
+        onError: (msg) => setSocketError(`${t('proctoring.socket_error')}: ${msg}`),
       },
     });
     socketRef.current = socket;
@@ -174,7 +185,7 @@ const ProctoringDashboard = () => {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
         <Alert color="red" variant="light">{error}</Alert>
@@ -187,8 +198,13 @@ const ProctoringDashboard = () => {
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
       <Stack gap="md">
+        {socketError && (
+          <Alert color="orange" variant="light" title={t('proctoring.socket_error')}>
+            {socketError}
+          </Alert>
+        )}
         <PageHeader
-          title={t('proctoring.title')}
+          title={examTitle || t('proctoring.title')}
           subtitle={t('proctoring.subtitle')}
           accent="teal"
           action={
