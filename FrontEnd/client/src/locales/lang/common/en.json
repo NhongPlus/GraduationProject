@@ -598,6 +598,7 @@
     "exam_breakdown": "By exam",
     "exam_title": "Exam",
     "pass_rate": "Pass rate (≥5)",
+    "sessions_hint": "{{count}} submitted sessions",
     "avg": "Avg",
     "max": "Max",
     "min": "Min",

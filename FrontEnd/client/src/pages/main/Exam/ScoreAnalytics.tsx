@@ -12,6 +12,8 @@ import scoreAnalyticsApi, {
 } from '@/services/scoreAnalyticsApi';
 import EmptyState from '@/components/EmptyState/EmptyState';
 import PageHeader from '@/components/PageHeader/PageHeader';
+import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
+import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
 import useAuth from '@/hooks/useAuth';
 import { formatExamScore } from '@/utils/formatExamScore';
 
@@ -31,6 +33,7 @@ const ScoreAnalytics = () => {
   const { t } = useTranslation();
   const { userRole } = useAuth();
   const isAdmin = userRole === 'admin';
+  const { groups: pickerGroups, loading: catalogLoading } = useSubjectPickerCatalog();
 
   const [classesLoading, setClassesLoading] = useState(true);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
@@ -136,13 +139,25 @@ const ScoreAnalytics = () => {
     return opts;
   }, [classes, isAdmin, t]);
 
-  const subjectOptions = useMemo(
-    () =>
-      subjects.map((s) => ({
-        value: s.subject_id,
-        label: `${s.subject_name} (${s.session_count})`,
-      })),
+  const analyticsSubjectIds = useMemo(
+    () => new Set(subjects.map((s) => s.subject_id)),
     [subjects]
+  );
+
+  const filteredPickerGroups = useMemo(
+    () =>
+      pickerGroups
+        .map((group) => ({
+          ...group,
+          subjects: group.subjects.filter((s) => analyticsSubjectIds.has(s.id)),
+        }))
+        .filter((group) => group.subjects.length > 0),
+    [pickerGroups, analyticsSubjectIds]
+  );
+
+  const selectedSubjectMeta = useMemo(
+    () => subjects.find((s) => s.subject_id === selectedSubjectId) ?? null,
+    [subjects, selectedSubjectId]
   );
 
   const chartData = useMemo(
@@ -194,14 +209,20 @@ const ScoreAnalytics = () => {
               disabled={!isAdmin && classes.length <= 1}
               searchable
             />
-            <Select
+            <SubjectCategoryPicker
               label={t('score_analytics.filter_subject')}
               placeholder={t('score_analytics.select_subject')}
-              data={subjectOptions}
+              externalGroups={filteredPickerGroups}
+              catalogLoading={catalogLoading || subjectsLoading}
+              searchMode="global"
               value={selectedSubjectId}
               onChange={setSelectedSubjectId}
-              disabled={needsClassPick || subjects.length === 0}
-              searchable
+              disabled={needsClassPick || subjects.length === 0 || subjectsLoading}
+              helperText={
+                selectedSubjectMeta
+                  ? t('score_analytics.sessions_hint', { count: selectedSubjectMeta.session_count })
+                  : undefined
+              }
             />
           </Group>
         )}

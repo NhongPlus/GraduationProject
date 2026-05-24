@@ -653,6 +653,7 @@
     "exam_breakdown": "Theo từng bài thi",
     "exam_title": "Bài thi",
     "pass_rate": "Tỷ lệ đạt (≥5)",
+    "sessions_hint": "{{count}} phiên thi đã nộp",
     "avg": "Trung bình",
     "max": "Cao nhất",
     "min": "Thấp nhất",

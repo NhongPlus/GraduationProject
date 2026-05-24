@@ -491,6 +491,7 @@
     "exam_breakdown": "試験別",
     "exam_title": "試験",
     "pass_rate": "合格率（≥5）",
+    "sessions_hint": "提出済み {{count}} セッション",
     "avg": "平均",
     "max": "最大",
     "min": "最小",
