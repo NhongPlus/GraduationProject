@@ -308,6 +308,8 @@
     "not_done_exams": "Chưa hoàn tất",
     "deadline_column": "Hạn bắt đầu",
     "schedule_column": "Lịch thi",
+    "schedule_start": "Bắt đầu:",
+    "schedule_end": "Kết thúc:",
     "active_sessions": "Phiên active",
     "deadline_none": "—",
     "take_disabled_not_open": "Chưa đến giờ mở thi",

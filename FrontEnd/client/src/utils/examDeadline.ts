@@ -54,13 +54,32 @@ export function canStudentEnterExam(
 }
 
 export function formatExamScheduleRange(exam: Pick<Exam, 'opens_at' | 'ends_at' | 'closes_at'>): string {
-  const open = exam.opens_at ? new Date(exam.opens_at).toLocaleString() : null;
-  const end = effectiveExamEndsAt(exam);
-  const endLabel = end ? new Date(end).toLocaleString() : null;
-  if (open && endLabel) return `${open} → ${endLabel}`;
-  if (open) return open;
-  if (endLabel) return endLabel;
+  const parts = getExamScheduleParts(exam);
+  if (parts.start && parts.end) return `${parts.start} → ${parts.end}`;
+  if (parts.start) return parts.start;
+  if (parts.end) return parts.end;
   return '—';
+}
+
+export function formatScheduleDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function getExamScheduleParts(exam: Pick<Exam, 'opens_at' | 'ends_at' | 'closes_at'>): {
+  start: string | null;
+  end: string | null;
+} {
+  const endIso = effectiveExamEndsAt(exam);
+  return {
+    start: exam.opens_at ? formatScheduleDateTime(exam.opens_at) : null,
+    end: endIso ? formatScheduleDateTime(endIso) : null,
+  };
 }
 
 /** Thời lượng (phút) từ giờ bắt đầu → kết thúc. */

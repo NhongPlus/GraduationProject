@@ -15,6 +15,7 @@ import {
   Button,
   Menu,
   ActionIcon,
+  Tooltip,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import {
@@ -32,10 +33,17 @@ import useAuth from '@/hooks/useAuth';
 import { useExamListState } from '@/hooks/useExamListState';
 import InputText from '@/components/Input/InputText/InputText';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange, canStudentEnterExam, canTeacherManualOpenExam } from '@/utils/examDeadline';
+import { isBeforeExamOpens, isPastExamEnd, getExamScheduleParts, canStudentEnterExam, canTeacherManualOpenExam } from '@/utils/examDeadline';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import { enterExamRoom } from '@/utils/enterExamRoom';
+
+const SUBJECT_DISPLAY_MAX = 24;
+
+function truncateText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}…`;
+}
 
 const ExamList = () => {
   const { t } = useTranslation();
@@ -242,7 +250,8 @@ const ExamList = () => {
                   const canManualOpen = isStaff && canTeacherManualOpenExam(item) && !examInProgress;
                   const beforeOpens = !isStaff && isBeforeExamOpens(item) && !item.runtime_is_active;
                   const canEnter = canStudentEnterExam(item, latest);
-                  const scheduleLabel = formatExamScheduleRange(item);
+                  const scheduleParts = getExamScheduleParts(item);
+                  const subjectName = item.subject_name || '';
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
                     : () => {
@@ -262,10 +271,41 @@ const ExamList = () => {
                       <Table.Td>
                         <Text fw={500}>{item.title}</Text>
                       </Table.Td>
-                      <Table.Td>{item.subject_name || '—'}</Table.Td>
+                      <Table.Td>
+                        {subjectName ? (
+                          <Tooltip label={subjectName} withArrow multiline maw={320}>
+                            <Text size="sm" truncate maw={140}>
+                              {truncateText(subjectName, SUBJECT_DISPLAY_MAX)}
+                            </Text>
+                          </Tooltip>
+                        ) : (
+                          <Text size="sm" c="dimmed">—</Text>
+                        )}
+                      </Table.Td>
                       <Table.Td>{item.duration_min}</Table.Td>
                       <Table.Td>
-                        <Text size="sm">{scheduleLabel}</Text>
+                        {scheduleParts.start || scheduleParts.end ? (
+                          <Stack gap={2}>
+                            {scheduleParts.start && (
+                              <Text size="xs" lh={1.3}>
+                                <Text span c="dimmed" size="xs">
+                                  {t('exam_list.schedule_start')}
+                                </Text>{' '}
+                                {scheduleParts.start}
+                              </Text>
+                            )}
+                            {scheduleParts.end && (
+                              <Text size="xs" lh={1.3}>
+                                <Text span c="dimmed" size="xs">
+                                  {t('exam_list.schedule_end')}
+                                </Text>{' '}
+                                {scheduleParts.end}
+                              </Text>
+                            )}
+                          </Stack>
+                        ) : (
+                          <Text size="sm" c="dimmed">—</Text>
+                        )}
                       </Table.Td>
                       {isStaff && (
                         <Table.Td>
