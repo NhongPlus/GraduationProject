@@ -771,20 +771,21 @@ export default function ExamAuthoring() {
                     }}
                   />
                 </Group>
-                <NumberInput
-                  label={t('exam_authoring.duration_label')}
-                  description={
-                    hasValidSchedule
-                      ? t('exam_authoring.duration_from_schedule', { minutes: computedScheduleDuration })
-                      : t('exam_authoring.duration_desc')
-                  }
-                  size="sm"
-                  min={1}
-                  max={300}
-                  disabled={hasValidSchedule}
-                  key={examForm.key('durationMin')}
-                  {...examForm.getInputProps('durationMin')}
-                />
+                {hasValidSchedule ? (
+                  <Text size="sm" c="dimmed">
+                    {t('exam_authoring.duration_from_schedule', { minutes: computedScheduleDuration })}
+                  </Text>
+                ) : (
+                  <NumberInput
+                    label={t('exam_authoring.duration_label')}
+                    description={t('exam_authoring.duration_desc')}
+                    size="sm"
+                    min={1}
+                    max={300}
+                    key={examForm.key('durationMin')}
+                    {...examForm.getInputProps('durationMin')}
+                  />
+                )}
                 <Select
                   label={t('exam_authoring.num_versions_label')}
                   description={t('exam_authoring.num_versions_desc')}
