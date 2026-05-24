@@ -50,6 +50,10 @@
   }
 }
 
+.shellSpanAll {
+  grid-column: 1 / -1;
+}
+
 .header {
   grid-column: 1 / -1;
   display: flex;

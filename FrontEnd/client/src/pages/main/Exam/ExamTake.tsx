@@ -218,7 +218,6 @@ const ExamTake = () => {
   /** Chỉ dev: production luôn bắt fullscreen (tránh VITE_DISABLE_INTEGRITY trên Vercel). */
   const integrityDisabled =
     import.meta.env.DEV && import.meta.env.VITE_DISABLE_INTEGRITY === 'true';
-  const inBrowserFullscreen = Boolean(document.fullscreenElement);
 
   const placeholderQuestion = (n: number): MockExamQuestion => ({
     number: n,
@@ -283,6 +282,8 @@ const ExamTake = () => {
     integrity: { violationLocked, setViolationLocked, lockReason, setLockReason },
     refs: { remainingRef, sessionStartingRef, violationTriggeredRef, lastViolationAtRef },
   } = useExamTakeState(activeExamId);
+
+  const inBrowserFullscreen = isFullscreen || Boolean(document.fullscreenElement);
 
   useEffect(() => {
     const saved = loadStrikes(activeExamId);
@@ -1352,19 +1353,20 @@ const ExamTake = () => {
           />
 
           {integrityStrikes > 0 && (
-            <Alert
-              color={integrityStrikes >= MAX_INTEGRITY_STRIKES - 1 ? 'orange' : 'yellow'}
-              variant="light"
-              mb="md"
-              title={t('exam_take.violation_strike_banner_title', {
-                current: integrityStrikes,
-                max: MAX_INTEGRITY_STRIKES,
-              })}
-            >
-              {t('exam_take.violation_strike_banner_body', {
-                remaining: MAX_INTEGRITY_STRIKES - integrityStrikes,
-              })}
-            </Alert>
+            <Box className={classes.shellSpanAll}>
+              <Alert
+                color={integrityStrikes >= MAX_INTEGRITY_STRIKES - 1 ? 'orange' : 'yellow'}
+                variant="light"
+                title={t('exam_take.violation_strike_banner_title', {
+                  current: integrityStrikes,
+                  max: MAX_INTEGRITY_STRIKES,
+                })}
+              >
+                {t('exam_take.violation_strike_banner_body', {
+                  remaining: MAX_INTEGRITY_STRIKES - integrityStrikes,
+                })}
+              </Alert>
+            </Box>
           )}
 
           <div>
