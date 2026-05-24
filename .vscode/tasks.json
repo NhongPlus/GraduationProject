@@ -1,0 +1,31 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "dev:backend",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"BackEnd/server",
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"group": "build"
+		},
+		{
+			"label": "dev:frontend",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"FrontEnd/client",
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

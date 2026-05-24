@@ -32,7 +32,7 @@ import useAuth from '@/hooks/useAuth';
 import { useExamListState } from '@/hooks/useExamListState';
 import InputText from '@/components/Input/InputText/InputText';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange, canStudentEnterExam } from '@/utils/examDeadline';
+import { isBeforeExamOpens, isPastExamEnd, formatExamScheduleRange, canStudentEnterExam, canTeacherManualOpenExam } from '@/utils/examDeadline';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, slicePage } from '@/utils/pagination';
 import { enterExamRoom } from '@/utils/enterExamRoom';
@@ -233,12 +233,13 @@ const ExamList = () => {
                   const done = isStaff
                     ? !examInProgress
                     : studentSubmitted && !canRetake;
+                  const pastDeadline = isPastExamEnd(item, latest);
                   const staffRunning = isStaff && examInProgress;
                   const staffScheduled =
                     isStaff && !examInProgress && Boolean(item.opens_at) && isBeforeExamOpens(item);
                   const staffEnded =
                     isStaff && !examInProgress && Boolean(item.ends_at ?? item.closes_at) && pastDeadline;
-                  const pastDeadline = isPastExamEnd(item, latest);
+                  const canManualOpen = isStaff && canTeacherManualOpenExam(item) && !examInProgress;
                   const beforeOpens = !isStaff && isBeforeExamOpens(item) && !item.runtime_is_active;
                   const canEnter = canStudentEnterExam(item, latest);
                   const scheduleLabel = formatExamScheduleRange(item);
@@ -327,13 +328,15 @@ const ExamList = () => {
                                 variant="light"
                                 leftSection={<IconPlayerPlay size={13} />}
                                 loading={startingExamId === item.id}
-                                disabled={startingExamId === item.id || staffEnded}
+                                disabled={startingExamId === item.id || !canManualOpen}
                                 title={
-                                  staffEnded
+                                  !canManualOpen && staffEnded
                                     ? t('exam_list.start_ended_hint')
-                                    : staffScheduled
-                                      ? t('exam_list.start_early_hint')
-                                      : t('exam_list.start_runtime_hint')
+                                    : !canManualOpen && !staffScheduled && Boolean(item.opens_at)
+                                      ? t('exam_list.start_auto_hint')
+                                      : staffScheduled
+                                        ? t('exam_list.start_early_hint', { minutes: item.duration_min })
+                                        : t('exam_list.start_runtime_hint')
                                 }
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
                               >

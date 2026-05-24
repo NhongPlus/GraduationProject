@@ -1,0 +1,84 @@
+erDiagram
+  accounts ||--o| admin_classes : manager
+  accounts }o--|| admin_classes : student
+  programs ||--o{ admin_classes : has
+  programs ||--o{ subject_groups : has
+  programs ||--o{ subjects : has
+  subject_groups ||--o{ subjects : group
+  subjects ||--o{ exams : subject
+  admin_classes ||--o{ exams : scope
+  accounts ||--o{ exams : creates
+  exams ||--o{ questions : has
+  exams ||--o{ exam_sessions : has
+  accounts ||--o{ exam_sessions : takes
+  exams ||--o| exam_runtime_state : runtime
+
+  accounts {
+    uuid id PK
+    string email UK
+    string username UK
+    string role
+    string full_name
+    uuid admin_class_id FK
+    boolean is_active
+  }
+
+  programs {
+    uuid id PK
+    string code UK
+    string name
+  }
+
+  admin_classes {
+    uuid id PK
+    uuid program_id FK
+    string display_name
+    uuid manager_teacher_id FK
+    int intake_year
+    string section
+  }
+
+  subjects {
+    uuid id PK
+    string name
+    string code
+    string category
+    uuid program_id FK
+    string prerequisites
+  }
+
+  exams {
+    uuid id PK
+    uuid admin_class_id FK
+    uuid subject_id FK
+    uuid created_by FK
+    string title
+    int duration_min
+    timestamp closes_at
+  }
+
+  questions {
+    uuid id PK
+    uuid exam_id FK
+    string question_type
+    jsonb options
+    jsonb correct_answer
+    decimal points
+  }
+
+  exam_sessions {
+    uuid id PK
+    uuid exam_id FK
+    uuid student_id FK
+    string status
+    decimal score
+    jsonb student_answers
+    jsonb graded_details
+  }
+
+  exam_runtime_state {
+    uuid exam_id PK
+    timestamp started_at
+    timestamp ends_at
+    boolean is_active
+  }

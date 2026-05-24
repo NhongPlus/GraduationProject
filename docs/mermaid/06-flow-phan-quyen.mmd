@@ -1,0 +1,16 @@
+flowchart LR
+  SA[Super admin]
+  T[Giang vien]
+  ST[Sinh vien]
+
+  SA -->|tao lop| AC[admin_class]
+  SA -->|gan GV| T
+  SA -->|gan SV| ST
+  AC --> T
+  AC --> ST
+  T -->|tao de| EX[Exam]
+  EX --> SES[Phien thi]
+  ST --> SES
+  T -->|export| GR[Bang diem]
+  SES --> GR
+  SA -->|export| GR

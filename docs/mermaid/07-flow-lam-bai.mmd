@@ -1,0 +1,14 @@
+flowchart TD
+  A[GV tao de thi] --> B[Them cau hoi]
+  B --> C[Start runtime]
+  C --> D[SV bat dau session]
+  D --> E[Lam bai va autosave]
+  E --> F{Het gio hoac nop}
+  F -->|Nop| G[Submit]
+  F -->|Het gio| H[Force submit]
+  G --> I[Auto grade MCQ]
+  H --> I
+  I --> J{Co essay}
+  J -->|Co| K[GV cham tay]
+  J -->|Khong| L[Xem ket qua]
+  K --> L

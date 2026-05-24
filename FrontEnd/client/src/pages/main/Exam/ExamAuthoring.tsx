@@ -44,6 +44,7 @@ import ExamImportPreviewModal from '@/components/ExamVerifyModal/ExamImportPrevi
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
 import { formatSubjectLabel } from '@/components/Input/SubjectCategoryPicker/subjectGrouping';
 import ExamQuestionBankPicker, { type BankPickTarget } from '@/pages/main/Exam/ExamQuestionBankPicker';
+import { scheduleDurationMin } from '@/utils/examDeadline';
 
 const MAX_EXAM_VERSIONS = 4;
 
@@ -167,6 +168,21 @@ export default function ExamAuthoring() {
   const [mediaUploadLoading, setMediaUploadLoading] = useState(false);
   const [mediaUploadError, setMediaUploadError] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [scheduleRev, setScheduleRev] = useState(0);
+
+  const { opensAt: opensAtValue, endsAt: endsAtValue } = examForm.getValues();
+  const computedScheduleDuration =
+    opensAtValue && endsAtValue ? scheduleDurationMin(opensAtValue, endsAtValue) : null;
+  const hasValidSchedule = computedScheduleDuration != null;
+  void scheduleRev;
+
+  const syncDurationFromSchedule = (opensAt: string, endsAt: string) => {
+    const mins = scheduleDurationMin(opensAt, endsAt);
+    if (mins != null) {
+      examForm.setFieldValue('durationMin', mins);
+    }
+    setScheduleRev((n) => n + 1);
+  };
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -213,6 +229,15 @@ export default function ExamAuthoring() {
           setNumVersionsCount(
             Math.min(MAX_EXAM_VERSIONS, Math.max(1, existingExam.num_versions ?? 2))
           );
+          const opens = existingExam.opens_at ? existingExam.opens_at.slice(0, 16) : '';
+          const ends = (existingExam.ends_at ?? existingExam.closes_at)
+            ? (existingExam.ends_at ?? existingExam.closes_at)!.slice(0, 16)
+            : '';
+          if (opens && ends) {
+            const mins = scheduleDurationMin(opens, ends);
+            if (mins != null) examForm.setFieldValue('durationMin', mins);
+            setScheduleRev((n) => n + 1);
+          }
         }
         if (existingQuestions.length) {
           setQuestions(
@@ -525,14 +550,13 @@ export default function ExamAuthoring() {
   };
 
   const saveExam = async () => {
-    const { title, description, durationMin, opensAt, endsAt, adminClassId, subjectId } = examForm.getValues();
-    const duration = Number(durationMin);
+    const { title, description, durationMin: durationMinRaw, opensAt, endsAt, adminClassId, subjectId } = examForm.getValues();
+    const durationMin = durationMinRaw;
     if (
       !title.trim() ||
       !adminClassId ||
       !subjectId ||
-      !Number.isFinite(duration) ||
-      duration <= 0
+      (!hasValidSchedule && (!Number.isFinite(Number(durationMin)) || Number(durationMin) <= 0))
     ) {
       setError(t('exam_authoring.error_fill_required'));
       return;
@@ -549,8 +573,20 @@ export default function ExamAuthoring() {
         return;
       }
     }
+    if ((opensAt && !endsAt) || (!opensAt && endsAt)) {
+      setError(t('exam_authoring.error_schedule_incomplete'));
+      return;
+    }
     if (opensAt && endsAt && new Date(opensAt).getTime() >= new Date(endsAt).getTime()) {
       setError(t('exam_authoring.error_schedule_order'));
+      return;
+    }
+
+    const duration = hasValidSchedule
+      ? computedScheduleDuration!
+      : Number(durationMin);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      setError(t('exam_authoring.error_fill_required'));
       return;
     }
 
@@ -714,7 +750,12 @@ export default function ExamAuthoring() {
                     size="sm"
                     type="datetime-local"
                     key={examForm.key('opensAt')}
-                    {...examForm.getInputProps('opensAt')}
+                    value={examForm.getValues().opensAt}
+                    onChange={(e) => {
+                      const v = e.currentTarget.value;
+                      examForm.setFieldValue('opensAt', v);
+                      syncDurationFromSchedule(v, examForm.getValues().endsAt);
+                    }}
                   />
                   <TextInput
                     label={t('exam_authoring.ends_at_label')}
@@ -722,15 +763,25 @@ export default function ExamAuthoring() {
                     size="sm"
                     type="datetime-local"
                     key={examForm.key('endsAt')}
-                    {...examForm.getInputProps('endsAt')}
+                    value={examForm.getValues().endsAt}
+                    onChange={(e) => {
+                      const v = e.currentTarget.value;
+                      examForm.setFieldValue('endsAt', v);
+                      syncDurationFromSchedule(examForm.getValues().opensAt, v);
+                    }}
                   />
                 </Group>
                 <NumberInput
                   label={t('exam_authoring.duration_label')}
-                  description={t('exam_authoring.duration_desc')}
+                  description={
+                    hasValidSchedule
+                      ? t('exam_authoring.duration_from_schedule', { minutes: computedScheduleDuration })
+                      : t('exam_authoring.duration_desc')
+                  }
                   size="sm"
                   min={1}
                   max={300}
+                  disabled={hasValidSchedule}
                   key={examForm.key('durationMin')}
                   {...examForm.getInputProps('durationMin')}
                 />

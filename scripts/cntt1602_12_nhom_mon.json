@@ -1,0 +1,502 @@
+{
+  "version": "1.0",
+  "class": "CNTT16-02",
+  "description": "12 nhóm môn học (admin) — mỗi nhóm kèm danh sách môn đầy đủ",
+  "source": "BackEnd/server/src/data/subject_groups.json + cntt1602_grades.json",
+  "total_groups": 12,
+  "groups": [
+    {
+      "sort_order": 1,
+      "code": "pe",
+      "label": "Nhóm thể chất",
+      "subject_count": 5,
+      "subjects": [
+        {
+          "id": "S01",
+          "code": "PE001",
+          "name": "Lý luận và phương pháp Giáo dục thể chất 1",
+          "credits": 1.0
+        },
+        {
+          "id": "S02",
+          "code": "PE002",
+          "name": "Võ (Cơ bản)",
+          "credits": 1.0
+        },
+        {
+          "id": "S03",
+          "code": "PE003",
+          "name": "Yoga (Cơ bản)",
+          "credits": 1.0
+        },
+        {
+          "id": "S04",
+          "code": "PE004",
+          "name": "Zumba(Cơ bản)",
+          "credits": 1.0
+        },
+        {
+          "id": "S05",
+          "code": "PE005",
+          "name": "Zumba(Nâng cao)",
+          "credits": 1.0
+        }
+      ],
+      "rule": "choose_one_path",
+      "paths": [
+        {
+          "name": "Võ",
+          "required": [
+            "S01",
+            "S02"
+          ]
+        },
+        {
+          "name": "Yoga",
+          "required": [
+            "S01",
+            "S03"
+          ]
+        },
+        {
+          "name": "Zumba",
+          "required": [
+            "S01",
+            "S04",
+            "S05"
+          ]
+        }
+      ],
+      "note": "SV chọn 1 trong 3 lộ trình (Võ / Yoga / Zumba). Zumba gồm cơ bản + nâng cao."
+    },
+    {
+      "sort_order": 2,
+      "code": "defense",
+      "label": "Nhóm quốc phòng",
+      "subject_count": 4,
+      "subjects": [
+        {
+          "id": "S26",
+          "code": "ND001",
+          "name": "Giáo dục quốc phòng P1",
+          "credits": 3.0
+        },
+        {
+          "id": "S27",
+          "code": "ND002",
+          "name": "Giáo dục quốc phòng P2",
+          "credits": 2.0
+        },
+        {
+          "id": "S28",
+          "code": "ND003",
+          "name": "Giáo dục quốc phòng P3",
+          "credits": 2.0
+        },
+        {
+          "id": "S29",
+          "code": "ND004",
+          "name": "Giáo dục quốc phòng P4",
+          "credits": 4.0
+        }
+      ],
+      "ordered": true,
+      "note": "Tuần tự P1 → P4."
+    },
+    {
+      "sort_order": 3,
+      "code": "english",
+      "label": "Nhóm tiếng Anh",
+      "subject_count": 5,
+      "subjects": [
+        {
+          "id": "S15",
+          "code": "ENG101",
+          "name": "Tiếng Anh P1",
+          "credits": 4.0
+        },
+        {
+          "id": "S20",
+          "code": "ENG102",
+          "name": "Tiếng Anh P2",
+          "credits": 4.0
+        },
+        {
+          "id": "S31",
+          "code": "ENG103",
+          "name": "Tiếng Anh P3",
+          "credits": 4.0
+        },
+        {
+          "id": "S36",
+          "code": "ENG104",
+          "name": "Tiếng Anh P4",
+          "credits": 3.0
+        },
+        {
+          "id": "S46",
+          "code": "ENG105",
+          "name": "Tiếng Anh P5",
+          "credits": 2.0
+        }
+      ],
+      "ordered": true,
+      "note": "Tuần tự P1 → P5."
+    },
+    {
+      "sort_order": 4,
+      "code": "ai_iot",
+      "label": "Nhóm học máy & IoT",
+      "subject_count": 10,
+      "subjects": [
+        {
+          "id": "S11",
+          "code": "CS111",
+          "name": "Lập trình cơ bản",
+          "credits": 3.0
+        },
+        {
+          "id": "S10",
+          "code": "CS001",
+          "name": "Nhập môn công nghệ thông tin",
+          "credits": 3.0
+        },
+        {
+          "id": "S17",
+          "code": "STAT001",
+          "name": "Xác suất thống kê và phân tích dữ liệu",
+          "credits": 4.0
+        },
+        {
+          "id": "S34",
+          "code": "AI401",
+          "name": "Trí tuệ nhân tạo",
+          "credits": 2.0
+        },
+        {
+          "id": "S33",
+          "code": "CS331",
+          "name": "Lập trình IoT",
+          "credits": 2.0
+        },
+        {
+          "id": "S43",
+          "code": "BD601",
+          "name": "Dữ liệu lớn",
+          "credits": 2.0
+        },
+        {
+          "id": "S38",
+          "code": "ML501",
+          "name": "Học máy",
+          "credits": 2.0
+        },
+        {
+          "id": "S22",
+          "code": "CS201",
+          "name": "Cấu trúc dữ liệu và giải thuật",
+          "credits": 3.0
+        },
+        {
+          "id": "S44",
+          "code": "CS105",
+          "name": "Thực tập CNTT5: Triển khai ứng dụng AI, IoT",
+          "credits": 4.0
+        },
+        {
+          "id": "S12",
+          "code": "CS101",
+          "name": "Thực tập CNTT1: Hệ thống máy tính",
+          "credits": 4.0
+        }
+      ]
+    },
+    {
+      "sort_order": 5,
+      "code": "philosophy",
+      "label": "Nhóm môn triết học",
+      "subject_count": 6,
+      "subjects": [
+        {
+          "id": "S13",
+          "code": "PHI001",
+          "name": "Triết học Mác - Lênin",
+          "credits": 3.0
+        },
+        {
+          "id": "S07",
+          "code": "LAW001",
+          "name": "Pháp luật đại cương",
+          "credits": 3.0
+        },
+        {
+          "id": "S40",
+          "code": "PHI004",
+          "name": "Tư tưởng Hồ Chí Minh",
+          "credits": 2.0
+        },
+        {
+          "id": "S35",
+          "code": "PHI003",
+          "name": "Chủ nghĩa xã hội khoa học",
+          "credits": 2.0
+        },
+        {
+          "id": "S14",
+          "code": "PHI002",
+          "name": "Kinh tế chính trị Mác - Lênin",
+          "credits": 2.0
+        },
+        {
+          "id": "S45",
+          "code": "HIS001",
+          "name": "Lịch sử Đảng Cộng sản Việt Nam",
+          "credits": 2.0
+        }
+      ]
+    },
+    {
+      "sort_order": 6,
+      "code": "software",
+      "label": "Nhóm phần mềm",
+      "subject_count": 10,
+      "subjects": [
+        {
+          "id": "S11",
+          "code": "CS111",
+          "name": "Lập trình cơ bản",
+          "credits": 3.0
+        },
+        {
+          "id": "S10",
+          "code": "CS001",
+          "name": "Nhập môn công nghệ thông tin",
+          "credits": 3.0
+        },
+        {
+          "id": "S24",
+          "code": "CS202",
+          "name": "Lập trình hướng đối tượng",
+          "credits": 3.0
+        },
+        {
+          "id": "S19",
+          "code": "CS102",
+          "name": "Thực tập CNTT2: Thiết kế web và triển khai hệ thống phần mềm",
+          "credits": 4.0
+        },
+        {
+          "id": "S25",
+          "code": "CS103",
+          "name": "Thực tập CNTT3: Thiết kế, lập trình Front-End",
+          "credits": 4.0
+        },
+        {
+          "id": "S32",
+          "code": "DB001",
+          "name": "Lý thuyết, thiết kế cơ sở dữ liệu",
+          "credits": 3.0
+        },
+        {
+          "id": "S41",
+          "code": "SE601",
+          "name": "Công nghệ phần mềm",
+          "credits": 3.0
+        },
+        {
+          "id": "S42",
+          "code": "CS621",
+          "name": "Lập trình mobile",
+          "credits": 3.0
+        },
+        {
+          "id": "S52",
+          "code": "SE802",
+          "name": "Kiểm thử phần mềm",
+          "credits": 2.0
+        },
+        {
+          "id": "S53",
+          "code": "INT004",
+          "name": "Thuc tap CNTT4: Thiet ke, lap trinh Back-End",
+          "credits": 4.0
+        }
+      ],
+      "note": "S53 (Thực tập CNTT4: Back-End) khi có dữ liệu.",
+      "missing_in_dataset": [
+        "S53"
+      ]
+    },
+    {
+      "sort_order": 7,
+      "code": "bigdata",
+      "label": "Nhóm BigData",
+      "subject_count": 3,
+      "subjects": [
+        {
+          "id": "S39",
+          "code": "DT501",
+          "name": "Công nghệ dữ liệu",
+          "credits": 2.0
+        },
+        {
+          "id": "S43",
+          "code": "BD601",
+          "name": "Dữ liệu lớn",
+          "credits": 2.0
+        },
+        {
+          "id": "S37",
+          "code": "SA001",
+          "name": "Phân tích, thiết kế hệ thống thông tin",
+          "credits": 3.0
+        }
+      ]
+    },
+    {
+      "sort_order": 8,
+      "code": "network",
+      "label": "Nhóm Network",
+      "subject_count": 4,
+      "subjects": [
+        {
+          "id": "S18",
+          "code": "GIS001",
+          "name": "Hệ thống thông tin địa lý",
+          "credits": 2.0
+        },
+        {
+          "id": "S23",
+          "code": "NET301",
+          "name": "Mạng máy tính",
+          "credits": 2.0
+        },
+        {
+          "id": "S47",
+          "code": "CS106",
+          "name": "Thực tập CNTT6: Cài đặt, cấu hình máy chủ, mạng, triển khai ứng dụng",
+          "credits": 4.0
+        },
+        {
+          "id": "S50",
+          "code": "NET801",
+          "name": "Lập trình mạng",
+          "credits": 3.0
+        }
+      ]
+    },
+    {
+      "sort_order": 9,
+      "code": "internship",
+      "label": "Nhóm thực tập",
+      "subject_count": 3,
+      "subjects": [
+        {
+          "id": "S49",
+          "code": "DS801",
+          "name": "Chuyển đổi số",
+          "credits": 2.0
+        },
+        {
+          "id": "S51",
+          "code": "IT001",
+          "name": "Ứng dụng Công nghệ thông tin trong doanh nghiệp",
+          "credits": 3.0
+        },
+        {
+          "id": "S06",
+          "code": "INT001",
+          "name": "Thực tập tốt nghiệp",
+          "credits": 4.0
+        }
+      ]
+    },
+    {
+      "sort_order": 10,
+      "code": "security",
+      "label": "Nhóm security",
+      "subject_count": 1,
+      "subjects": [
+        {
+          "id": "S48",
+          "code": "SEC001",
+          "name": "An toàn, bảo mật thông tin",
+          "credits": 2.0
+        }
+      ]
+    },
+    {
+      "sort_order": 11,
+      "code": "soft_skills",
+      "label": "Nhóm kỹ năng mềm",
+      "subject_count": 2,
+      "subjects": [
+        {
+          "id": "S08",
+          "code": "SKL001",
+          "name": "Kỹ năng mềm cơ bản",
+          "credits": 2.0
+        },
+        {
+          "id": "S30",
+          "code": "SKL002",
+          "name": "Kỹ năng mềm nâng cao",
+          "credits": 3.0
+        }
+      ],
+      "ordered": true
+    },
+    {
+      "sort_order": 12,
+      "code": "math",
+      "label": "Nhóm đại số",
+      "subject_count": 4,
+      "subjects": [
+        {
+          "id": "S09",
+          "code": "MATH001",
+          "name": "Đại số tuyến tính, tối ưu",
+          "credits": 2.0
+        },
+        {
+          "id": "S21",
+          "code": "MATH201",
+          "name": "Toán rời rạc",
+          "credits": 3.0
+        },
+        {
+          "id": "S16",
+          "code": "MATH101",
+          "name": "Toán giải tích",
+          "credits": 3.0
+        },
+        {
+          "id": "S17",
+          "code": "STAT001",
+          "name": "Xác suất thống kê và phân tích dữ liệu",
+          "credits": 4.0
+        }
+      ],
+      "ordered": true,
+      "note": "Đại số TT → Giải tích → Rời rạc → XSTK"
+    }
+  ],
+  "overlap_subjects": {
+    "S11": [
+      "ai_iot",
+      "software"
+    ],
+    "S10": [
+      "ai_iot",
+      "software"
+    ],
+    "S17": [
+      "ai_iot",
+      "math"
+    ],
+    "S43": [
+      "ai_iot",
+      "bigdata"
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+erDiagram
+  programs ||--o{ subject_groups : has
+  programs ||--o{ subjects : has
+  programs ||--o{ program_teachers : teachers
+  programs ||--o{ admin_classes : has
+  subject_groups ||--o{ subjects : group
+  subjects ||--o{ classes : teaches
+  classes ||--o{ enrollments : enroll
+  classes ||--o{ assignments : has
+  accounts ||--o{ classes : teacher
+  accounts ||--o{ enrollments : student
+  accounts ||--o{ program_teachers : member
+  assignments ||--o{ grades : graded
+
+  programs {
+    uuid id PK
+    string code UK
+    string name
+    boolean is_active
+  }
+
+  subject_groups {
+    uuid id PK
+    uuid program_id FK
+    string code
+    string name
+    int sort_order
+  }
+
+  subjects {
+    uuid id PK
+    string name
+    string code
+    decimal credits
+    int semester
+    string category
+    uuid program_id FK
+    string prerequisites
+  }
+
+  admin_classes {
+    uuid id PK
+    uuid program_id FK
+    string display_name
+    uuid manager_teacher_id FK
+    int intake_year
+  }
+
+  classes {
+    uuid id PK
+    uuid subject_id FK
+    uuid teacher_id FK
+    string semester
+    int year
+  }
+
+  enrollments {
+    uuid id PK
+    uuid class_id FK
+    uuid student_id FK
+    timestamp enrolled_at
+  }
+
+  assignments {
+    uuid id PK
+    uuid class_id FK
+    string title
+    timestamp due_date
+  }
+
+  grades {
+    uuid id PK
+    uuid assignment_id FK
+    uuid student_id FK
+    decimal score
+  }
+
+  program_teachers {
+    uuid program_id PK
+    uuid teacher_id PK
+  }

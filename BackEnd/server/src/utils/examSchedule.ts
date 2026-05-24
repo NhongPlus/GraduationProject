@@ -53,3 +53,15 @@ export function effectiveEndsAt(exam: {
 }): string | null {
   return exam.ends_at ?? exam.closes_at ?? null;
 }
+
+/** Thời lượng làm bài (phút) = ends_at − opens_at khi có lịch. */
+export function durationMinFromSchedule(
+  opensAt: string | null | undefined,
+  endsAt: string | null | undefined
+): number | null {
+  const openMs = opensAt ? scheduleToTimestampMs(opensAt) : null;
+  const endMs = endsAt ? scheduleToTimestampMs(endsAt) : null;
+  if (openMs == null || endMs == null || endMs <= openMs) return null;
+  const mins = Math.ceil((endMs - openMs) / 60_000);
+  return Math.max(1, Math.min(300, mins));
+}

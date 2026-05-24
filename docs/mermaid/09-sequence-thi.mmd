@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant GV as Giang vien
+  participant SV as Sinh vien
+  participant BE as Backend
+  participant DB as PostgreSQL
+  participant SIO as Socket.IO
+
+  GV->>BE: POST start-runtime
+  BE->>DB: exam_runtime_state
+  BE->>SIO: exam started
+
+  SV->>BE: POST sessions
+  BE->>DB: exam_session
+  BE-->>SV: questions and deadline
+
+  loop Trong gio thi
+    SV->>BE: autosave
+    SV->>BE: integrity-events
+  end
+
+  SV->>BE: submit
+  BE->>DB: score
+  GV->>BE: PATCH grade essay

@@ -62,3 +62,23 @@ export function formatExamScheduleRange(exam: Pick<Exam, 'opens_at' | 'ends_at' 
   if (endLabel) return endLabel;
   return '—';
 }
+
+/** Thời lượng (phút) từ giờ bắt đầu → kết thúc. */
+export function scheduleDurationMin(opensAt: string, endsAt: string): number | null {
+  const o = toMs(opensAt);
+  const e = toMs(endsAt);
+  if (o == null || e == null || e <= o) return null;
+  return Math.max(1, Math.min(300, Math.ceil((e - o) / 60_000)));
+}
+
+/** GV chỉ mở sớm thủ công trước opens_at; từ opens_at trở đi hệ thống tự mở. */
+export function canTeacherManualOpenExam(
+  exam: Pick<Exam, 'opens_at' | 'ends_at' | 'closes_at' | 'runtime_is_active'>,
+  nowMs: number = Date.now()
+): boolean {
+  if (exam.runtime_is_active) return false;
+  const end = effectiveExamEndsAt(exam);
+  if (end && toMs(end) != null && nowMs > toMs(end)!) return false;
+  if (!exam.opens_at) return true;
+  return isBeforeExamOpens(exam, nowMs);
+}

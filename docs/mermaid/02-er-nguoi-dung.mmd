@@ -1,0 +1,69 @@
+erDiagram
+  accounts ||--o{ user_sessions : login
+  accounts ||--o{ password_reset_requests : request
+  accounts ||--o{ password_reset_tokens : token
+  accounts ||--o{ user_notifications : notify
+  accounts ||--o{ audit_logs : actor
+  accounts ||--o| student_prediction_cache : predict
+
+  accounts {
+    uuid id PK
+    string email UK
+    string username UK
+    string hashed_password
+    string role
+    string full_name
+    uuid admin_class_id FK
+    boolean first_login
+    timestamp created_at
+  }
+
+  user_sessions {
+    uuid id PK
+    uuid user_id FK
+    string device_id
+    string token_hash
+    boolean is_active
+    timestamp expires_at
+  }
+
+  password_reset_requests {
+    uuid id PK
+    uuid user_id FK
+    uuid requested_by FK
+    string status
+    timestamp expires_at
+  }
+
+  password_reset_tokens {
+    uuid id PK
+    uuid user_id FK
+    string token UK
+    boolean used
+    timestamp expires_at
+  }
+
+  user_notifications {
+    uuid id PK
+    uuid user_id FK
+    string type
+    string title
+    string message
+    boolean is_read
+  }
+
+  audit_logs {
+    uuid id PK
+    uuid actor_id FK
+    string action
+    string resource_type
+    uuid resource_id
+    jsonb details
+    timestamp created_at
+  }
+
+  student_prediction_cache {
+    uuid user_id PK
+    jsonb payload
+    timestamp computed_at
+  }

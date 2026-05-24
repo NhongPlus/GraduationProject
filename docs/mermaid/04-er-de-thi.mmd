@@ -1,0 +1,97 @@
+erDiagram
+  exams ||--o{ questions : has
+  exams ||--o{ exam_sessions : has
+  exams ||--o{ exam_versions : versions
+  exams ||--o| exam_runtime_state : runtime
+  exams ||--o{ exam_shares : shares
+  exams ||--o{ exam_collaborators : collab
+  exams }o--|| admin_classes : class
+  exams }o--|| subjects : subject
+  accounts ||--o{ exams : creates
+  questions }o--o| question_bank : source
+  exam_sessions }o--o| exam_versions : version
+  accounts ||--o{ exam_sessions : takes
+  exam_sessions ||--o{ grading_assignments : grade
+  question_bank }o--|| subjects : subject
+
+  exams {
+    uuid id PK
+    string title
+    uuid admin_class_id FK
+    uuid subject_id FK
+    uuid created_by FK
+    int duration_min
+    int num_versions
+    timestamp closes_at
+  }
+
+  questions {
+    uuid id PK
+    uuid exam_id FK
+    string question_type
+    string content
+    jsonb options
+    jsonb correct_answer
+    string media_url
+    decimal points
+    uuid question_bank_id FK
+  }
+
+  exam_versions {
+    uuid id PK
+    uuid exam_id FK
+    string version_code
+    int version_index
+    jsonb question_order
+    jsonb option_maps
+  }
+
+  exam_sessions {
+    uuid id PK
+    uuid exam_id FK
+    uuid student_id FK
+    string status
+    timestamp started_at
+    timestamp submitted_at
+    decimal score
+    jsonb student_answers
+    jsonb graded_details
+    string grading_status
+  }
+
+  exam_runtime_state {
+    uuid exam_id PK
+    timestamp started_at
+    timestamp ends_at
+    boolean is_active
+  }
+
+  question_bank {
+    uuid id PK
+    uuid subject_id FK
+    uuid created_by FK
+    string difficulty
+    int chapter
+    int usage_count
+  }
+
+  exam_shares {
+    uuid id PK
+    uuid exam_id FK
+    uuid shared_with FK
+    string role
+  }
+
+  exam_collaborators {
+    uuid id PK
+    uuid exam_id FK
+    uuid teacher_id FK
+    string role
+  }
+
+  grading_assignments {
+    uuid id PK
+    uuid exam_session_id FK
+    uuid teacher_id FK
+    string status
+  }

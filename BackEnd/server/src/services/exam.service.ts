@@ -85,6 +85,7 @@ import {
 import {
   assertValidExamSchedule,
   effectiveEndsAt,
+  durationMinFromSchedule,
   isBeforeOpensAt,
   isMalformedScheduleAt,
   isPastEndsAt,
@@ -164,13 +165,22 @@ export const createExamService = async (
   endsAt?: string | null
 ): Promise<Exam> => {
   validateScheduleFields({ opens_at: opensAt, ends_at: endsAt, closes_at: closesAt });
+  const normOpens = normalizeScheduleAtInput(opensAt);
+  const normEnds = normalizeScheduleAtInput(endsAt ?? closesAt);
+  const scheduledDuration = durationMinFromSchedule(normOpens, normEnds);
+  const effectiveDuration = scheduledDuration ?? durationMin;
+  if (!scheduledDuration) {
+    if (!Number.isFinite(durationMin) || durationMin <= 0 || durationMin > 300) {
+      throw httpError(400, "duration_min phải từ 1 đến 300 phút");
+    }
+  }
   const normalized = normalizeClosesAtInput(closesAt);
   const validated = await assertExamScope(scope, createdBy, role);
-  return createExam(title, createdBy, durationMin, {
+  return createExam(title, createdBy, effectiveDuration, {
     description,
     closesAt: normalized,
-    opensAt: normalizeScheduleAtInput(opensAt),
-    endsAt: normalizeScheduleAtInput(endsAt ?? closesAt),
+    opensAt: normOpens,
+    endsAt: normEnds,
     adminClassId: validated.admin_class_id,
     subjectId: validated.subject_id,
     classId: validated.class_id ?? null,
@@ -239,6 +249,12 @@ export const updateExamService = async (
       ends_at: fields.ends_at ?? current.ends_at ?? current.closes_at,
       closes_at: fields.closes_at ?? current.closes_at,
     });
+    const mergedOpens = fields.opens_at ?? current.opens_at;
+    const mergedEnds = fields.ends_at ?? current.ends_at ?? current.closes_at;
+    const fromSchedule = durationMinFromSchedule(mergedOpens, mergedEnds);
+    if (fromSchedule != null) {
+      fields.duration_min = fromSchedule;
+    }
   }
 
   return updateExam(id, fields);
@@ -374,10 +390,16 @@ export const createExamWithQuestionsService = async (
     payload.created_by,
     payload.role
   );
-  if (!Number.isFinite(payload.duration_min) || payload.duration_min <= 0 || payload.duration_min > 300) {
-    throw httpError(400, "duration_min phải từ 1 đến 300 phút");
-  }
   validateScheduleFields(payload);
+  const normOpens = normalizeScheduleAtInput(payload.opens_at);
+  const normEnds = normalizeScheduleAtInput(payload.ends_at ?? payload.closes_at);
+  const scheduledDuration = durationMinFromSchedule(normOpens, normEnds);
+  const effectiveDuration = scheduledDuration ?? payload.duration_min;
+  if (!scheduledDuration) {
+    if (!Number.isFinite(payload.duration_min) || payload.duration_min <= 0 || payload.duration_min > 300) {
+      throw httpError(400, "duration_min phải từ 1 đến 300 phút");
+    }
+  }
   if (!Array.isArray(payload.questions) || payload.questions.length === 0) {
     throw httpError(400, "questions là mảng bắt buộc");
   }
@@ -403,11 +425,11 @@ export const createExamWithQuestionsService = async (
         scope.admin_class_id,
         scope.subject_id,
         payload.created_by,
-        Math.floor(payload.duration_min),
+        Math.floor(effectiveDuration),
         numVersions,
         normalizeClosesAtInput(payload.closes_at),
-        normalizeScheduleAtInput(payload.opens_at),
-        normalizeScheduleAtInput(payload.ends_at ?? payload.closes_at),
+        normOpens,
+        normEnds,
       ]
     );
     const exam = examResult.rows[0] as Exam;

@@ -1,0 +1,51 @@
+erDiagram
+  exams ||--o{ exam_integrity_events : integrity
+  exams ||--o{ exam_proctor_presence : presence
+  exams ||--o{ exam_proctor_logs : proctor
+  exams ||--o{ exam_session_autosaves : autosave
+  exam_sessions ||--o{ exam_integrity_events : session
+  exam_sessions ||--o| exam_session_autosaves : snapshot
+  accounts ||--o{ exam_integrity_events : student
+  accounts ||--o{ exam_proctor_presence : student
+  accounts ||--o{ exam_proctor_logs : student
+
+  exam_integrity_events {
+    uuid id PK
+    uuid exam_id FK
+    uuid session_id FK
+    uuid student_id FK
+    string event_type
+    timestamp client_at
+    jsonb details
+  }
+
+  exam_proctor_presence {
+    uuid id PK
+    uuid exam_id FK
+    uuid student_id FK
+    string socket_id
+    timestamp joined_at
+    timestamp last_ping_at
+    timestamp disconnected_at
+  }
+
+  exam_proctor_logs {
+    uuid id PK
+    uuid exam_id FK
+    uuid session_id FK
+    uuid student_id FK
+    string event_type
+    string screenshot_url
+    jsonb metadata
+    timestamp created_at
+  }
+
+  exam_session_autosaves {
+    uuid id PK
+    uuid session_id FK
+    uuid exam_id FK
+    uuid student_id FK
+    jsonb answers
+    timestamp saved_at
+    timestamp server_at
+  }

@@ -1,0 +1,17 @@
+erDiagram
+  programs ||--o{ admin_classes : has
+  programs ||--o{ subjects : has
+  programs ||--o{ subject_groups : has
+  admin_classes ||--o{ accounts : students
+  admin_classes ||--o{ exams : scope
+  accounts ||--o| admin_classes : manages
+  subjects ||--o{ exams : for
+  exams ||--o{ questions : has
+  exams ||--o{ exam_sessions : has
+  exams ||--o| exam_runtime_state : runtime
+  accounts ||--o{ exam_sessions : takes
+  exam_sessions ||--o| exam_session_autosaves : saves
+  exams ||--o{ exam_integrity_events : monitors
+  exams ||--o{ exam_proctor_presence : proctors
+  question_bank ||--o{ questions : imports
+  subjects ||--o{ question_bank : bank
