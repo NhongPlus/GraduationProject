@@ -1717,7 +1717,7 @@ export interface ProctoringEntry {
   student_email: string | null;
   status: "active" | "submitted" | "expired";
   started_at: string;
-  submitted_at: string | null;
+  finished_at: string | null;
   score: number | null;
   max_points: number | null;
   violation_count: number;
