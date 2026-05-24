@@ -564,6 +564,16 @@ const examApi = {
     return res.data.data;
   },
 
+  forceSubmitSession: async (
+    sessionId: string
+  ): Promise<{ session_id: string; exam_id: string; student_id: string; submitted: boolean }> => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { session_id: string; exam_id: string; student_id: string; submitted: boolean };
+    }>(`/exams/sessions/${sessionId}/force-submit`);
+    return res.data.data;
+  },
+
   startExamRuntime: async (examId: string): Promise<StartRuntimeResult> => {
     const res = await apiClient.post<{ success: boolean; data: StartRuntimeResult }>(
       `/exams/${examId}/start-runtime`

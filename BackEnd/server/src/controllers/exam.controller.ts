@@ -21,6 +21,7 @@ import {
   getSessionGradingView,
   gradeEssaySessionService,
   forceSubmitActiveSessionsByExamService,
+  forceSubmitSessionService,
   getExamProctoringData,
   normalizeIntegrityEvents,
   persistIntegrityEventsService,
@@ -385,6 +386,21 @@ export const forceSubmitExamSessionsController = async (
     const data = await forceSubmitActiveSessionsByExamService(examId);
     emitForceSubmitNotification(examId, data);
     await auditForceSubmit(user.userId, user.role, examId, data.active_sessions, req);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const forceSubmitSessionController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = (req as any).user;
+    const { sessionId } = req.params;
+    const data = await forceSubmitSessionService(sessionId, user.userId, user.role);
     res.json({ success: true, data });
   } catch (err) {
     next(err);

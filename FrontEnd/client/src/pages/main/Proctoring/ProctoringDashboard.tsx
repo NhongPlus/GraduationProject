@@ -6,8 +6,8 @@ import {
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { IconUsers, IconAlertCircle, IconSend } from '@tabler/icons-react';
-import examApi from '@/services/examApi';
-import type { ExamProctoringData } from '@/services/examApi';
+import examApi, { type ExamProctoringData } from '@/services/examApi';
+import { MAX_INTEGRITY_STRIKES } from '@/services/examIntegrityStrikes';
 import appConfig from '@/configs/app.config';
 import { createProctoringSocket, requestPresence, sendGroupBroadcast, leaveProctoring, type PresencePayload } from '@/services/proctoringSocket';
 import { shouldForceSocketPolling } from '@/utils/socketTransport';
@@ -46,6 +46,7 @@ const ProctoringDashboard = () => {
   const [socketError, setSocketError] = useState('');
   const [examTitle, setExamTitle] = useState('');
   const [alertingSession, setAlertingSession] = useState<string | null>(null);
+  const [forceSubmittingAll, setForceSubmittingAll] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [presence, setPresence] = useState<PresencePayload | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting'|'connected'|'disconnected'|'reconnecting'>('connecting');
@@ -148,11 +149,15 @@ const ProctoringDashboard = () => {
     sendGroupBroadcast(socketRef.current, examId!, broadcastGroup, broadcastMessage);
   }, [examId, broadcastGroup, broadcastMessage]);
 
-  const handleForceSubmit = async (sessionId: string) => {
+  const handleForceSubmit = async (sessionId: string, studentLabel: string) => {
     if (!examId) return;
+    const ok = window.confirm(
+      t('proctoring.force_submit_one_confirm', { name: studentLabel })
+    );
+    if (!ok) return;
     try {
       setAlertingSession(sessionId);
-      await examApi.forceSubmitExam(examId);
+      await examApi.forceSubmitSession(sessionId);
       await refreshProctoring({ silent: true });
     } catch {
       setError(t('proctoring.force_submit_failed'));
@@ -161,9 +166,26 @@ const ProctoringDashboard = () => {
     }
   };
 
+  const handleForceSubmitAll = async () => {
+    if (!examId) return;
+    const ok = window.confirm(t('proctoring.force_submit_all_confirm'));
+    if (!ok) return;
+    try {
+      setForceSubmittingAll(true);
+      await examApi.forceSubmitExam(examId);
+      await refreshProctoring({ silent: true });
+    } catch {
+      setError(t('proctoring.force_submit_failed'));
+    } finally {
+      setForceSubmittingAll(false);
+    }
+  };
+
   const getViolationBadge = (count: number) => {
     if (count === 0) return <Badge color="gray" size="sm">{t('proctoring.violation_none')}</Badge>;
-    if (count <= 3) return <Badge color="yellow" size="sm">{t('proctoring.violation_count', { count })}</Badge>;
+    if (count < MAX_INTEGRITY_STRIKES) {
+      return <Badge color="yellow" size="sm">{t('proctoring.violation_count', { count })}</Badge>;
+    }
     return <Badge color="red" size="sm">{t('proctoring.violation_count', { count })}</Badge>;
   };
 
@@ -279,12 +301,22 @@ const ProctoringDashboard = () => {
           </Group>
           <Button
             size="sm"
+            variant="outline"
+            color="red"
+            loading={forceSubmittingAll}
+            disabled={forceSubmittingAll || (data?.active_sessions ?? 0) === 0}
+            onClick={() => void handleForceSubmitAll()}
+          >
+            {t('proctoring.force_submit_all')}
+          </Button>
+          <Button
+            size="sm"
             leftSection={<IconSend size={14} />}
             onClick={() => setBroadcastOpen(true)}
             variant="light"
             color="teal"
           >
-            Gửi thông báo
+            {t('proctoring.broadcast_button')}
           </Button>
         </Group>
 
@@ -364,10 +396,15 @@ const ProctoringDashboard = () => {
                           <ButtonFilled
                             size="xs"
                             color="red"
-                            label="Force submit"
+                            label={t('proctoring.force_submit_one')}
                             loading={alertingSession === session.session_id}
                             disabled={alertingSession === session.session_id}
-                            onClick={() => void handleForceSubmit(session.session_id)}
+                            onClick={() =>
+                              void handleForceSubmit(
+                                session.session_id,
+                                session.student_name || session.student_id
+                              )
+                            }
                           />
                         )}
                       </Group>

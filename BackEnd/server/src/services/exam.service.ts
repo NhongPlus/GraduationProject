@@ -53,6 +53,7 @@ import {
 import {
   insertIntegrityEvents,
   getIntegrityEventsByExam,
+  countStrikeEventsBySession,
   IntegrityEventInput,
   IntegrityEventType,
 } from "~/models/examIntegrity.model";
@@ -92,6 +93,8 @@ import {
   normalizeScheduleAtInput,
 } from "~/utils/examSchedule";
 import { formatScoreScale10Pair } from "~/utils/gradeScale";
+import { shouldAutoSubmitByViolationCount, STRIKE_EVENT_TYPES } from "~/utils/examIntegrityPolicy";
+import { canManageExamRetake } from "~/services/examRetake.service";
 import type { ImportedQuestionDraft } from "~/services/examImport.service";
 
 export function httpError(status: number, message: string): Error & { status: number } {
@@ -846,6 +849,28 @@ export const persistIntegrityEventsService = async (
     student_id: studentId,
     accepted,
   });
+
+  if (session.status === "active") {
+    const strikeCount = await countStrikeEventsBySession(session.id);
+    if (shouldAutoSubmitByViolationCount(strikeCount)) {
+      try {
+        await forceSubmitOneActiveSession(session);
+        const { emitViolationConfirmed } = await import("~/socket/examSocket");
+        emitViolationConfirmed(session.id, {
+          acknowledged: true,
+          violation_id: `server_strikes_${strikeCount}`,
+          session_status: "submitted",
+          auto_submit_triggered: true,
+          message: `Đã ghi nhận ${strikeCount} vi phạm. Hệ thống tự động nộp bài.`,
+        });
+      } catch (err) {
+        console.error(
+          `[integrity] auto-submit after ${strikeCount} strikes failed session=${session.id}`,
+          err
+        );
+      }
+    }
+  }
 
   return {
     accepted,
@@ -1759,6 +1784,53 @@ export interface ForceSubmitSummary {
   failed_sessions: number;
 }
 
+export interface ForceSubmitSessionResult {
+  session_id: string;
+  exam_id: string;
+  student_id: string;
+  submitted: boolean;
+}
+
+async function forceSubmitOneActiveSession(session: ExamSession): Promise<void> {
+  const questions = await getQuestionsByExam(session.exam_id);
+  const orderedQuestionIds = questions.map((q) => q.id);
+  const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
+  const submitAnswers = session.version_id
+    ? autosaveToDisplayIndexAnswers(snapshot?.answers ?? {})
+    : normalizeAutosaveToSubmitAnswers(snapshot?.answers ?? {}, orderedQuestionIds);
+
+  await submitSessionService(session.id, session.student_id, submitAnswers, {
+    allowPastDeadline: true,
+  });
+}
+
+export const forceSubmitSessionService = async (
+  sessionId: string,
+  actorId: string,
+  actorRole: string
+): Promise<ForceSubmitSessionResult> => {
+  if (!sessionId) throw httpError(400, "session_id là bắt buộc");
+
+  const session = await getSessionById(sessionId);
+  if (!session) throw httpError(404, "Phiên thi không tồn tại");
+
+  const allowed = await canManageExamRetake(session.exam_id, actorId, actorRole);
+  if (!allowed) throw httpError(403, "Không có quyền ép nộp phiên này");
+
+  if (session.status !== "active") {
+    throw httpError(400, "Phiên thi không còn đang làm bài");
+  }
+
+  await forceSubmitOneActiveSession(session);
+
+  return {
+    session_id: session.id,
+    exam_id: session.exam_id,
+    student_id: session.student_id,
+    submitted: true,
+  };
+};
+
 export const forceSubmitActiveSessionsByExamService = async (
   examId: string
 ): Promise<ForceSubmitSummary> => {
@@ -1774,22 +1846,12 @@ export const forceSubmitActiveSessionsByExamService = async (
     };
   }
 
-  const questions = await getQuestionsByExam(examId);
-  const orderedQuestionIds = questions.map((q) => q.id);
-
   let submittedSessions = 0;
   let failedSessions = 0;
 
   for (const session of activeSessions) {
     try {
-      const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
-      const submitAnswers = session.version_id
-        ? autosaveToDisplayIndexAnswers(snapshot?.answers ?? {})
-        : normalizeAutosaveToSubmitAnswers(snapshot?.answers ?? {}, orderedQuestionIds);
-
-      await submitSessionService(session.id, session.student_id, submitAnswers, {
-        allowPastDeadline: true,
-      });
+      await forceSubmitOneActiveSession(session);
       submittedSessions += 1;
     } catch (error) {
       failedSessions += 1;
@@ -1918,6 +1980,8 @@ export const reportViolationService = async (
     },
   ]);
 
+  const strikeCount = await countStrikeEventsBySession(session.id);
+
   const { emitProctoringIntegrityUpdate } = await import("~/socket/examSocket");
   emitProctoringIntegrityUpdate(session.exam_id, {
     session_id: session.id,
@@ -1926,10 +1990,13 @@ export const reportViolationService = async (
   });
 
   let autoSubmitTriggered = false;
-  let sessionStatus: ReportViolationResult["session_status"] = session.status as any;
+  let sessionStatus: ReportViolationResult["session_status"] = session.status as ReportViolationResult["session_status"];
 
-  // Nếu chưa nộp và client yêu cầu auto-submit, thực hiện force-submit
-  if (!alreadyFinished && payload.auto_submit) {
+  const requestAutoSubmit =
+    !alreadyFinished &&
+    (payload.auto_submit === true || shouldAutoSubmitByViolationCount(strikeCount));
+
+  if (requestAutoSubmit) {
     try {
       const snapshot = await getLatestAutosaveSnapshotBySession(session.id);
       const submitAnswers = autosaveToDisplayIndexAnswers(snapshot?.answers ?? {});
@@ -1972,26 +2039,32 @@ export const getExamProctoringData = async (examId: string): Promise<ExamProctor
     eventsBySession.set(ev.session_id, list);
   }
 
-  const entries: ProctoringEntry[] = sessions.map((s) => {
-    const sessEvents = eventsBySession.get(s.id) ?? [];
-    return {
-      session_id: s.id,
-      student_id: s.student_id,
-      student_name: s.student_name,
-      student_email: s.student_email,
-      status: s.status,
-      started_at: s.started_at,
-      finished_at: s.submitted_at,
-      score: s.score,
-      max_points: s.max_points,
-      violation_count: sessEvents.length,
-      violations: sessEvents.map((ev) => ({
-        event_type: ev.event_type,
-        client_at: ev.client_at,
-        details: ev.details,
-      })),
-    };
-  });
+  const strikeTypeSet = new Set<string>(STRIKE_EVENT_TYPES);
+
+  const entries: ProctoringEntry[] = await Promise.all(
+    sessions.map(async (s) => {
+      const sessEvents = eventsBySession.get(s.id) ?? [];
+      const strikeCount = await countStrikeEventsBySession(s.id);
+      const strikeEvents = sessEvents.filter((ev) => strikeTypeSet.has(ev.event_type));
+      return {
+        session_id: s.id,
+        student_id: s.student_id,
+        student_name: s.student_name,
+        student_email: s.student_email,
+        status: s.status,
+        started_at: s.started_at,
+        finished_at: s.submitted_at,
+        score: s.score,
+        max_points: s.max_points,
+        violation_count: strikeCount,
+        violations: strikeEvents.map((ev) => ({
+          event_type: ev.event_type,
+          client_at: ev.client_at,
+          details: ev.details,
+        })),
+      };
+    })
+  );
 
   return {
     exam_id: examId,

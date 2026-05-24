@@ -1,4 +1,5 @@
 import pool from "~/config/db";
+import { STRIKE_EVENT_TYPES } from "~/utils/examIntegrityPolicy";
 
 export type IntegrityEventType =
   | "exam_opened"
@@ -94,4 +95,16 @@ export const getIntegrityEventsByExam = async (
     [examId]
   );
   return result.rows;
+};
+
+/** Đếm số sự kiện vi phạm (cảnh cáo) của một phiên — dùng cho auto-submit phía server. */
+export const countStrikeEventsBySession = async (sessionId: string): Promise<number> => {
+  const result = await pool.query<{ cnt: number }>(
+    `SELECT COUNT(*)::int AS cnt
+     FROM exam_integrity_events
+     WHERE session_id = $1
+       AND event_type = ANY($2::text[])`,
+    [sessionId, [...STRIKE_EVENT_TYPES]]
+  );
+  return result.rows[0]?.cnt ?? 0;
 };

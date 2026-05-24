@@ -17,6 +17,7 @@ import {
   getMySessionsController,
   getExamSessionsController,
   forceSubmitExamSessionsController,
+  forceSubmitSessionController,
   startExamRuntimeController,
   getMySubmissionController,
   getSessionGradingController,
@@ -62,6 +63,11 @@ examRouter.post(
   "/sessions/:sessionId/report-violation",
   roleMiddleware(["student"]),
   reportViolationController
+);
+examRouter.post(
+  "/sessions/:sessionId/force-submit",
+  roleMiddleware(["admin", "teacher"]),
+  forceSubmitSessionController
 );
 examRouter.get(
   "/sessions/:sessionId/grading",
