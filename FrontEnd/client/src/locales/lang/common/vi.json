@@ -312,7 +312,26 @@
     "take_disabled_deadline": "Đã quá hạn bắt đầu bài thi",
     "take_disabled_submitted": "Bạn đã nộp bài thi này",
     "force_submit_confirm": "Bạn có chắc muốn force-submit toàn bộ phiên đang active của đề thi này?",
-    "force_submit_done": "Đã xử lý force-submit. Active: {{active}}, nộp thành công: {{submitted}}, lỗi: {{failed}}."
+    "force_submit_done": "Đã xử lý force-submit. Active: {{active}}, nộp thành công: {{submitted}}, lỗi: {{failed}}.",
+    "status_retake_granted": "Được thi lại",
+    "take_retake_hint": "Giáo viên đã cho phép thi lại bài này"
+  },
+  "exam_retake": {
+    "grant_btn": "Cho thi lại",
+    "revoke_btn": "Thu hồi",
+    "confirm_btn": "Xác nhận",
+    "modal_title": "Cho phép thi lại",
+    "modal_student": "Sinh viên: {{name}}",
+    "reason_label": "Lý do",
+    "reason_placeholder": "VD: Mất mạng, lỗi hệ thống...",
+    "reason_required": "Vui lòng nhập lý do thi lại",
+    "grant_success": "Đã cấp quyền thi lại cho sinh viên",
+    "grant_failed": "Không thể cấp thi lại",
+    "revoke_confirm": "Thu hồi quyền thi lại? Sinh viên sẽ không làm lại được.",
+    "revoke_success": "Đã thu hồi quyền thi lại",
+    "revoke_failed": "Không thể thu hồi",
+    "grant_pending": "Đã cấp thi lại",
+    "session_voided": "Đã thay thế"
   },
   "exam_result": {
     "invalid_exam": "Bài thi không hợp lệ",

@@ -35,6 +35,12 @@ import {
   getProctorLogsController,
   reportViolationController,
 } from "~/controllers/exam.controller";
+import {
+  grantRetakeController,
+  revokeRetakeController,
+  listExamRetakeGrantsController,
+  getMyRetakeGrantsController,
+} from "~/controllers/examRetake.controller";
 
 const examRouter = Router();
 const upload = multer({
@@ -49,6 +55,7 @@ const mediaUpload = multer({
 examRouter.use(authMiddleware);
 
 examRouter.get("/sessions/me", roleMiddleware(["admin", "teacher", "student"]), getMySessionsController);
+examRouter.get("/retake-grants/me", roleMiddleware(["student"]), getMyRetakeGrantsController);
 examRouter.post("/sessions/:sessionId/submit", roleMiddleware(["student"]), submitSessionController);
 // P0 Fix: Report violation immediately to server (lock + auto-submit)
 examRouter.post(
@@ -129,6 +136,21 @@ examRouter.delete("/:examId/questions/:questionId", roleMiddleware(["admin", "te
 
 examRouter.post("/:examId/sessions", roleMiddleware(["student"]), startSessionController);
 examRouter.get("/:examId/sessions", roleMiddleware(["admin", "teacher"]), getExamSessionsController);
+examRouter.get(
+  "/:examId/retake-grants",
+  roleMiddleware(["admin", "teacher"]),
+  listExamRetakeGrantsController
+);
+examRouter.post(
+  "/:examId/retake-grants",
+  roleMiddleware(["admin", "teacher"]),
+  grantRetakeController
+);
+examRouter.delete(
+  "/:examId/retake-grants/:grantId",
+  roleMiddleware(["admin", "teacher"]),
+  revokeRetakeController
+);
 examRouter.get(
   "/:examId/proctoring",
   roleMiddleware(["admin", "teacher"]),

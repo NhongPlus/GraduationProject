@@ -288,7 +288,26 @@
     "deadline_none": "—",
     "take_disabled_deadline": "かいし きげんを すぎました",
     "force_submit_confirm": "このしけんの active セッションを ぜんぶ force-submit しますか？",
-    "force_submit_done": "Force-submit が おわりました。active: {{active}}, submitted: {{submitted}}, failed: {{failed}}。"
+    "force_submit_done": "Force-submit が おわりました。active: {{active}}, submitted: {{submitted}}, failed: {{failed}}。",
+    "status_retake_granted": "再試験可",
+    "take_retake_hint": "教員が再試験を許可しました"
+  },
+  "exam_retake": {
+    "grant_btn": "再試験を許可",
+    "revoke_btn": "取り消し",
+    "confirm_btn": "確認",
+    "modal_title": "再試験の許可",
+    "modal_student": "学生: {{name}}",
+    "reason_label": "理由",
+    "reason_placeholder": "例: ネットワーク障害、システムエラー...",
+    "reason_required": "理由を入力してください",
+    "grant_success": "再試験を許可しました",
+    "grant_failed": "再試験を許可できませんでした",
+    "revoke_confirm": "再試験の許可を取り消しますか？",
+    "revoke_success": "許可を取り消しました",
+    "revoke_failed": "取り消しに失敗しました",
+    "grant_pending": "再試験許可済",
+    "session_voided": "置換済"
   },
   "exam_result": {
     "invalid_exam": "だめな しけん",

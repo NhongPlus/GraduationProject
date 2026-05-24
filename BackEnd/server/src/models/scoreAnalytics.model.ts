@@ -119,6 +119,7 @@ const SESSIONS_BASE_SQL = `
   WHERE es.status = 'submitted'
     AND es.score IS NOT NULL
     AND es.max_points > 0
+    AND es.voided_at IS NULL
     AND s.id IS NOT NULL
 `;
 

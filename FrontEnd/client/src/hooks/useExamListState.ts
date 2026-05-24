@@ -23,6 +23,7 @@ export function useExamListState(opts: {
   const [startingExamId, setStartingExamId] = useState<string | null>(null);
   const [updatingExamId, setUpdatingExamId] = useState<string | null>(null);
   const [forceSubmittingExamId, setForceSubmittingExamId] = useState<string | null>(null);
+  const [retakeGrantExamIds, setRetakeGrantExamIds] = useState<Set<string>>(new Set());
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSetSearchText = (value: string) => {
@@ -52,7 +53,9 @@ export function useExamListState(opts: {
           fetchedExams.map(async (exam) => {
             try {
               const examSessions = await examApi.getExamSessions(exam.id);
-              const activeCount = examSessions.filter((s) => s.status === 'active').length;
+              const activeCount = examSessions.filter(
+                (s) => s.status === 'active' && !s.voided_at
+              ).length;
               return [exam.id, activeCount] as const;
             } catch {
               return [exam.id, 0] as const;
@@ -61,8 +64,12 @@ export function useExamListState(opts: {
         );
         setActiveSessionCountByExam(Object.fromEntries(entries));
       } else {
-        const mySessions = await examApi.getMySessions();
+        const [mySessions, myRetakes] = await Promise.all([
+          examApi.getMySessions(),
+          examApi.getMyRetakeGrants(),
+        ]);
         setSessions(mySessions);
+        setRetakeGrantExamIds(new Set(myRetakes.map((g) => g.exam_id)));
         setActiveSessionCountByExam({});
       }
     } catch {
@@ -81,7 +88,7 @@ export function useExamListState(opts: {
   const submittedSessionByExam = useMemo(() => {
     const byExam = new Map<string, ExamSession>();
     for (const s of sessions) {
-      if (s.status !== 'submitted') continue;
+      if (s.status !== 'submitted' || s.voided_at) continue;
       const prev = byExam.get(s.exam_id);
       const sAt = new Date(s.submitted_at ?? s.started_at).getTime();
       const prevAt = prev ? new Date(prev.submitted_at ?? prev.started_at).getTime() : 0;
@@ -113,6 +120,11 @@ export function useExamListState(opts: {
   const hasSubmitted = useCallback(
     (examId: string) => submittedSessionByExam.has(examId),
     [submittedSessionByExam]
+  );
+
+  const hasRetakeGrant = useCallback(
+    (examId: string) => retakeGrantExamIds.has(examId),
+    [retakeGrantExamIds]
   );
 
   const filteredExams = useMemo(() => {
@@ -226,6 +238,7 @@ export function useExamListState(opts: {
     latestSessionByExam,
     submittedSessionByExam,
     hasSubmitted,
+    hasRetakeGrant,
     activeSessionCountByExam,
     runtimeActiveByExam,
     filteredExams,

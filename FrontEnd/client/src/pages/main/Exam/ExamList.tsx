@@ -57,6 +57,7 @@ const ExamList = () => {
     latestSessionByExam,
     submittedSessionByExam,
     hasSubmitted,
+    hasRetakeGrant,
     activeSessionCountByExam,
     runtimeActiveByExam,
     filteredExams,
@@ -216,9 +217,10 @@ const ExamList = () => {
                   const runtimeActive = isStaff ? Boolean(runtimeActiveByExam[item.id]) : false;
                   const examInProgress = runtimeActive || activeCount > 0;
                   const studentSubmitted = !isStaff && hasSubmitted(item.id);
+                  const canRetake = !isStaff && hasRetakeGrant(item.id);
                   const done = isStaff
                     ? !examInProgress
-                    : studentSubmitted;
+                    : studentSubmitted && !canRetake;
                   const pastDeadline = isPastExamStartDeadline(item, latest);
                   const deadlineLabel =
                     item.closes_at != null && item.closes_at !== ''
@@ -227,7 +229,7 @@ const ExamList = () => {
                   const rowNavigate = isStaff
                     ? () => navigate(`/exam-sessions/${item.id}`)
                     : () => {
-                        if (studentSubmitted) {
+                        if (studentSubmitted && !canRetake) {
                           navigate(`/result/${item.id}`);
                           return;
                         }
@@ -256,8 +258,16 @@ const ExamList = () => {
                         </Table.Td>
                       )}
                       <Table.Td>
-                        <Badge color={done ? 'green' : 'gray'}>
-                          {done ? t('exam_list.status_done') : t('exam_list.status_not_done')}
+                        <Badge
+                          color={
+                            canRetake ? 'orange' : done ? 'green' : 'gray'
+                          }
+                        >
+                          {canRetake
+                            ? t('exam_list.status_retake_granted')
+                            : done
+                              ? t('exam_list.status_done')
+                              : t('exam_list.status_not_done')}
                         </Badge>
                       </Table.Td>
                       <Table.Td>
@@ -316,17 +326,19 @@ const ExamList = () => {
                               size="xs"
                               color="blue"
                               label={t('exam_list.action_take')}
-                              disabled={pastDeadline || done}
+                              disabled={pastDeadline || (studentSubmitted && !canRetake)}
                               title={
-                                done
+                                studentSubmitted && !canRetake
                                   ? t('exam_list.take_disabled_submitted', 'Bạn đã nộp bài thi này')
                                   : pastDeadline
                                     ? t('exam_list.take_disabled_deadline')
-                                    : undefined
+                                    : canRetake
+                                      ? t('exam_list.take_retake_hint')
+                                      : undefined
                               }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (done) return;
+                                if (studentSubmitted && !canRetake) return;
                                 void enterExamRoom(navigate, item.id);
                               }}
                             />
@@ -335,7 +347,7 @@ const ExamList = () => {
                               style={{ marginLeft: 8 }}
                               color="gray"
                               label={t('exam_list.action_result')}
-                              disabled={!done}
+                              disabled={!studentSubmitted && !canRetake}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/result/${item.id}`);

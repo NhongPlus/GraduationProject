@@ -75,6 +75,8 @@ import {
   normalizeLetterKey,
 } from "~/utils/examMcqGrading";
 import { createNotification } from "~/models/userNotification.model";
+import { applyRetakeOnSessionStart } from "~/services/examRetake.service";
+import { getApprovedRetakeGrant } from "~/models/examRetakeGrant.model";
 import {
   isMalformedClosesAt,
   isPastClosesAt,
@@ -492,7 +494,10 @@ export const startSessionWithMeta = async (
   if (!session) {
     const alreadySubmitted = await getLatestSubmittedSession(examId, studentId);
     if (alreadySubmitted) {
-      throw httpError(409, "Bạn đã nộp bài thi này. Xem kết quả tại mục Kết quả.");
+      const grant = await getApprovedRetakeGrant(examId, studentId);
+      if (!grant) {
+        throw httpError(409, "Bạn đã nộp bài thi này. Xem kết quả tại mục Kết quả.");
+      }
     }
   }
   if (session) {
@@ -512,6 +517,7 @@ export const startSessionWithMeta = async (
       [examId, studentId, version.id, version.version_code]
     ).then((r) => r.rows[0] as ExamSession);
     if (!session) throw httpError(500, "Không thể tạo phiên thi");
+    await applyRetakeOnSessionStart(examId, studentId, session.id);
   }
 
   const started = new Date(session.started_at).getTime();

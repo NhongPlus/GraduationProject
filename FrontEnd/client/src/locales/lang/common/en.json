@@ -301,7 +301,26 @@
     "deadline_none": "—",
     "take_disabled_deadline": "The start deadline has passed",
     "force_submit_confirm": "Are you sure you want to force-submit all active sessions for this exam?",
-    "force_submit_done": "Force-submit completed. Active: {{active}}, submitted: {{submitted}}, failed: {{failed}}."
+    "force_submit_done": "Force-submit completed. Active: {{active}}, submitted: {{submitted}}, failed: {{failed}}.",
+    "status_retake_granted": "Retake allowed",
+    "take_retake_hint": "Your teacher allowed a retake for this exam"
+  },
+  "exam_retake": {
+    "grant_btn": "Allow retake",
+    "revoke_btn": "Revoke",
+    "confirm_btn": "Confirm",
+    "modal_title": "Allow retake",
+    "modal_student": "Student: {{name}}",
+    "reason_label": "Reason",
+    "reason_placeholder": "e.g. network outage, system error...",
+    "reason_required": "Please enter a reason",
+    "grant_success": "Retake granted",
+    "grant_failed": "Could not grant retake",
+    "revoke_confirm": "Revoke retake permission? The student will not be able to retake.",
+    "revoke_success": "Retake revoked",
+    "revoke_failed": "Could not revoke",
+    "grant_pending": "Retake granted",
+    "session_voided": "Superseded"
   },
   "exam_result": {
     "invalid_exam": "Invalid exam",

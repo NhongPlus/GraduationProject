@@ -69,6 +69,22 @@ export interface ExamSession {
   student_name?: string | null;
   student_email?: string | null;
   version_code?: string | null;
+  voided_at?: string | null;
+  void_reason?: string | null;
+}
+
+export interface ExamRetakeGrant {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  granted_by: string;
+  reason: string;
+  status: 'approved' | 'consumed' | 'revoked';
+  superseded_session_id: string | null;
+  consumed_session_id: string | null;
+  granted_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
 }
 
 export interface StartSessionData {
@@ -477,6 +493,38 @@ const examApi = {
   getMySessions: async (): Promise<ExamSession[]> => {
     const res = await apiClient.get<{ success: boolean; data: ExamSession[] }>(
       '/exams/sessions/me'
+    );
+    return res.data.data;
+  },
+
+  getMyRetakeGrants: async (): Promise<ExamRetakeGrant[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ExamRetakeGrant[] }>(
+      '/exams/retake-grants/me'
+    );
+    return res.data.data ?? [];
+  },
+
+  listRetakeGrants: async (examId: string): Promise<ExamRetakeGrant[]> => {
+    const res = await apiClient.get<{ success: boolean; data: ExamRetakeGrant[] }>(
+      `/exams/${examId}/retake-grants`
+    );
+    return res.data.data ?? [];
+  },
+
+  grantRetake: async (
+    examId: string,
+    payload: { student_id: string; reason: string }
+  ): Promise<ExamRetakeGrant> => {
+    const res = await apiClient.post<{ success: boolean; data: ExamRetakeGrant }>(
+      `/exams/${examId}/retake-grants`,
+      payload
+    );
+    return res.data.data;
+  },
+
+  revokeRetake: async (examId: string, grantId: string): Promise<ExamRetakeGrant> => {
+    const res = await apiClient.delete<{ success: boolean; data: ExamRetakeGrant }>(
+      `/exams/${examId}/retake-grants/${grantId}`
     );
     return res.data.data;
   },

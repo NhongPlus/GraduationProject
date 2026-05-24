@@ -18,6 +18,10 @@ export interface ExamSession {
   grading_status: GradingStatus | null;
   version_id: string | null;
   version_code: string | null;
+  voided_at?: string | null;
+  void_reason?: string | null;
+  superseded_by?: string | null;
+  retake_grant_id?: string | null;
 }
 
 export interface SessionWithExamMeta extends ExamSession {
@@ -63,7 +67,7 @@ export const getActiveSession = async (
   studentId: string
 ): Promise<ExamSession | null> => {
   const result = await pool.query(
-    "SELECT * FROM exam_sessions WHERE exam_id = $1 AND student_id = $2 AND status = 'active'",
+    "SELECT * FROM exam_sessions WHERE exam_id = $1 AND student_id = $2 AND status = 'active' AND voided_at IS NULL",
     [examId, studentId]
   );
   return (result.rows[0] as ExamSession) ?? null;
@@ -195,7 +199,7 @@ export const getLatestSubmittedSession = async (
 ): Promise<ExamSession | null> => {
   const result = await pool.query(
     `SELECT * FROM exam_sessions
-     WHERE exam_id = $1 AND student_id = $2 AND status = 'submitted'
+     WHERE exam_id = $1 AND student_id = $2 AND status = 'submitted' AND voided_at IS NULL
      ORDER BY submitted_at DESC NULLS LAST
      LIMIT 1`,
     [examId, studentId]

@@ -385,7 +385,7 @@ export const getGradeReportController = async (req: Request, res: Response, next
           es.grading_status
         FROM accounts a
         LEFT JOIN exam_sessions es
-          ON es.student_id = a.id AND es.exam_id = $${examParamIdx} AND es.status = 'submitted'
+          ON es.student_id = a.id AND es.exam_id = $${examParamIdx} AND es.status = 'submitted' AND es.voided_at IS NULL
         LEFT JOIN exams e ON e.id = $${examParamIdx}
         WHERE ${studentWhere}
         ORDER BY a.full_name NULLS LAST, a.username
@@ -781,6 +781,7 @@ async function loadStudentTranscriptPayload(studentId: string, adminClassId: str
     JOIN exams e ON e.id = es.exam_id
     LEFT JOIN subjects s ON s.id = e.subject_id
     WHERE es.student_id = $1 AND es.status = 'submitted'
+      AND es.voided_at IS NULL
       AND e.admin_class_id = (SELECT admin_class_id FROM accounts WHERE id = $1)
     ORDER BY COALESCE(e.subject_id::text, e.id::text), es.submitted_at DESC
     `,
