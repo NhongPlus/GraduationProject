@@ -44,7 +44,6 @@ const pushQueue = (event: IntegrityEvent) => {
 };
 
 async function sendBatch(examId: string, events: IntegrityEvent[]) {
-  // Endpoint có thể chưa tồn tại ở BE hiện tại, nên fail-safe.
   await apiClient.post('/exams/integrity-events', { exam_id: examId, events });
 }
 

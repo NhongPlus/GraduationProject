@@ -32,6 +32,15 @@ export const saveDraftAnswers = (examId: string, answers: DraftAnswers) => {
   localStorage.setItem(draftKey(examId), JSON.stringify(answers));
 };
 
+/** Gộp bản nháp server (khôi phục cross-device) với local (ưu tiên local cho key trùng). */
+export const mergeDraftAnswers = (
+  serverAnswers: DraftAnswers | null | undefined,
+  localAnswers: DraftAnswers
+): DraftAnswers => {
+  if (!serverAnswers || !Object.keys(serverAnswers).length) return { ...localAnswers };
+  return { ...serverAnswers, ...localAnswers };
+};
+
 const readPending = (examId: string): PendingAutosave[] => {
   try {
     const raw = localStorage.getItem(pendingKey(examId));
@@ -74,7 +83,7 @@ export async function flushAutosaveQueue(examId: string): Promise<void> {
     });
     writePending(examId, []);
   } catch {
-    // Endpoint chưa có hoặc offline -> giữ queue để retry.
+    // Giữ queue để retry khi offline.
   }
 }
 

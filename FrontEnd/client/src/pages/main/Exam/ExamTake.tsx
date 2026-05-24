@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, Paper, Stack, Text } from '@mantine/core';
+import { Box, Button, Paper, Stack, Text, Alert } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconArrowLeft, IconArrowRight, IconArrowsMaximize } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -20,10 +20,18 @@ import { useExamTakeState } from '@/hooks/useExamTakeState';
 import useAuth from '@/hooks/useAuth';
 import {
   flushAutosaveQueue,
+  mergeDraftAnswers,
   queueAutosave,
+  readDraftAnswers,
   saveDraftAnswers,
 } from '@/services/examAutosaveClient';
 import { flushIntegrityQueue, trackIntegrityEvent } from '@/services/examIntegrityClient';
+import {
+  clearStrikes,
+  loadStrikes,
+  MAX_INTEGRITY_STRIKES,
+  registerStrike,
+} from '@/services/examIntegrityStrikes';
 import { createExamRealtimeSocket, type ForceSubmitPayload, type ViolationConfirmedPayload } from '@/services/examRealtimeSocket';
 import classes from '@/components/ExamTake/ExamTake.module.scss';
 
@@ -173,6 +181,7 @@ function loadViolationFromStorage(examId: string): ViolationStorageData | null {
 function clearViolationStorage(examId: string): void {
   try {
     sessionStorage.removeItem(VIOLATION_STORAGE_KEY(examId));
+    clearStrikes(examId);
   } catch {
     // Ignore
   }
@@ -205,6 +214,7 @@ const ExamTake = () => {
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** P0 Fix: Flag to indicate violation is being reported to server */
   const reportingViolationRef = useRef(false);
+  const [integrityStrikes, setIntegrityStrikes] = useState(0);
   /** Chỉ dev: production luôn bắt fullscreen (tránh VITE_DISABLE_INTEGRITY trên Vercel). */
   const integrityDisabled =
     import.meta.env.DEV && import.meta.env.VITE_DISABLE_INTEGRITY === 'true';
@@ -273,6 +283,16 @@ const ExamTake = () => {
     integrity: { violationLocked, setViolationLocked, lockReason, setLockReason },
     refs: { remainingRef, sessionStartingRef, violationTriggeredRef, lastViolationAtRef },
   } = useExamTakeState(activeExamId);
+
+  useEffect(() => {
+    const saved = loadStrikes(activeExamId);
+    if (sessionId && saved.sessionId === sessionId) {
+      setIntegrityStrikes(saved.count);
+      setFocusLeaveCount(saved.count);
+    } else if (sessionId) {
+      setIntegrityStrikes(0);
+    }
+  }, [activeExamId, sessionId, setFocusLeaveCount]);
 
   const byNumber = useMemo(() => new Map(questions.map((q) => [q.number, q])), [questions]);
   const resolveQuestion = (n: number): MockExamQuestion => byNumber.get(n) ?? placeholderQuestion(n);
@@ -381,6 +401,11 @@ const ExamTake = () => {
       setSessionId(startData.session.id);
       setVersionCode(startData.version_code ?? null);
 
+      const localDraft = readDraftAnswers(activeExamId);
+      const restoredAnswers = mergeDraftAnswers(startData.autosave?.answers, localDraft);
+      setAnswers(restoredAnswers);
+      saveDraftAnswers(activeExamId, restoredAnswers);
+
       const classEndsAt =
         startData.runtime_state?.is_active && startData.runtime_state.ends_at
           ? startData.runtime_state.ends_at
@@ -413,6 +438,7 @@ const ExamTake = () => {
     setQuestions,
     setSessionId,
     setVersionCode,
+    setAnswers,
     syncServerTime,
   ]);
 
@@ -605,6 +631,90 @@ const ExamTake = () => {
     reportingViolationRef.current = false;
   }, [activeExamId, lastViolationAtRef, sessionId, setAutoSubmitCountdown, setAutoSubmitted, setLockReason, setRealtimeMessage, setViolationLocked, violationTriggeredRef]);
 
+  /** Cảnh cáo lần 1, 2… — chỉ khóa + auto-submit khi đạt MAX_INTEGRITY_STRIKES. */
+  const handleIntegrityStrike = useCallback(
+    async (
+      reason: string,
+      violationType:
+        | 'fullscreen_exit'
+        | 'visibility_hidden'
+        | 'window_blur'
+        | 'tab_switch'
+        | 'devtools_open'
+        | 'copy_attempt'
+        | 'paste_attempt'
+        | 'context_menu'
+        | 'other'
+    ) => {
+      if (violationTriggeredRef.current || autoSubmitted || !examStarted) return;
+
+      const { record, incremented } = registerStrike(activeExamId, sessionId);
+      if (!incremented) return;
+
+      setIntegrityStrikes(record.count);
+      setFocusLeaveCount(record.count);
+
+      const integrityType =
+        violationType === 'tab_switch'
+          ? 'visibility_hidden'
+          : violationType === 'devtools_open'
+            ? 'context_menu'
+            : violationType === 'other'
+              ? 'window_blur'
+              : violationType;
+
+      void trackIntegrityEvent(activeExamId, integrityType, {
+        strike: record.count,
+        max_strikes: MAX_INTEGRITY_STRIKES,
+        reason,
+      });
+
+      if (record.count >= MAX_INTEGRITY_STRIKES) {
+        void triggerViolationLock(
+          t('exam_take.violation_final_reason', { max: MAX_INTEGRITY_STRIKES }),
+          violationType
+        );
+        return;
+      }
+
+      const summary = t('exam_take.violation_warning_message', {
+        current: record.count,
+        max: MAX_INTEGRITY_STRIKES,
+      });
+      setRealtimeMessage(summary);
+
+      modals.open({
+        centered: true,
+        title: t('exam_take.violation_warning_title', {
+          current: record.count,
+          max: MAX_INTEGRITY_STRIKES,
+        }),
+        children: (
+          <Stack gap="md">
+            <Text size="sm">{reason}</Text>
+            <Text size="sm" c="dimmed">
+              {summary}
+            </Text>
+            <Button color="orange" onClick={() => modals.closeAll()}>
+              {t('exam_take.violation_warning_ack')}
+            </Button>
+          </Stack>
+        ),
+      });
+    },
+    [
+      activeExamId,
+      autoSubmitted,
+      examStarted,
+      sessionId,
+      setFocusLeaveCount,
+      setRealtimeMessage,
+      t,
+      triggerViolationLock,
+      violationTriggeredRef,
+    ]
+  );
+
   useEffect(() => {
     let canceled = false;
 
@@ -748,8 +858,8 @@ const ExamTake = () => {
             graceTimerRef.current = null;
             // Only trigger if still not in fullscreen after grace period
             if (!document.fullscreenElement && examStarted && !autoSubmitted) {
-              void triggerViolationLock(
-                'Phát hiện thoát toàn màn hình. Bài thi sẽ bị khóa và tự động nộp.',
+              void handleIntegrityStrike(
+                t('exam_take.violation_reason_fullscreen'),
                 'fullscreen_exit'
               );
             }
@@ -776,25 +886,19 @@ const ExamTake = () => {
         graceTimerRef.current = null;
       }
     };
-  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, isFullscreen, setIsFullscreen, setRealtimeMessage, setViolationLocked, t, triggerViolationLock]);
+  }, [activeExamId, autoSubmitted, examStarted, handleIntegrityStrike, integrityDisabled, isFullscreen, setIsFullscreen, setRealtimeMessage, setViolationLocked, t]);
 
   useEffect(() => {
     if (integrityDisabled) return;
     const onVisibilityChange = () => {
       if (!examStarted || autoSubmitted) return;
       if (document.hidden) {
-        setFocusLeaveCount((v) => v + 1);
-        void trackIntegrityEvent(activeExamId, 'visibility_hidden');
-        // P0 Fix: Use updated triggerViolationLock with violation type
-        void triggerViolationLock('Phát hiện rời khỏi tab thi. Bài thi sẽ bị khóa và tự động nộp.', 'visibility_hidden');
+        void handleIntegrityStrike(t('exam_take.violation_reason_tab'), 'visibility_hidden');
       }
     };
     const onWindowBlur = () => {
       if (!examStarted || autoSubmitted) return;
-      setFocusLeaveCount((v) => v + 1);
-      void trackIntegrityEvent(activeExamId, 'window_blur');
-      // P0 Fix: Use updated triggerViolationLock with violation type
-      void triggerViolationLock('Phát hiện mất focus cửa sổ thi. Bài thi sẽ bị khóa và tự động nộp.', 'window_blur');
+      void handleIntegrityStrike(t('exam_take.violation_reason_blur'), 'window_blur');
     };
     const onWindowFocus = () => {
       if (!examStarted || autoSubmitted) return;
@@ -848,7 +952,7 @@ const ExamTake = () => {
       document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [activeExamId, autoSubmitted, examStarted, integrityDisabled, triggerViolationLock]);
+  }, [activeExamId, autoSubmitted, examStarted, handleIntegrityStrike, integrityDisabled]);
   useEffect(() => {
     if (!examStarted || !sessionId || autoSubmitted) return;
     saveDraftAnswers(activeExamId, answers);
@@ -1247,6 +1351,22 @@ const ExamTake = () => {
             connectionStatus={connectionStatus}
           />
 
+          {integrityStrikes > 0 && (
+            <Alert
+              color={integrityStrikes >= MAX_INTEGRITY_STRIKES - 1 ? 'orange' : 'yellow'}
+              variant="light"
+              mb="md"
+              title={t('exam_take.violation_strike_banner_title', {
+                current: integrityStrikes,
+                max: MAX_INTEGRITY_STRIKES,
+              })}
+            >
+              {t('exam_take.violation_strike_banner_body', {
+                remaining: MAX_INTEGRITY_STRIKES - integrityStrikes,
+              })}
+            </Alert>
+          )}
+
           <div>
             <ExamQuestionPanel
               question={currentQuestion}
@@ -1297,7 +1417,7 @@ const ExamTake = () => {
       )}
       {!autoSubmitted && !isFullscreen && (
         <Text size="xs" c="dimmed" ta="center" mt="xs">
-          {t('exam_take.leave_count', { count: focusLeaveCount })}
+          {t('exam_take.leave_count', { count: focusLeaveCount, max: MAX_INTEGRITY_STRIKES })}
         </Text>
       )}
       {!autoSubmitted && realtimeMessage && examStarted && canShowExamShell && (

@@ -582,6 +582,21 @@ export function emitViolationConfirmed(sessionId: string, data: {
   });
 }
 
+/** Báo giám thị trong room exam có integrity event mới — dashboard refresh dữ liệu. */
+export function emitProctoringIntegrityUpdate(
+  examId: string,
+  meta?: { session_id?: string; student_id?: string; accepted?: number }
+): void {
+  if (!ioInstance) return;
+  ioInstance.to(roomForExam(examId)).emit("proctor:integrity_update", {
+    examId,
+    session_id: meta?.session_id ?? null,
+    student_id: meta?.student_id ?? null,
+    accepted: meta?.accepted ?? 0,
+    at: new Date().toISOString(),
+  });
+}
+
 export async function startExamRuntimeFromServer(examId: string): Promise<{
   examId: string;
   startedAt: string;

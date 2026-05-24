@@ -17,9 +17,18 @@ export type GroupAlertPayload = {
   at: string;
 };
 
+export type IntegrityUpdatePayload = {
+  examId: string;
+  session_id: string | null;
+  student_id: string | null;
+  accepted: number;
+  at: string;
+};
+
 type ProctoringHandlers = {
   onPresenceUpdate?: (payload: PresencePayload) => void;
   onGroupAlert?: (payload: GroupAlertPayload) => void;
+  onIntegrityUpdate?: (payload: IntegrityUpdatePayload) => void;
   onProctorJoined?: (payload: { examId: string; room: string }) => void;
   onProctorLeft?: (payload: { examId: string }) => void;
   onBroadcastSent?: (payload: { examId: string; group: string }) => void;
@@ -54,6 +63,10 @@ export function createProctoringSocket(opts: {
 
   socket.on('proctor:group_alert', (p: GroupAlertPayload) => {
     handlers?.onGroupAlert?.(p);
+  });
+
+  socket.on('proctor:integrity_update', (p: IntegrityUpdatePayload) => {
+    handlers?.onIntegrityUpdate?.(p);
   });
 
   socket.on('proctor:joined', (p: { examId: string; room: string }) => {

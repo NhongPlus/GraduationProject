@@ -92,6 +92,11 @@ export interface StartSessionData {
     ends_at: string;
     is_active: boolean;
   } | null;
+  /** Bản nháp mới nhất trên server */
+  autosave?: {
+    saved_at: string;
+    answers: Record<string, string>;
+  } | null;
 }
 
 export interface SubmitResult {
@@ -119,6 +124,31 @@ export interface MySubmission {
   max_points: number | null;
   grading_status: 'pending_manual' | 'complete' | null;
   details: SubmitResult['details'];
+}
+
+export interface ExamProctoringData {
+  exam_id: string;
+  total_sessions: number;
+  active_sessions: number;
+  submitted_sessions: number;
+  expired_sessions: number;
+  sessions: Array<{
+    session_id: string;
+    student_id: string;
+    student_name: string | null;
+    student_email: string | null;
+    status: 'active' | 'submitted' | 'expired';
+    started_at: string;
+    finished_at: string | null;
+    score: number | null;
+    max_points: number | null;
+    violation_count: number;
+    violations: Array<{
+      event_type: string;
+      client_at: string;
+      details: Record<string, unknown> | null;
+    }>;
+  }>;
 }
 
 export interface GradingPayload {
@@ -517,59 +547,10 @@ const examApi = {
     return res.data.data;
   },
 
-  getExamProctoring: async (
-    examId: string
-  ): Promise<{
-    exam_id: string;
-    total_sessions: number;
-    active_sessions: number;
-    submitted_sessions: number;
-    expired_sessions: number;
-    sessions: Array<{
-      session_id: string;
-      student_id: string;
-      student_name: string | null;
-      student_email: string | null;
-      status: "active" | "submitted" | "expired";
-      started_at: string;
-      finished_at: string | null;
-      score: number | null;
-      max_points: number | null;
-      violation_count: number;
-      violations: Array<{
-        event_type: string;
-        client_at: string;
-        details: Record<string, unknown> | null;
-      }>;
-    }>;
-  }> => {
-    const res = await apiClient.get<{
-      success: boolean;
-      data: {
-        exam_id: string;
-        total_sessions: number;
-        active_sessions: number;
-        submitted_sessions: number;
-        expired_sessions: number;
-        sessions: Array<{
-          session_id: string;
-          student_id: string;
-          student_name: string | null;
-          student_email: string | null;
-          status: "active" | "submitted" | "expired";
-          started_at: string;
-          finished_at: string | null;
-          score: number | null;
-          max_points: number | null;
-          violation_count: number;
-          violations: Array<{
-            event_type: string;
-            client_at: string;
-            details: Record<string, unknown> | null;
-          }>;
-        }>;
-      };
-    }>(`/exams/${examId}/proctoring`);
+  getExamProctoring: async (examId: string): Promise<ExamProctoringData> => {
+    const res = await apiClient.get<{ success: boolean; data: ExamProctoringData }>(
+      `/exams/${examId}/proctoring`
+    );
     return res.data.data;
   },
 

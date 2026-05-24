@@ -7,6 +7,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { IconUsers, IconAlertCircle, IconSend } from '@tabler/icons-react';
 import examApi from '@/services/examApi';
+import type { ExamProctoringData } from '@/services/examApi';
 import appConfig from '@/configs/app.config';
 import { createProctoringSocket, requestPresence, sendGroupBroadcast, leaveProctoring, type PresencePayload } from '@/services/proctoringSocket';
 import useAuth from '@/hooks/useAuth';
@@ -15,34 +16,9 @@ import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import PageHeader from '@/components/PageHeader/PageHeader';
 import type { Socket } from 'socket.io-client';
 
-type ViolationEvent = {
-  event_type: string;
-  client_at: string;
-  details: Record<string, unknown> | null;
-};
+type ProctoringSession = ExamProctoringData['sessions'][number];
 
-type ProctoringSession = {
-  session_id: string;
-  student_id: string;
-  student_name: string | null;
-  student_email: string | null;
-  status: 'active' | 'submitted' | 'expired';
-  started_at: string;
-  finished_at: string | null;
-  score: number | null;
-  max_points: number | null;
-  violation_count: number;
-  violations: ViolationEvent[];
-};
-
-type ProctoringData = {
-  exam_id: string;
-  total_sessions: number;
-  active_sessions: number;
-  submitted_sessions: number;
-  expired_sessions: number;
-  sessions: ProctoringSession[];
-};
+const POLL_INTERVAL_MS = 10_000;
 
 const EVENT_LABELS: Record<string, string> = {
   exam_opened: 'Mở đề',
@@ -62,8 +38,9 @@ const ProctoringDashboard = () => {
   const { t } = useTranslation();
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<ProctoringData | null>(null);
+  const [data, setData] = useState<ExamProctoringData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [alertingSession, setAlertingSession] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -74,23 +51,47 @@ const ProctoringDashboard = () => {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [realtimeAlert, setRealtimeAlert] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const refreshTimerRef = useRef<number | null>(null);
   const { accessToken } = useAuth();
+
+  const refreshProctoring = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!examId) return;
+    const silent = opts?.silent ?? false;
+    try {
+      if (!silent) setRefreshing(true);
+      const d = await examApi.getExamProctoring(examId);
+      setData(d);
+      setError('');
+    } catch {
+      if (!silent) setError(t('proctoring.load_failed'));
+    } finally {
+      if (!silent) setRefreshing(false);
+    }
+  }, [examId, t]);
 
   useEffect(() => {
     if (!examId) return;
     const load = async () => {
-      try {
-        setLoading(true);
-        const d = await examApi.getExamProctoring(examId);
-        setData(d);
-      } catch {
-        setError('Không tải được dữ liệu giám sát.');
-      } finally {
-        setLoading(false);
+      setLoading(true);
+      await refreshProctoring();
+      setLoading(false);
+    };
+    void load();
+  }, [examId, refreshProctoring]);
+
+  // Poll khi còn phiên active; socket integrity_update cũng kích hoạt refresh
+  useEffect(() => {
+    if (!examId || !data?.active_sessions) return;
+    refreshTimerRef.current = window.setInterval(() => {
+      void refreshProctoring({ silent: true });
+    }, POLL_INTERVAL_MS);
+    return () => {
+      if (refreshTimerRef.current != null) {
+        window.clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
       }
     };
-    load();
-  }, [examId]);
+  }, [data?.active_sessions, examId, refreshProctoring]);
 
   // Proctoring socket
   useEffect(() => {
@@ -106,6 +107,9 @@ const ProctoringDashboard = () => {
         onDisconnect: () => setConnectionStatus('disconnected'),
         onReconnecting: () => setConnectionStatus('reconnecting'),
         onPresenceUpdate: (p) => setPresence(p),
+        onIntegrityUpdate: () => {
+          void refreshProctoring({ silent: true });
+        },
         onGroupAlert: (p) => {
           setRealtimeAlert(p.message);
           setTimeout(() => setRealtimeAlert(null), 5000);
@@ -114,7 +118,7 @@ const ProctoringDashboard = () => {
           setBroadcastOpen(false);
           setBroadcastMessage('');
         },
-        onError: (msg) => setError(`Socket: ${msg}`),
+        onError: (msg) => setError(`${t('proctoring.socket_error')}: ${msg}`),
       },
     });
     socketRef.current = socket;
@@ -126,7 +130,7 @@ const ProctoringDashboard = () => {
         socketRef.current = null;
       }
     };
-  }, [examId, accessToken]);
+  }, [examId, accessToken, refreshProctoring, t]);
 
   const handleBroadcast = useCallback(() => {
     if (!socketRef.current || !broadcastMessage.trim()) return;
@@ -138,29 +142,28 @@ const ProctoringDashboard = () => {
     try {
       setAlertingSession(sessionId);
       await examApi.forceSubmitExam(examId);
-      const d = await examApi.getExamProctoring(examId);
-      setData(d);
+      await refreshProctoring({ silent: true });
     } catch {
-      setError('Force-submit thất bại.');
+      setError(t('proctoring.force_submit_failed'));
     } finally {
       setAlertingSession(null);
     }
   };
 
   const getViolationBadge = (count: number) => {
-    if (count === 0) return <Badge color="gray" size="sm">0 vi phạm</Badge>;
-    if (count <= 3) return <Badge color="yellow" size="sm">{count} vi phạm</Badge>;
-    return <Badge color="red" size="sm">{count} vi phạm</Badge>;
+    if (count === 0) return <Badge color="gray" size="sm">{t('proctoring.violation_none')}</Badge>;
+    if (count <= 3) return <Badge color="yellow" size="sm">{t('proctoring.violation_count', { count })}</Badge>;
+    return <Badge color="red" size="sm">{t('proctoring.violation_count', { count })}</Badge>;
   };
 
   const getStatusBadge = (status: ProctoringSession['status']) => {
-    const map: Record<string, { color: string; label: string }> = {
-      active: { color: 'orange', label: 'Đang thi' },
-      submitted: { color: 'green', label: 'Đã nộp' },
-      expired: { color: 'gray', label: 'Hết giờ' },
+    const map: Record<string, { color: string; labelKey: string }> = {
+      active: { color: 'orange', labelKey: 'proctoring.status_active' },
+      submitted: { color: 'green', labelKey: 'proctoring.status_submitted' },
+      expired: { color: 'gray', labelKey: 'proctoring.status_expired' },
     };
-    const { color, label } = map[status] ?? { color: 'gray', label: status };
-    return <Badge color={color} size="sm">{label}</Badge>;
+    const { color, labelKey } = map[status] ?? { color: 'gray', labelKey: status };
+    return <Badge color={color} size="sm">{t(labelKey)}</Badge>;
   };
 
   if (loading) {
@@ -200,26 +203,26 @@ const ProctoringDashboard = () => {
 
         <Group grow>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">Tổng phiên</Text>
+            <Text size="sm" c="dimmed">{t('proctoring.total_sessions')}</Text>
             <Text fw={700} size="xl">{data.total_sessions}</Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">Đang thi</Text>
+            <Text size="sm" c="dimmed">{t('proctoring.active')}</Text>
             <Text fw={700} size="xl" c="orange">{data.active_sessions}</Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">Đã nộp</Text>
+            <Text size="sm" c="dimmed">{t('proctoring.submitted')}</Text>
             <Text fw={700} size="xl" c="green">{data.submitted_sessions}</Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
-            <Text size="sm" c="dimmed">Hết giờ</Text>
+            <Text size="sm" c="dimmed">{t('proctoring.expired')}</Text>
             <Text fw={700} size="xl" c="gray">{data.expired_sessions}</Text>
           </Paper>
         </Group>
 
         {data.active_sessions > 0 && (
           <Alert color="orange" variant="light">
-            Có {data.active_sessions} sinh viên đang thi. Giám thị giám sát trong thời gian thực.
+            {t('proctoring.active_alert', { count: data.active_sessions })}
           </Alert>
         )}
 
@@ -227,9 +230,13 @@ const ProctoringDashboard = () => {
         <Group justify="space-between">
           <Group gap="sm">
             {presence && (
-              <Tooltip label={`${presence.teachers} GV, ${presence.admins} Admin, ${presence.students} SV đang theo dõi`}>
+              <Tooltip label={t('proctoring.presence_tooltip', {
+                teachers: presence.teachers,
+                admins: presence.admins,
+                students: presence.students,
+              })}>
                 <Badge leftSection={<IconUsers size={14} />} color="teal" size="lg" variant="light">
-                  {presence.total} người giám sát
+                  {t('proctoring.presence_count', { count: presence.total })}
                 </Badge>
               </Tooltip>
             )}
@@ -243,8 +250,11 @@ const ProctoringDashboard = () => {
               size="sm"
               variant="light"
             >
-              {connectionStatus === 'connected' ? 'Live' : connectionStatus}
+              {connectionStatus === 'connected' ? t('proctoring.live') : connectionStatus}
             </Badge>
+            {refreshing && (
+              <Badge size="sm" variant="light" color="blue">{t('proctoring.refreshing')}</Badge>
+            )}
             {realtimeAlert && (
               <Alert color="blue" variant="light" p="xs" py={4} px="sm">
                 <Text size="xs">{realtimeAlert}</Text>
@@ -263,21 +273,21 @@ const ProctoringDashboard = () => {
         </Group>
 
         {/* Broadcast modal */}
-        <Modal opened={broadcastOpen} onClose={() => setBroadcastOpen(false)} title="Gửi thông báo đến sinh viên" centered>
+        <Modal opened={broadcastOpen} onClose={() => setBroadcastOpen(false)} title={t('proctoring.broadcast_title')} centered>
           <Stack gap="sm">
             <Select
-              label="Nhóm nhận"
+              label={t('proctoring.broadcast_group')}
               value={broadcastGroup}
               onChange={(v) => setBroadcastGroup(v as 'all' | 'violators' | 'active')}
               data={[
-                { value: 'all', label: 'Tất cả sinh viên' },
-                { value: 'active', label: 'Đang thi' },
-                { value: 'violators', label: 'Sinh viên vi phạm' },
+                { value: 'all', label: t('proctoring.broadcast_all') },
+                { value: 'active', label: t('proctoring.broadcast_active') },
+                { value: 'violators', label: t('proctoring.broadcast_violators') },
               ]}
             />
             <TextInput
-              label="Tin nhắn"
-              placeholder="VD: Sắp hết giờ, vui lòng nộp bài..."
+              label={t('proctoring.broadcast_message')}
+              placeholder={t('proctoring.broadcast_placeholder')}
               value={broadcastMessage}
               onChange={(e) => setBroadcastMessage(e.target.value)}
             />

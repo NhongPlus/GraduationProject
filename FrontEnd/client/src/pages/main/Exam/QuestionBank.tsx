@@ -430,6 +430,7 @@ const QuestionBankPage = () => {
               <Group
                 px="md"
                 py="xs"
+                mb="md"
                 gap="sm"
                 wrap="wrap"
                 style={{

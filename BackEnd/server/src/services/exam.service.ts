@@ -454,6 +454,11 @@ export interface StartSessionPayload {
     ends_at: string;
     is_active: boolean;
   } | null;
+  /** Bản nháp mới nhất trên server (khôi phục khi đổi thiết bị / xóa cache) */
+  autosave: {
+    saved_at: string;
+    answers: AutosaveAnswers;
+  } | null;
 }
 
 export const startSessionWithMeta = async (
@@ -532,6 +537,7 @@ export const startSessionWithMeta = async (
 
   // Check if exam has been started (runtime state exists)
   const runtimeState = await getRuntimeStateByExam(examId);
+  const autosaveSnapshot = await getLatestAutosaveSnapshotBySession(session.id);
 
   return {
     session,
@@ -546,6 +552,9 @@ export const startSessionWithMeta = async (
           ends_at: runtimeState.ends_at,
           is_active: true,
         }
+      : null,
+    autosave: autosaveSnapshot
+      ? { saved_at: autosaveSnapshot.saved_at, answers: autosaveSnapshot.answers }
       : null,
   };
 };
@@ -732,6 +741,14 @@ export const persistIntegrityEventsService = async (
   }
 
   const accepted = await insertIntegrityEvents(examId, session.id, studentId, events);
+
+  const { emitProctoringIntegrityUpdate } = await import("~/socket/examSocket");
+  emitProctoringIntegrityUpdate(examId, {
+    session_id: session.id,
+    student_id: studentId,
+    accepted,
+  });
+
   return {
     accepted,
     rejected: Math.max(0, events.length - accepted),
@@ -1706,7 +1723,7 @@ export interface ProctoringEntry {
   violation_count: number;
   violations: Array<{
     event_type: string;
-    event_at: string;
+    client_at: string;
     details: Record<string, unknown> | null;
   }>;
 }
@@ -1803,6 +1820,13 @@ export const reportViolationService = async (
     },
   ]);
 
+  const { emitProctoringIntegrityUpdate } = await import("~/socket/examSocket");
+  emitProctoringIntegrityUpdate(session.exam_id, {
+    session_id: session.id,
+    student_id: studentId,
+    accepted: 1,
+  });
+
   let autoSubmitTriggered = false;
   let sessionStatus: ReportViolationResult["session_status"] = session.status as any;
 
@@ -1859,13 +1883,13 @@ export const getExamProctoringData = async (examId: string): Promise<ExamProctor
       student_email: s.student_email,
       status: s.status,
       started_at: s.started_at,
-      submitted_at: s.submitted_at,
+      finished_at: s.submitted_at,
       score: s.score,
       max_points: s.max_points,
       violation_count: sessEvents.length,
       violations: sessEvents.map((ev) => ({
         event_type: ev.event_type,
-        event_at: ev.client_at,
+        client_at: ev.client_at,
         details: ev.details,
       })),
     };
