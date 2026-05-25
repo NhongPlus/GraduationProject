@@ -56,5 +56,9 @@ export function groupSubjectsByCategory(subjects: SubjectDto[]): SubjectCategory
 
 export function formatSubjectLabel(subject: SubjectDto): string {
   const code = subject.code?.trim();
-  return code ? `${code} — ${subject.name}` : subject.name;
+  const semester =
+    typeof subject.semester === 'number' && subject.semester > 0
+      ? ` (Kỳ ${subject.semester})`
+      : '';
+  return code ? `${code} — ${subject.name}${semester}` : `${subject.name}${semester}`;
 }

@@ -577,6 +577,9 @@ export default function SubjectCategoryPicker({
                       <Text size="sm" fw={value === subject.id ? 600 : 400}>
 
                         {subject.name}
+                        {typeof subject.semester === 'number' && subject.semester > 0
+                          ? ` (Kỳ ${subject.semester})`
+                          : ''}
 
                       </Text>
 
