@@ -287,7 +287,7 @@ const SubjectCatalogManagementPage = () => {
     void subjectApi
       .getSubjects()
       .then((list) => setAllSubjects(list as Subject[]))
-      .catch(() => {});
+      .catch(() => { });
   }, [accessToken]);
 
   const pageIds = subjects.map((s) => s.id);
@@ -602,37 +602,43 @@ const SubjectCatalogManagementPage = () => {
               Kho trường (nhóm + môn) — ngành chỉ gán từ kho qua GET /subjects/catalog.
             </Text>
           </Box>
+
           <Box>
-            {selectedProgramId && (
-              <Group gap="sm">
+            <Group gap="sm">
+              {/* Nút Chọn từ kho */}
+              {selectedProgramId && (
                 <Button variant="light" onClick={() => setAssignOpen(true)}>
                   Chọn từ kho
                 </Button>
-                {activeTab === 'groups' && (
-                  <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
-                    Thêm nhóm (kho + gán ngành)
-                  </Button>
-                )}
-              </Group>
-            )}
-            {activeTab === 'subjects' && (
-              <Group gap="sm">
-                <Button
-                  variant="light"
-                  leftSection={<IconUpload size={16} />}
-                  disabled={!canManageSubjects}
-                  onClick={openImportModal}
-                >
-                  Import hàng loạt
+              )}
+
+              {/* Nút Thêm nhóm (nếu đang ở tab groups) */}
+              {selectedProgramId && activeTab === 'groups' && (
+                <Button leftSection={<IconPlus size={16} />} color="teal" onClick={openGroupCreate}>
+                  Thêm nhóm (kho + gán ngành)
                 </Button>
-                <ButtonFilled
-                  label="Thêm môn học"
-                  leftSection={<IconPlus size={16} />}
-                  disabled={!canManageSubjects}
-                  onClick={() => setCreateOpen(true)}
-                />
-              </Group>
-            )}
+              )}
+
+              {/* Các nút dành cho tab subjects */}
+              {activeTab === 'subjects' && (
+                <>
+                  <Button
+                    variant="light"
+                    leftSection={<IconUpload size={16} />}
+                    disabled={!canManageSubjects}
+                    onClick={openImportModal}
+                  >
+                    Import hàng loạt
+                  </Button>
+                  <ButtonFilled
+                    label="Thêm môn học"
+                    leftSection={<IconPlus size={16} />}
+                    disabled={!canManageSubjects}
+                    onClick={() => setCreateOpen(true)}
+                  />
+                </>
+              )}
+            </Group>
           </Box>
         </Group>
 
@@ -788,149 +794,149 @@ const SubjectCatalogManagementPage = () => {
               </Group>
             )}
 
-        {selectedIds.size > 0 && (
-          <Group>
-            <Text size="sm" c="dimmed">
-              Đã chọn {selectedIds.size} môn
-            </Text>
-            <Button
-              color="red"
-              variant="light"
-              leftSection={<IconTrash size={16} />}
-              loading={bulkDeleting}
-              onClick={() => void handleBulkDelete()}
-            >
-              Xóa đã chọn
-            </Button>
-            <Button variant="subtle" size="compact-sm" onClick={() => setSelectedIds(new Set())}>
-              Bỏ chọn
-            </Button>
-          </Group>
-        )}
+            {selectedIds.size > 0 && (
+              <Group>
+                <Text size="sm" c="dimmed">
+                  Đã chọn {selectedIds.size} môn
+                </Text>
+                <Button
+                  color="red"
+                  variant="light"
+                  leftSection={<IconTrash size={16} />}
+                  loading={bulkDeleting}
+                  onClick={() => void handleBulkDelete()}
+                >
+                  Xóa đã chọn
+                </Button>
+                <Button variant="subtle" size="compact-sm" onClick={() => setSelectedIds(new Set())}>
+                  Bỏ chọn
+                </Button>
+              </Group>
+            )}
 
-        {!selectedProgramId ? (
-          <Paper withBorder radius="md" p="xl">
-            <Text c="dimmed" ta="center">
-              Bước 1: Chọn hoặc tạo chuyên ngành để bắt đầu.
-            </Text>
-          </Paper>
-        ) : !selectedGroupId ? (
-          <Paper withBorder radius="md" p="xl">
-            <Text c="dimmed" ta="center">
-              Bước 2: Chọn nhóm môn trong ngành{' '}
-              <strong>{selectedProgram?.name ?? ''}</strong> để xem danh sách môn.
-            </Text>
-          </Paper>
-        ) : loading ? (
-          <Loader />
-        ) : (
-          <Paper withBorder radius="md">
-            <ListPaginationBar
-              page={page}
-              total={total}
-              limit={pageSize}
-              onPageChange={setPage}
-              onLimitChange={(next) => {
-                setPageSize(next);
-                setPage(1);
-              }}
-            />
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th w={44}>
-                    <Checkbox
-                      checked={allPageSelected}
-                      indeterminate={somePageSelected && !allPageSelected}
-                      onChange={toggleSelectAllPage}
-                      aria-label="Chọn tất cả trang này"
-                    />
-                  </Table.Th>
-                  <Table.Th>Tên môn</Table.Th>
-                  <Table.Th>Mã</Table.Th>
-                  <Table.Th>Tín chỉ</Table.Th>
-                  <Table.Th>Học kỳ</Table.Th>
-                  <Table.Th>Nhóm môn</Table.Th>
-                  <Table.Th>Loại</Table.Th>
-                  <Table.Th>Tiên quyết</Table.Th>
-                  <Table.Th>Trạng thái</Table.Th>
-                  <Table.Th>Thao tác</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {subjects.map((subject) => (
-                  <Table.Tr
-                    key={subject.id}
-                    bg={selectedIds.has(subject.id) ? 'var(--mantine-color-teal-light)' : undefined}
-                  >
-                    <Table.Td>
-                      <Checkbox
-                        checked={selectedIds.has(subject.id)}
-                        onChange={() => toggleSelectRow(subject.id)}
-                        aria-label={`Chọn ${subject.name}`}
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <Text fw={500}>{subject.name}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm" c="dimmed">
-                        {subject.code || '—'}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm">{subject.credits}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm">{subject.semester}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <GroupNameBadge
-                        groupId={subject.subject_group_id}
-                        groups={groups}
-                        fallback={subject.sub_category}
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      <CategoryBadge category={subject.category} />
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c="dimmed" lineClamp={2}>
-                        {(subject.prerequisites?.length ?? 0) > 0
-                          ? subject.prerequisites!.map((p) => p.name).join(', ')
-                          : '—'}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge color={subject.is_active ? 'green' : 'gray'} size="sm">
-                        {subject.is_active ? 'Hoạt động' : 'Không hoạt động'}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap={4}>
-                        <ActionIcon variant="subtle" color="blue" onClick={() => void openEdit(subject)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="red" onClick={() => void handleDelete(subject.id)}>
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-                {subjects.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={10}>
-                      <Text c="dimmed" ta="center" py="lg">
-                        Chưa có môn trong nhóm «{selectedGroup?.name ?? 'đã chọn'}». Bấm «Thêm môn học».
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-        )}
+            {!selectedProgramId ? (
+              <Paper withBorder radius="md" p="xl">
+                <Text c="dimmed" ta="center">
+                  Bước 1: Chọn hoặc tạo chuyên ngành để bắt đầu.
+                </Text>
+              </Paper>
+            ) : !selectedGroupId ? (
+              <Paper withBorder radius="md" p="xl">
+                <Text c="dimmed" ta="center">
+                  Bước 2: Chọn nhóm môn trong ngành{' '}
+                  <strong>{selectedProgram?.name ?? ''}</strong> để xem danh sách môn.
+                </Text>
+              </Paper>
+            ) : loading ? (
+              <Loader />
+            ) : (
+              <Paper withBorder radius="md">
+                <ListPaginationBar
+                  page={page}
+                  total={total}
+                  limit={pageSize}
+                  onPageChange={setPage}
+                  onLimitChange={(next) => {
+                    setPageSize(next);
+                    setPage(1);
+                  }}
+                />
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th w={44}>
+                        <Checkbox
+                          checked={allPageSelected}
+                          indeterminate={somePageSelected && !allPageSelected}
+                          onChange={toggleSelectAllPage}
+                          aria-label="Chọn tất cả trang này"
+                        />
+                      </Table.Th>
+                      <Table.Th>Tên môn</Table.Th>
+                      <Table.Th>Mã</Table.Th>
+                      <Table.Th>Tín chỉ</Table.Th>
+                      <Table.Th>Học kỳ</Table.Th>
+                      <Table.Th>Nhóm môn</Table.Th>
+                      <Table.Th>Loại</Table.Th>
+                      <Table.Th>Tiên quyết</Table.Th>
+                      <Table.Th>Trạng thái</Table.Th>
+                      <Table.Th>Thao tác</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {subjects.map((subject) => (
+                      <Table.Tr
+                        key={subject.id}
+                        bg={selectedIds.has(subject.id) ? 'var(--mantine-color-teal-light)' : undefined}
+                      >
+                        <Table.Td>
+                          <Checkbox
+                            checked={selectedIds.has(subject.id)}
+                            onChange={() => toggleSelectRow(subject.id)}
+                            aria-label={`Chọn ${subject.name}`}
+                          />
+                        </Table.Td>
+                        <Table.Td>
+                          <Text fw={500}>{subject.name}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed">
+                            {subject.code || '—'}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{subject.credits}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{subject.semester}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <GroupNameBadge
+                            groupId={subject.subject_group_id}
+                            groups={groups}
+                            fallback={subject.sub_category}
+                          />
+                        </Table.Td>
+                        <Table.Td>
+                          <CategoryBadge category={subject.category} />
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="xs" c="dimmed" lineClamp={2}>
+                            {(subject.prerequisites?.length ?? 0) > 0
+                              ? subject.prerequisites!.map((p) => p.name).join(', ')
+                              : '—'}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={subject.is_active ? 'green' : 'gray'} size="sm">
+                            {subject.is_active ? 'Hoạt động' : 'Không hoạt động'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Group gap={4}>
+                            <ActionIcon variant="subtle" color="blue" onClick={() => void openEdit(subject)}>
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                            <ActionIcon variant="subtle" color="red" onClick={() => void handleDelete(subject.id)}>
+                              <IconTrash size={16} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                    {subjects.length === 0 && (
+                      <Table.Tr>
+                        <Table.Td colSpan={10}>
+                          <Text c="dimmed" ta="center" py="lg">
+                            Chưa có môn trong nhóm «{selectedGroup?.name ?? 'đã chọn'}». Bấm «Thêm môn học».
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </Paper>
+            )}
           </Tabs.Panel>
         </Tabs>
       </Stack>
