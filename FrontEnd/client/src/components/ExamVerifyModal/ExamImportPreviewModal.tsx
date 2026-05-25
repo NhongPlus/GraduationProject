@@ -378,6 +378,7 @@ export default function ExamImportPreviewModal({
   onClose,
 }: ExamImportPreviewModalProps) {
   const [, setFormTick] = useState(0);
+  const [currentPreview, setCurrentPreview] = useState<ExamImportPreview>(preview);
   const [confirmError, setConfirmError] = useState('');
   const form = useForm<ImportPreviewFormValues>({
     mode: 'uncontrolled',
@@ -404,7 +405,7 @@ export default function ExamImportPreviewModal({
   const needsReviewCount = questions.filter((q) => q.needs_review).length;
   const mcqCount = questions.filter((q) => q.question_type === 'mcq').length;
   const essayCount = questions.filter((q) => q.question_type === 'essay').length;
-  const chapterDefinitions = preview.chapter_definitions ?? [];
+  const chapterDefinitions = currentPreview.chapter_definitions ?? [];
   const chapterOptions = useMemo<ChapterOption[]>(
     () =>
       chapterDefinitions.map((item) => ({
@@ -521,12 +522,6 @@ export default function ExamImportPreviewModal({
   };
 
   const handleRecompose = async () => {
-    if (!hasChapterDefinitions) {
-      setRecomposeError(
-        'File Word chưa có block CHUONG ở đầu file. Bắt buộc khai báo CHUONG trước khi gửi AI.'
-      );
-      return;
-    }
     if (!recomposeFile) {
       setShowFileUpload(true);
       return;
@@ -537,8 +532,9 @@ export default function ExamImportPreviewModal({
       const result = await examApi.aiRecomposeExam({
         file: recomposeFile,
         mediaArchive: recomposeArchiveFile ?? mediaArchive ?? null,
-        examInfo: preview.exam,
+        examInfo: currentPreview.exam,
       });
+      setCurrentPreview(result);
       const nextValues = draftsToFormValues(result.questions);
       form.setInitialValues(nextValues);
       form.setValues(nextValues);
@@ -667,11 +663,11 @@ export default function ExamImportPreviewModal({
       <Paper radius={0} p="sm" withBorder>
         <Group justify="space-between" align="center" wrap="nowrap">
           <Stack gap={4} style={{ flex: 1 }}>
-            <Title order={4}>{preview.exam.title || 'Xem trước đề thi'}</Title>
+            <Title order={4}>{currentPreview.exam.title || 'Xem trước đề thi'}</Title>
             <Group gap="xs" wrap="wrap">
-              {preview.exam.duration_min && (
+              {currentPreview.exam.duration_min && (
                 <Badge variant="light" color="gray">
-                  {preview.exam.duration_min} phút
+                  {currentPreview.exam.duration_min} phút
                 </Badge>
               )}
               <Badge variant="light" color="gray">
@@ -688,9 +684,9 @@ export default function ExamImportPreviewModal({
                   {needsReviewCount} cần xem lại
                 </Badge>
               )}
-              {preview.parse_summary && (
+              {currentPreview.parse_summary && (
                 <Text size="xs" c="dimmed">
-                  Parse {preview.parse_summary.parse_time_ms}ms
+                  Parse {currentPreview.parse_summary.parse_time_ms}ms
                 </Text>
               )}
               {hasChapterDefinitions && (
@@ -729,7 +725,7 @@ export default function ExamImportPreviewModal({
               color="teal"
               leftSection={recomposing ? <Loader size={12} color="#fff" /> : <IconWand size={12} />}
               onClick={handleRecompose}
-              disabled={recomposing || (showFileUpload && !recomposeFile) || !hasChapterDefinitions}
+              disabled={recomposing || (showFileUpload && !recomposeFile)}
             >
               AI Sửa Lại
             </Button>
@@ -758,9 +754,9 @@ export default function ExamImportPreviewModal({
           </Alert>
         )}
         {!hasChapterDefinitions && (
-          <Alert mt="xs" color="red" variant="light" icon={<IconAlertCircle size={14} />}>
-            File Word chưa khai báo danh sách chương. Bắt buộc thêm block dạng `CHUONG 1 : Bien`,
-            `CHUONG 2 : Vong lap` ở đầu file trước khi import hoặc gửi AI.
+          <Alert mt="xs" color="orange" variant="light" icon={<IconAlertCircle size={14} />}>
+            Regex hiện chưa nhận ra danh sách chương từ file Word này. Bạn vẫn có thể bấm `AI Sửa Lại`
+            để AI thử bóc tách từ nội dung gốc, nhưng chỉ được `Xác nhận` khi đã có danh sách CHUONG hợp lệ.
           </Alert>
         )}
         {hasChapterDefinitions && (
@@ -775,10 +771,10 @@ export default function ExamImportPreviewModal({
             {confirmError}
           </Alert>
         )}
-        {preview.warnings.length > 0 && (
+        {currentPreview.warnings.length > 0 && (
           <Alert mt="xs" color="yellow" variant="light" icon={<IconAlertCircle size={14} />}>
             <Stack gap={4}>
-              {preview.warnings.map((warning, index) => (
+              {currentPreview.warnings.map((warning, index) => (
                 <Text key={index} size="sm">
                   {warning}
                 </Text>

@@ -153,6 +153,24 @@ export function normalizeMediaLookupKey(filename: string): string {
   return `${normalizedStem}${ext}`;
 }
 
+function buildChapterDefinitionsFromQuestions(
+  questions: ImportedQuestionDraft[]
+): ChapterDefinition[] {
+  const chapterMap = new Map<number, string>();
+  for (const question of questions) {
+    if (question.chapter == null) continue;
+    const label = question.chapter_label?.trim();
+    if (!label) continue;
+    if (!chapterMap.has(question.chapter)) {
+      chapterMap.set(question.chapter, label);
+    }
+  }
+
+  return [...chapterMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([chapter, label]) => ({ chapter, label }));
+}
+
 function buildQuestionReviewState(
   question: Pick<
     ImportedQuestionDraft,
@@ -832,6 +850,7 @@ Sửa các lỗi sau:
 - Câu trắc nghiệm thiếu đáp án
 - Điền thông tin mặc định hợp lý (difficulty: DE)
 - CHUONG là bắt buộc, nhưng KHÔNG được tự đoán chương nếu input không có hoặc chương không nằm trong danh sách chapter_definitions
+- Nếu chapter_definitions đầu vào đang rỗng nhưng raw_docx_text có block CHUONG rõ ràng, hãy tự bóc tách danh sách CHUONG từ raw_docx_text rồi dùng chính danh sách đó để điền chapter/chapter_label
 - Nếu không xác định được chương hợp lệ thì trả chapter = null, chapter_label = null, needs_review = true
 
 Trả về JSON theo schema:
@@ -923,11 +942,6 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
     parseExamImportDocx(fileBuffer, mediaArchiveBuffer),
     extractTextFromDocx(fileBuffer),
   ]);
-  if (preview.chapter_definitions.length === 0) {
-    throw new Error(
-      "File Word chưa khai báo block CHUONG ở đầu file. Bắt buộc thêm CHUONG 1 : ... trước khi gửi AI."
-    );
-  }
 
   console.log("[aiRecompose] File buffer size:", fileBuffer.length, "bytes");
   console.log(
@@ -1062,8 +1076,12 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
     fixed: 0,
     needs_review: parsed.questions.filter((q) => q.needs_review).length,
   };
+  const effectiveChapterDefinitions =
+    preview.chapter_definitions.length > 0
+      ? preview.chapter_definitions
+      : buildChapterDefinitionsFromQuestions(parsed.questions);
   const chapterLookup = new Map(
-    preview.chapter_definitions.map((item) => [item.chapter, item.label])
+    effectiveChapterDefinitions.map((item) => [item.chapter, item.label])
   );
   const chapterErrors = new Set<string>();
   const normalizedQuestions = parsed.questions.map((question, index) => {
@@ -1077,7 +1095,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
       needsReview = true;
       reviewReason = reviewReason ?? "Thiếu thẻ [CHUONG:x] cho câu hỏi.";
       chapterLabel = null;
-    } else if (!chapterLookup.has(chapter)) {
+    } else if (chapterLookup.size > 0 && !chapterLookup.has(chapter)) {
       chapterErrors.add(
         `Câu ${index + 1}: [CHUONG:${chapter}] chưa được khai báo trong block CHUONG ở đầu file.`
       );
@@ -1086,7 +1104,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
         reviewReason ??
         `Chương ${chapter} chưa được khai báo trong block CHUONG ở đầu file.`;
       chapterLabel = null;
-    } else {
+    } else if (chapterLookup.size > 0) {
       chapterLabel = chapterLookup.get(chapter) ?? null;
     }
 
@@ -1115,7 +1133,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
   let responsePreview: ExamImportPreview = {
     exam: examInfo,
     questions: normalizedQuestions,
-    chapter_definitions: preview.chapter_definitions,
+    chapter_definitions: effectiveChapterDefinitions,
     errors: [...chapterErrors],
     warnings: [
       `AI đã xử lý ${summary.fixed} câu. ${normalizedNeedsReview} câu cần xem lại.`,
@@ -1128,6 +1146,11 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
       parse_time_ms: Date.now() - startTime,
     },
   };
+  if (preview.chapter_definitions.length === 0 && effectiveChapterDefinitions.length > 0) {
+    responsePreview.warnings.unshift(
+      `AI đã bóc tách được ${effectiveChapterDefinitions.length} chương từ nội dung file Word dù regex ban đầu chưa nhận đúng block CHUONG.`
+    );
+  }
   if (mediaArchiveBuffer) {
     responsePreview = await resolveMediaArchiveInPreview(
       responsePreview,
