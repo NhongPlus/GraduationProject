@@ -8,59 +8,62 @@ from docx.shared import Pt
 
 OUTPUT = Path(__file__).resolve().parents[1] / "BackEnd" / "exam_template_GiaoVien.docx"
 
-CONTENT = """HƯỚNG DẪN SOẠN ĐỀ (đọc trước khi làm)
+CONTENT = """HƯỚNG DẪN SOẠN ĐỀ THI BẰNG WORD (FORMAT MỚI)
 
 GHI CHÚ QUAN TRỌNG CHO GIẢNG VIÊN
 • Chỉ cần gõ chữ trong Word — KHÔNG cần tô màu, vẽ khung, banner hay bố cục phức tạp.
-• Mỗi câu hỏi bắt đầu bằng MỘT DÒNG THẺ (xem mẫu bên dưới), sau đó gõ nội dung câu hỏi.
-• Sau khi soạn xong: vào hệ thống → Soạn đề → Import file Word → kiểm tra lại → Lưu.
+• Hệ thống hiện dùng format mới có CHƯƠNG bắt buộc.
+• Nếu thiếu block khai báo CHƯƠNG ở đầu file hoặc thiếu [CHUONG:x] ở từng câu, hệ thống sẽ không cho import hoàn chỉnh.
+• Sau khi đã hiểu cách soạn, khi tạo đề thật nên xóa phần hướng dẫn của file mẫu và chỉ giữ lại block CHUONG cùng các câu hỏi thật.
+• Nếu quên xóa, hệ thống sẽ cố gắng tự bỏ qua các dòng hướng dẫn phổ biến và hiển thị cảnh báo khi xem trước.
+• Sau khi soạn xong: vào hệ thống → Soạn đề → chọn file Word (.docx) → nếu có media thì gửi kèm 1 file ZIP → kiểm tra lại → Lưu.
 
 ────────────────────────────────────────
-BẢNG 1 — LOẠI CÂU HỎI (chọn một trong các mã sau)
+BƯỚC 1 — KHAI BÁO DANH SÁCH CHƯƠNG Ở ĐẦU FILE (BẮT BUỘC)
 
-TN hoặc mcq  =  TRẮC NGHIỆM (sinh viên chọn A, B, C, D…)
-TL hoặc essay =  TỰ LUẬN (sinh viên tự viết câu trả lời dài)
-TN-ANH        =  Trắc nghiệm kèm ảnh (ghi thêm tên file ảnh)
-TN-AUDIO      =  Trắc nghiệm kèm file nghe (MP3, WAV…)
-TN-VIDEO      =  Trắc nghiệm kèm video (MP4…)
+CHUONG 1 : Biến và kiểu dữ liệu
+CHUONG 2 : Cấu trúc điều kiện và vòng lặp
+CHUONG 3 : Hàm
 
-Giải thích mcq và essay (cú pháp cũ, vẫn dùng được):
-→ mcq   = Multiple Choice Question = câu trắc nghiệm (giống TN)
-→ essay = câu tự luận, chấm tay (giống TL)
-
-Ví dụ so sánh hai cách viết CÙNG MỘT Ý:
-→ Cách mới:  dòng đầu ghi [LOAI:TN] [DIEM:1]
-→ Cách cũ:   dòng đầu ghi Q1 [mcq] [1]   (Q1 chỉ là nhãn, số thứ tự tự đếm khi import)
+Lưu ý:
+→ Mỗi chương viết trên một dòng riêng
+→ Số chương phải là số nguyên dương
+→ Tên chương là nội dung giáo viên tự đặt theo môn học
 
 ────────────────────────────────────────
-BẢNG 2 — CÁC THẺ (TAG) TRONG NGOẶC VUÔNG
+BƯỚC 2 — CÁC THẺ (TAG) DÙNG CHO MỖI CÂU HỎI
 
-Thẻ LOAI:TN     — Bắt buộc, loại câu (TN, TL, TN-ANH, TN-AUDIO, TN-VIDEO)
-Thẻ DIEM:0.5    — Điểm câu hỏi (VD: 0.5, 1, 2). Bỏ thẻ thì mặc định 1 điểm
-Thẻ KHO:DE      — Độ khó: DE (dễ), TRUNGBINH (trung bình), KHO (khó)
-Thẻ CHUONG:1    — Chương / chủ đề (số nguyên)
-Thẻ ANH:ten.png — Tên file ảnh (upload kèm ZIP khi import)
-Thẻ AUDIO:ten.mp3 — File âm thanh
-Thẻ VIDEO:ten.mp4 — File video
-Thẻ DAPAN:A     — Đáp án đúng (hoặc viết dòng Đáp án: A)
+Thẻ LOAI:TN         — Bắt buộc, loại câu (TN, TL, TN-ANH, TN-AUDIO, TN-VIDEO)
+Thẻ DIEM:0.5        — Điểm câu hỏi (ví dụ: 0.5, 1, 2)
+Thẻ KHO:DE          — Độ khó: DE, TRUNGBINH, KHO
+Thẻ CHUONG:1        — Bắt buộc, phải khớp với danh sách CHUONG đã khai báo ở đầu file
+Thẻ ANH:ten.png     — Tên file ảnh (nếu có), ví dụ: [ANH:code_python_loop.png]
+Thẻ AUDIO:ten.mp3   — Tên file audio (nếu có), ví dụ: [AUDIO:python_question_01.mp3]
+Thẻ VIDEO:ten.mp4   — Tên file video (nếu có), ví dụ: [VIDEO:python_demo_01.mp4]
+Thẻ DAPAN:A         — Đáp án đúng (hoặc có thể viết dòng “Đáp án: A” bên dưới)
+
+Ví dụ dòng thẻ chuẩn:
+CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
 
 Lưu ý khi gõ thẻ:
-→ Mỗi câu: dòng THẺ phải đứng MỘT MÌNH, bắt đầu bằng [LOAI:...]
-→ Trắc nghiệm: bắt buộc có A. B. C. D. và dòng Đáp án: X
-→ Tự luận: không cần A/B/C/D; có thể thêm dòng Gợi ý chấm: ...
+→ Mỗi câu phải bắt đầu bằng MỘT dòng thẻ riêng
+→ Dòng thẻ nên bắt đầu bằng CAU 1 [LOAI:...] hoặc trực tiếp [LOAI:...]
+→ [CHUONG:x] là bắt buộc cho mọi câu
+→ Nếu là câu trắc nghiệm thì cần đáp án A/B/C/D và dòng Đáp án
+→ Nếu là câu tự luận thì không cần A/B/C/D, có thể thêm dòng Gợi ý chấm
+→ Khi đối chiếu media từ ZIP: hệ thống so theo tên file gốc, không phân biệt hoa/thường, bỏ qua thư mục con, và coi khoảng trắng / dấu gạch ngang / dấu gạch dưới là tương đương
 
 ────────────────────────────────────────
-THÔNG TIN ĐỀ THI (đặt trước các câu hỏi, tùy chọn)
+THÔNG TIN ĐỀ THI (TÙY CHỌN)
 
 Tiêu đề: Đề kiểm tra mẫu — Python cơ bản
 Thời gian: 45
 Mô tả: (có thể ghi thêm yêu cầu chung của đề)
 
 ────────────────────────────────────────
-PHẦN MẪU — CÁC CÂU HỎI (xóa nội dung mẫu, thay bằng đề của bạn)
+PHẦN MẪU — CÁC CÂU HỎI
 
-(Mẫu câu 1 — Trắc nghiệm thường)
-[LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
+CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
 Biến nào sau đây là tên biến hợp lệ trong ngôn ngữ Python?
 A. my_var
 B. 1variable
@@ -68,17 +71,17 @@ C. my-var
 D. class
 Đáp án: A
 
-(Mẫu câu 2 — Trắc nghiệm, độ khó trung bình)
-[LOAI:TN] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:1]
-Kết quả của biểu thức 10 // 3 là bao nhiêu?
-A. 3.33
-B. 3
-C. 1
+CAU 2 [LOAI:TN] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2]
+Kết quả của đoạn mã sau là gì?
+for i in range(3):
+    print(i)
+A. 1 2 3
+B. 0 1 2
+C. 0 1 2 3
 D. Lỗi cú pháp
 Đáp án: B
 
-(Mẫu câu 3 — Trắc nghiệm có ảnh: đặt file code_python_loop.png vào ZIP cùng lúc import)
-[LOAI:TN-ANH] [DIEM:0.5] [ANH:code_python_loop.png]
+CAU 3 [LOAI:TN-ANH] [DIEM:0.5] [KHO:DE] [CHUONG:2] [ANH:code_python_loop.png]
 Quan sát đoạn code trong ảnh. Kết quả in ra là gì?
 A. 0 1 2 3 4
 B. 1 2 3 4 5
@@ -86,36 +89,80 @@ C. 0 1 2 3
 D. 1 2 3 4
 Đáp án: A
 
-(Mẫu câu 4 — Tự luận: không cần A/B/C/D, giáo viên chấm tay trên hệ thống)
-[LOAI:TL] [DIEM:2] [KHO:KHO] [CHUONG:2]
+CAU 4 [LOAI:TN-AUDIO] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2] [AUDIO:python_question_01.mp3]
+Nghe đoạn âm thanh và chọn từ khóa được nhắc đến trong ví dụ.
+A. list
+B. tuple
+C. dictionary
+D. set
+Đáp án: C
+
+CAU 5 [LOAI:TN-VIDEO] [DIEM:0.5] [KHO:DE] [CHUONG:3] [VIDEO:python_demo_01.mp4]
+Xem video minh họa và cho biết hàm nào được gọi trong ví dụ.
+A. print()
+B. len()
+C. range()
+D. input()
+Đáp án: A
+
+CAU 6 [LOAI:TL] [DIEM:2] [KHO:KHO] [CHUONG:3]
 Viết hàm Python kiểm tra số nguyên dương n có phải số nguyên tố không. Giải thích độ phức tạp thời gian.
 Gợi ý chấm: Hàm đúng 1đ; giải thích O(√n) 1đ.
 
 ────────────────────────────────────────
-PHỤ LỤC — CÚ PHÁP CŨ (Q1 [mcq] [1] — vẫn import được)
+MẪU KHUNG SOẠN NHANH CHO GIẢNG VIÊN
 
-Ghi chú:
-→ [mcq]   = trắc nghiệm (tương đương [LOAI:TN])
-→ [essay] = tự luận (tương đương [LOAI:TL])
-→ Số trong [1] hoặc [3] là ĐIỂM của câu đó
+CHUONG 1 : ................................
+CHUONG 2 : ................................
+CHUONG 3 : ................................
 
-Q1 [mcq] [1]
-Nội dung câu hỏi trắc nghiệm?
-A. Đáp án A
-B. Đáp án B
+CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
+Nội dung câu hỏi...
+A. ...
+B. ...
+C. ...
+D. ...
+Đáp án: A
+
+CAU 2 [LOAI:TN-ANH] [DIEM:0.5] [KHO:DE] [CHUONG:2] [ANH:ten_anh.png]
+Nội dung câu hỏi dùng ảnh...
+A. ...
+B. ...
+C. ...
+D. ...
+Đáp án: A
+
+CAU 3 [LOAI:TN-AUDIO] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2] [AUDIO:ten_audio.mp3]
+Nội dung câu hỏi dùng audio...
+A. ...
+B. ...
+C. ...
+D. ...
 Đáp án: B
 
-Q2 [essay] [3]
-Nội dung câu tự luận — sinh viên viết đoạn văn hoặc code, không chọn A/B/C/D.
-Gợi ý chấm: (tùy chọn) Mô tả tiêu chí chấm điểm cho giáo viên.
+CAU 4 [LOAI:TN-VIDEO] [DIEM:0.5] [KHO:DE] [CHUONG:3] [VIDEO:ten_video.mp4]
+Nội dung câu hỏi dùng video...
+A. ...
+B. ...
+C. ...
+D. ...
+Đáp án: C
+
+CAU 5 [LOAI:TL] [DIEM:2] [KHO:TRUNGBINH] [CHUONG:2]
+Nội dung câu tự luận...
+Gợi ý chấm: ...
 
 ────────────────────────────────────────
 CHECKLIST TRƯỚC KHI NỘP
 
-1. Mỗi câu trắc nghiệm đã có đủ đáp án A/B/C/D và dòng Đáp án: ...
-2. Đã điền điểm [DIEM:...] (hoặc [số] nếu dùng cú pháp Q1 [mcq] [1])
-3. File ảnh/audio/video (nếu có) đã đóng ZIP, tên file khớp với thẻ [ANH:...] / [AUDIO:...] / [VIDEO:...]
-4. Import trên hệ thống → xem trước → sửa nếu có cảnh báo → Lưu đề
+1. Đã khai báo danh sách CHUONG ở đầu file
+2. Mỗi câu đều có [CHUONG:x] hợp lệ
+3. Mỗi câu trắc nghiệm có đủ A/B/C/D và dòng Đáp án: ...
+4. Đã điền [DIEM:...] và [KHO:...]
+5. Nếu có ảnh/audio/video, nên nộp kèm 1 file ZIP chứa toàn bộ media; hệ thống đối chiếu không phân biệt hoa/thường, bỏ qua thư mục con, và coi space / "-" / "_" là tương đương
+   Ví dụ: [ANH:code_python_loop.png], [AUDIO:python_question_01.mp3], [VIDEO:python_demo_01.mp4]
+6. Nếu ZIP thiếu file hoặc tên không khớp, hệ thống sẽ báo để tải tay từng media còn thiếu ngay trên màn hình xem trước
+7. Đã xem trước, sửa cảnh báo nếu có rồi mới lưu đề
 """
 
 

@@ -239,6 +239,16 @@ const Prediction = () => {
     predictionResult?.predictions.find(
       (p) => p.subject === predictionResult.target_subject || p.subject === selectedSubject?.name
     ) ?? predictionResult?.predictions[0];
+  const forecastSubjectName =
+    predictionResult?.target_subject ?? targetPrediction?.subject ?? selectedSubject?.name ?? '—';
+  const forecastScore =
+    predictionResult?.learning_assessment?.quantitative?.predicted_score ??
+    targetPrediction?.predicted_score ??
+    0;
+  const forecastGrade =
+    predictionResult?.learning_assessment?.quantitative?.predicted_grade ??
+    targetPrediction?.grade ??
+    '—';
 
   return (
     <Box className="max-w-[1100px] mx-auto p-4">
@@ -367,15 +377,10 @@ const Prediction = () => {
                 <Text size="sm" c="dimmed">{t('prediction.predicted_score_label')}</Text>
                 <Group gap="xs" align="flex-end">
                   <Text fw={700} size="xl">
-                    {(predictionResult.learning_assessment?.quantitative?.predicted_score ??
-                      targetPrediction?.predicted_score ??
-                      0).toFixed(1)}
-                    /10
+                    {forecastScore.toFixed(1)}/10
                   </Text>
                   <Badge color="blue">
-                    {predictionResult.learning_assessment?.quantitative?.predicted_grade ??
-                      targetPrediction?.grade ??
-                      '—'}
+                    {forecastGrade}
                   </Badge>
                 </Group>
                 {targetPrediction && (
@@ -420,6 +425,15 @@ const Prediction = () => {
                 </Paper>
               )}
             </Group>
+            <Alert color="yellow" variant="light" mt="md">
+              <Text size="sm" fw={600}>
+                {t('prediction.forecast_reference_subject', { subject: forecastSubjectName })}
+                : {forecastScore.toFixed(1)} / 10
+              </Text>
+              <Text size="sm" mt={4}>
+                {t('prediction.forecast_reference_notice')}
+              </Text>
+            </Alert>
             {targetPrediction?.reasoning && (
               <Text size="xs" c="dimmed" mt="sm" lineClamp={4}>
                 {targetPrediction.reasoning}

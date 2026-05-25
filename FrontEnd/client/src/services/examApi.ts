@@ -261,7 +261,13 @@ export interface ImportedQuestionDraft {
   difficulty?: QuestionDifficulty;
   chapter?: number | null;
   chapter_label?: string | null;
-  media?: { type: "image" | "audio" | "video"; filename: string; status: "found" | "missing" | "embedded"; url?: string } | null;
+  media?: {
+    type: "image" | "audio" | "video";
+    filename: string;
+    status: "found" | "missing" | "embedded";
+    url?: string;
+    source?: "archive" | "manual";
+  } | null;
   /** URL sau upload (Cloudinary); BE commit/import đọc kèm media.url */
   media_url?: string | null;
   answer_hint?: string | null;
@@ -479,9 +485,10 @@ const examApi = {
     URL.revokeObjectURL(url);
   },
 
-  previewWordImport: async (file: File): Promise<ExamImportPreview> => {
+  previewWordImport: async (file: File, mediaArchive?: File | null): Promise<ExamImportPreview> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (mediaArchive) formData.append('mediaArchive', mediaArchive);
     const res = await apiClient.post<{ success: boolean; data: ExamImportPreview }>(
       '/exams/import-word/preview',
       formData,
@@ -510,12 +517,23 @@ const examApi = {
     return res.data.data;
   },
 
-  aiRecomposeExam: async (payload: {
-    file: File;
-    examInfo: { title?: string; duration_min?: number; description?: string };
-  }): Promise<ExamImportPreview> => {
+  aiRecomposeExam: async (payload:
+    | {
+        file: File;
+        mediaArchive?: File | null;
+        examInfo: { title?: string; duration_min?: number; description?: string };
+      }
+    | {
+        questions: ImportedQuestionDraft[];
+        examInfo: { title?: string; duration_min?: number; description?: string };
+      }
+  ): Promise<ExamImportPreview> => {
+    if (!('file' in payload)) {
+      throw new Error('AI recompose trong luồng này yêu cầu file .docx để phân tích lại.');
+    }
     const formData = new FormData();
     formData.append('file', payload.file);
+    if (payload.mediaArchive) formData.append('mediaArchive', payload.mediaArchive);
     formData.append('examInfo', JSON.stringify(payload.examInfo));
     const res = await apiClient.post<{ success: boolean; data: ExamImportPreview }>(
       '/exams/import-word/ai-recompose',
@@ -525,9 +543,13 @@ const examApi = {
     return res.data.data;
   },
 
-  uploadExamMedia: async (file: File): Promise<MediaUploadResult> => {
+  uploadExamMedia: async (
+    file: File,
+    options?: { scope?: 'preview-temp' | 'permanent' }
+  ): Promise<MediaUploadResult> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (options?.scope) formData.append('scope', options.scope);
     const res = await apiClient.post<{ success: boolean; data: MediaUploadResult }>(
       '/exams/upload-media',
       formData,

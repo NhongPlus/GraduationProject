@@ -35,7 +35,11 @@ import { getIntegrityEventsByExam } from "~/models/examIntegrity.model";
 import { getActivePresenceByExam, queryProctorLogsByExamPaginated } from "~/models/examProctor.model";
 import { querySessionsByExamPaginated } from "~/models/examsession.model";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
-import { uploadMediaBuffer } from "~/services/cloudinary.service";
+import {
+  EXAM_MEDIA_FOLDER,
+  EXAM_PREVIEW_MEDIA_FOLDER,
+  uploadMediaBuffer,
+} from "~/services/cloudinary.service";
 import { emitForceSubmitNotification, startExamRuntimeFromServer, emitViolationConfirmed } from "~/socket/examSocket";
 import { auditGradeSession, auditForceSubmit } from "~/services/auditHelpers";
 import type { QuestionType } from "~/models/question.model";
@@ -106,6 +110,15 @@ const WORD_IMPORT_TEMPLATE_PATH = path.join(
   "exam_template_GiaoVien.docx"
 );
 
+function getMultipartFile(req: Request, fieldName: string): Express.Multer.File | null {
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  return files?.[fieldName]?.[0] ?? null;
+}
+
+function isFileExtension(file: Express.Multer.File, expectedExtension: string): boolean {
+  return file.originalname.toLowerCase().endsWith(expectedExtension.toLowerCase());
+}
+
 export const downloadWordImportTemplateController = async (
   _req: Request,
   res: Response,
@@ -127,11 +140,18 @@ export const previewWordImportController = async (
   next: NextFunction
 ) => {
   try {
-    const file = req.file;
+    const file = getMultipartFile(req, "file");
+    const mediaArchive = getMultipartFile(req, "mediaArchive");
     if (!file) {
       return res.status(400).json({ success: false, message: "file .docx là bắt buộc" });
     }
-    const preview = await parseExamImportDocx(file.buffer);
+    if (!isFileExtension(file, ".docx")) {
+      return res.status(400).json({ success: false, message: "file phải là .docx hợp lệ" });
+    }
+    if (mediaArchive && !isFileExtension(mediaArchive, ".zip")) {
+      return res.status(400).json({ success: false, message: "mediaArchive phải là file .zip" });
+    }
+    const preview = await parseExamImportDocx(file.buffer, mediaArchive?.buffer);
     res.json({ success: true, data: preview });
   } catch (err) {
     next(err);
@@ -174,12 +194,19 @@ export const aiRecomposeExamController = async (
   next: NextFunction
 ) => {
   try {
-    const file = req.file;
+    const file = getMultipartFile(req, "file");
+    const mediaArchive = getMultipartFile(req, "mediaArchive");
     if (!file) {
       return res.status(400).json({ success: false, message: "file .docx là bắt buộc" });
     }
+    if (!isFileExtension(file, ".docx")) {
+      return res.status(400).json({ success: false, message: "file phải là .docx hợp lệ" });
+    }
+    if (mediaArchive && !isFileExtension(mediaArchive, ".zip")) {
+      return res.status(400).json({ success: false, message: "mediaArchive phải là file .zip" });
+    }
     const examInfo = req.body.examInfo ? JSON.parse(req.body.examInfo) : {};
-    const result = await aiRecomposeExam(file.buffer, examInfo);
+    const result = await aiRecomposeExam(file.buffer, examInfo, mediaArchive?.buffer);
     res.json({ success: true, data: result });
   } catch (err: any) {
     console.error("aiRecomposeExamController error:", err.message);
@@ -194,6 +221,7 @@ export const uploadExamMediaController = async (
 ) => {
   try {
     const file = req.file;
+    const isPreviewTemp = req.body?.scope === "preview-temp";
     if (!file) {
       return res.status(400).json({ success: false, message: "file media là bắt buộc" });
     }
@@ -202,7 +230,8 @@ export const uploadExamMediaController = async (
       buffer: file.buffer,
       filename: file.originalname,
       mimeType: file.mimetype,
-      folder: "exam-media",
+      folder: isPreviewTemp ? EXAM_PREVIEW_MEDIA_FOLDER : EXAM_MEDIA_FOLDER,
+      tags: isPreviewTemp ? ["preview-temp"] : ["exam-media"],
     });
 
     res.json({

@@ -43,6 +43,7 @@ import {
 
 interface ExamImportPreviewModalProps {
   preview: ExamImportPreview;
+  mediaArchive?: File | null;
   onConfirm: (questions: ImportedQuestionDraft[]) => void;
   onClose: () => void;
 }
@@ -106,6 +107,8 @@ function QuestionCard({
   const mediaType = mediaPreview?.type || q.media?.type;
   const mediaName = mediaPreview?.name || q.media?.filename;
   const needsMediaUpload = q.media?.status === 'missing' && !mediaPreview;
+  const mediaFromArchive = q.media?.source === 'archive' && Boolean(q.media?.url);
+  const mediaFromManualUpload = q.media?.source === 'manual' && Boolean(q.media?.url);
   const chapterMissing = q.chapter == null;
 
   const handleTypeChange = (value: string) => {
@@ -212,21 +215,33 @@ function QuestionCard({
         )}
 
         {q.media && (
-          <Badge
-            variant="light"
-            color="yellow"
-            leftSection={
-              q.media.type === 'image' ? (
-                <IconPhoto size={12} />
-              ) : q.media.type === 'audio' ? (
-                <IconMicrophone size={12} />
-              ) : (
-                <IconVideo size={12} />
-              )
-            }
-          >
-            {q.media.filename}
-          </Badge>
+          <Group gap="xs" wrap="wrap">
+            <Badge
+              variant="light"
+              color="yellow"
+              leftSection={
+                q.media.type === 'image' ? (
+                  <IconPhoto size={12} />
+                ) : q.media.type === 'audio' ? (
+                  <IconMicrophone size={12} />
+                ) : (
+                  <IconVideo size={12} />
+                )
+              }
+            >
+              {q.media.filename}
+            </Badge>
+            {mediaFromArchive && (
+              <Badge variant="light" color="teal">
+                Tự gán từ ZIP
+              </Badge>
+            )}
+            {mediaFromManualUpload && (
+              <Badge variant="light" color="blue">
+                Tải tay
+              </Badge>
+            )}
+          </Group>
         )}
 
         {mediaUrl && mediaType === 'image' && (
@@ -358,6 +373,7 @@ function QuestionCard({
 
 export default function ExamImportPreviewModal({
   preview,
+  mediaArchive = null,
   onConfirm,
   onClose,
 }: ExamImportPreviewModalProps) {
@@ -375,6 +391,7 @@ export default function ExamImportPreviewModal({
   const [recomposing, setRecomposing] = useState(false);
   const [recomposeError, setRecomposeError] = useState('');
   const [recomposeFile, setRecomposeFile] = useState<File | null>(null);
+  const [recomposeArchiveFile, setRecomposeArchiveFile] = useState<File | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<Record<number, File | null>>({});
   const [mediaPreviews, setMediaPreviews] = useState<Record<number, MediaPreview>>({});
@@ -466,6 +483,7 @@ export default function ExamImportPreviewModal({
       type,
       filename: file.name,
       status: 'embedded',
+      source: 'manual',
     });
 
     const token = `${file.name}-${file.size}-${file.lastModified}`;
@@ -473,13 +491,14 @@ export default function ExamImportPreviewModal({
     setMediaUploading((prev) => ({ ...prev, [idx]: true }));
 
     try {
-      const uploaded = await examApi.uploadExamMedia(file);
+      const uploaded = await examApi.uploadExamMedia(file, { scope: 'preview-temp' });
       if (mediaUploadTokenRef.current[idx] !== token) return;
 
       patchQuestionMedia(idx, {
         type,
         filename: file.name,
         status: 'found',
+        source: 'manual',
         url: uploaded.url,
       });
 
@@ -515,13 +534,18 @@ export default function ExamImportPreviewModal({
     setRecomposing(true);
     setRecomposeError('');
     try {
-      const result = await examApi.aiRecomposeExam({ file: recomposeFile, examInfo: preview.exam });
+      const result = await examApi.aiRecomposeExam({
+        file: recomposeFile,
+        mediaArchive: recomposeArchiveFile ?? mediaArchive ?? null,
+        examInfo: preview.exam,
+      });
       const nextValues = draftsToFormValues(result.questions);
       form.setInitialValues(nextValues);
       form.setValues(nextValues);
       form.reset();
       setShowFileUpload(false);
       setRecomposeFile(null);
+      setRecomposeArchiveFile(null);
       setConfirmError('');
       setMediaFiles({});
       setMediaPreviews({});
@@ -679,14 +703,25 @@ export default function ExamImportPreviewModal({
 
           <Group gap="xs" wrap="nowrap">
             {showFileUpload && (
-              <FileInput
-                size="xs"
-                placeholder="Chọn file docx..."
-                accept=".docx"
-                value={recomposeFile}
-                onChange={setRecomposeFile}
-                style={{ minWidth: 160 }}
-              />
+              <>
+                <FileInput
+                  size="xs"
+                  placeholder="Chọn file docx..."
+                  accept=".docx"
+                  value={recomposeFile}
+                  onChange={setRecomposeFile}
+                  style={{ minWidth: 160 }}
+                />
+                <FileInput
+                  size="xs"
+                  placeholder={mediaArchive ? 'Giữ ZIP hiện tại hoặc chọn ZIP mới' : 'Chọn file zip (tùy chọn)'}
+                  accept=".zip,application/zip"
+                  value={recomposeArchiveFile}
+                  onChange={setRecomposeArchiveFile}
+                  clearable
+                  style={{ minWidth: 200 }}
+                />
+              </>
             )}
             <Button
               size="xs"
@@ -717,6 +752,11 @@ export default function ExamImportPreviewModal({
             {recomposeError}
           </Alert>
         )}
+        {mediaArchive && (
+          <Alert mt="xs" color="teal" variant="light" icon={<IconCheck size={14} />}>
+            Đã có file ZIP media đi kèm từ bước xem trước. Nếu cần, bạn có thể chọn ZIP mới khi bấm AI Sửa Lại.
+          </Alert>
+        )}
         {!hasChapterDefinitions && (
           <Alert mt="xs" color="red" variant="light" icon={<IconAlertCircle size={14} />}>
             File Word chưa khai báo danh sách chương. Bắt buộc thêm block dạng `CHUONG 1 : Bien`,
@@ -733,6 +773,17 @@ export default function ExamImportPreviewModal({
         {confirmError && (
           <Alert mt="xs" color="red" variant="light" icon={<IconAlertCircle size={14} />}>
             {confirmError}
+          </Alert>
+        )}
+        {preview.warnings.length > 0 && (
+          <Alert mt="xs" color="yellow" variant="light" icon={<IconAlertCircle size={14} />}>
+            <Stack gap={4}>
+              {preview.warnings.map((warning, index) => (
+                <Text key={index} size="sm">
+                  {warning}
+                </Text>
+              ))}
+            </Stack>
           </Alert>
         )}
       </Paper>

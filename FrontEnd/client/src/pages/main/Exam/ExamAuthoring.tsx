@@ -56,7 +56,13 @@ type AuthoringQuestion = ImportedQuestionDraft & {
   id?: string;
   question_bank_id?: string;
   version_index: number;
-  media?: { type: 'image' | 'audio' | 'video'; filename: string; url?: string };
+  media?: {
+    type: 'image' | 'audio' | 'video';
+    filename: string;
+    status?: 'found' | 'missing' | 'embedded';
+    url?: string;
+    source?: 'archive' | 'manual';
+  };
   media_url?: string | null;
 };
 
@@ -153,6 +159,9 @@ export default function ExamAuthoring() {
   const [numVersionsCount, setNumVersionsCount] = useState(2);
   const [activeVersion, setActiveVersion] = useState(0);
   const [versionFiles, setVersionFiles] = useState<(File | null)[]>(() =>
+    Array.from({ length: MAX_EXAM_VERSIONS }, () => null)
+  );
+  const [versionMediaArchives, setVersionMediaArchives] = useState<(File | null)[]>(() =>
     Array.from({ length: MAX_EXAM_VERSIONS }, () => null)
   );
   const [versionPreviews, setVersionPreviews] = useState<(ExamImportPreview | null)[]>(() =>
@@ -381,6 +390,16 @@ export default function ExamAuthoring() {
       copy[versionIdx] = next;
       return copy;
     });
+    setVersionPreview(versionIdx, null);
+  };
+
+  const setVersionMediaArchive = (versionIdx: number, next: File | null) => {
+    setVersionMediaArchives((prev) => {
+      const copy = [...prev];
+      copy[versionIdx] = next;
+      return copy;
+    });
+    setVersionPreview(versionIdx, null);
   };
 
   const setVersionPreview = (versionIdx: number, next: ExamImportPreview | null) => {
@@ -442,7 +461,7 @@ export default function ExamAuthoring() {
     setError('');
     setNotice('');
     try {
-      const data = await examApi.previewWordImport(file);
+      const data = await examApi.previewWordImport(file, versionMediaArchives[activeVersion]);
       setVersionPreview(activeVersion, data);
       const meta = examForm.getValues();
       if (data.exam.title && !meta.title) examForm.setFieldValue('title', data.exam.title);
@@ -552,6 +571,7 @@ export default function ExamAuthoring() {
               type: guessMediaType(v.media_url),
               filename: '',
               status: 'found' as const,
+              source: 'manual' as const,
               url: v.media_url,
             }
           : undefined,
@@ -908,6 +928,17 @@ export default function ExamAuthoring() {
                   </div>
                 </Group>
               </Dropzone>
+              <FileInput
+                size="xs"
+                label="ZIP media (tùy chọn)"
+                placeholder={
+                  versionMediaArchives[activeVersion]?.name ?? 'Chọn .zip chứa ảnh/audio/video nếu có'
+                }
+                accept=".zip,application/zip"
+                value={versionMediaArchives[activeVersion]}
+                clearable
+                onChange={(next) => setVersionMediaArchive(activeVersion, next)}
+              />
               <Group gap="xs">
                 <Button size="xs" variant="light" leftSection={<IconFileWord size={12} />} loading={loading} onClick={previewWord} disabled={!file}>
                   {t('exam_authoring.btn_preview')}
@@ -922,8 +953,14 @@ export default function ExamAuthoring() {
                   {preview.parse_summary && preview.parse_summary.needs_review > 0 && (
                     <Badge color="orange" size="sm">{t('exam_authoring.needs_review', { count: preview.parse_summary.needs_review })}</Badge>
                   )}
+                  {preview.warnings.length > 0 && (
+                    <Badge color="yellow" size="sm">{preview.warnings.length} lưu ý</Badge>
+                  )}
                   {preview.errors.map((item, i) => (
                     <Text key={i} size="xs" c="red">{item}</Text>
+                  ))}
+                  {preview.warnings.map((item, i) => (
+                    <Text key={`warning-${i}`} size="xs" c="orange">{item}</Text>
                   ))}
                 </Group>
               )}
@@ -1172,6 +1209,7 @@ export default function ExamAuthoring() {
       {verifyOpened && preview && (
         <ExamImportPreviewModal
           preview={preview}
+          mediaArchive={versionMediaArchives[activeVersion]}
           onConfirm={handleVerifyConfirm}
           onClose={() => setVerifyOpened(false)}
         />

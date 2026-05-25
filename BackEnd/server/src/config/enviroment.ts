@@ -51,4 +51,13 @@ export const env = {
   MINIMAX_MODEL: process.env.MINIMAX_MODEL?.trim() || "MiniMax-M2.7",
   /** Cloudinary upload (cloudinary://<key>:<secret>@<cloud>) */
   CLOUDINARY_URL: process.env.CLOUDINARY_URL?.trim() || "",
+  /** Cleanup media uploaded only for preview/import but never saved. */
+  CLOUDINARY_PREVIEW_CLEANUP_INTERVAL_MS: parseIntEnv(
+    process.env.CLOUDINARY_PREVIEW_CLEANUP_INTERVAL_MS,
+    60 * 60 * 1000
+  ),
+  CLOUDINARY_PREVIEW_MAX_AGE_MS: parseIntEnv(
+    process.env.CLOUDINARY_PREVIEW_MAX_AGE_MS,
+    24 * 60 * 60 * 1000
+  ),
 };

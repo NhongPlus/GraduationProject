@@ -44,9 +44,9 @@ import {
 } from "~/controllers/examRetake.controller";
 
 const examRouter = Router();
-const upload = multer({
+const wordImportUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 2 },
 });
 const mediaUpload = multer({
   storage: multer.memoryStorage(),
@@ -107,7 +107,10 @@ examRouter.get(
 examRouter.post(
   "/import-word/preview",
   roleMiddleware(["admin", "teacher"]),
-  upload.single("file"),
+  wordImportUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "mediaArchive", maxCount: 1 },
+  ]),
   previewWordImportController
 );
 examRouter.post(
@@ -118,7 +121,10 @@ examRouter.post(
 examRouter.post(
   "/import-word/ai-recompose",
   roleMiddleware(["admin", "teacher"]),
-  upload.single("file"),
+  wordImportUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "mediaArchive", maxCount: 1 },
+  ]),
   aiRecomposeExamController
 );
 examRouter.post(

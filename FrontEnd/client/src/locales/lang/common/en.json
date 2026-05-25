@@ -177,6 +177,8 @@
     "insufficient_title": "Insufficient data",
     "group_hint": "Groups: {{groups}}",
     "predicted_score_label": "Predicted score",
+    "forecast_reference_subject": "Predicted score for {{subject}}",
+    "forecast_reference_notice": "Based on the student dataset — for reference only.",
     "result_for": "Result for: {{subject}}",
     "context_exam": "Reference exam (same group)",
     "cache_empty": "No prediction yet. Click \"Generate AI prediction\" to analyze your latest exam.",

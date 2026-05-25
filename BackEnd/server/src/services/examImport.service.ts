@@ -1,12 +1,19 @@
+import path from "path";
+import JSZip from "jszip";
 import mammoth from "mammoth";
 import { env } from "~/config/enviroment";
 import type { QuestionType } from "~/models/question.model";
+import {
+  EXAM_PREVIEW_MEDIA_FOLDER,
+  uploadMediaBuffer,
+} from "~/services/cloudinary.service";
 
 export interface MediaInfo {
   type: "image" | "audio" | "video";
   filename: string;
   status: "found" | "missing" | "embedded";
   url?: string;
+  source?: "archive" | "manual";
 }
 
 export interface ImportedQuestionDraft {
@@ -20,6 +27,7 @@ export interface ImportedQuestionDraft {
   chapter?: number | null;
   chapter_label?: string | null;
   media?: MediaInfo | null;
+  media_url?: string | null;
   answer_hint?: string | null;
   ai_confidence?: number;
   needs_review?: boolean;
@@ -72,6 +80,319 @@ interface MutableQuestionDraft {
   media: MediaInfo | null;
 }
 
+interface ReviewState {
+  needs_review: boolean;
+  review_reason: string | null;
+}
+
+interface ArchiveMediaEntry {
+  archivePath: string;
+  normalizedLookupKey: string;
+  mediaType: MediaInfo["type"];
+  mimeType: string;
+  file: JSZip.JSZipObject;
+}
+
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"]);
+const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".avi", ".mkv"]);
+
+function getMediaTypeFromFilename(filename: string): MediaInfo["type"] | null {
+  const ext = path.extname(filename).toLowerCase();
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (AUDIO_EXTENSIONS.has(ext)) return "audio";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  return null;
+}
+
+function getMimeTypeFromFilename(filename: string, fallbackType?: MediaInfo["type"]): string {
+  const ext = path.extname(filename).toLowerCase();
+  const mimeByExt: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".svg": "image/svg+xml",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+  };
+  if (mimeByExt[ext]) return mimeByExt[ext];
+  if (fallbackType === "image") return "image/*";
+  if (fallbackType === "audio") return "audio/*";
+  if (fallbackType === "video") return "video/*";
+  return "application/octet-stream";
+}
+
+function normalizeMediaStem(stem: string): string {
+  return stem
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "_")
+    .replace(/_+/g, "_");
+}
+
+export function normalizeMediaLookupKey(filename: string): string {
+  const basename = path.posix.basename(filename.replace(/\\/g, "/")).trim();
+  if (!basename) return "";
+
+  const ext = path.extname(basename).trim().toLowerCase();
+  const stem = ext ? basename.slice(0, -ext.length) : basename;
+  const normalizedStem = normalizeMediaStem(stem);
+  return `${normalizedStem}${ext}`;
+}
+
+function buildQuestionReviewState(
+  question: Pick<
+    ImportedQuestionDraft,
+    "content" | "chapter" | "media" | "review_reason"
+  >,
+  chapterDefinitions: Map<number, string>
+): ReviewState {
+  if (question.media?.status === "missing") {
+    return {
+      needs_review: true,
+      review_reason:
+        question.review_reason ??
+        `File ${question.media.type} "${question.media.filename}" không tìm thấy.`,
+    };
+  }
+  if (!question.content.trim()) {
+    return {
+      needs_review: true,
+      review_reason: "Thiếu nội dung câu hỏi.",
+    };
+  }
+  if (question.chapter == null) {
+    return {
+      needs_review: true,
+      review_reason: "Thiếu thẻ [CHUONG:x] cho câu hỏi.",
+    };
+  }
+  if (chapterDefinitions.size > 0 && !chapterDefinitions.has(question.chapter)) {
+    return {
+      needs_review: true,
+      review_reason: `Chương ${question.chapter} chưa được khai báo trong block CHUONG ở đầu file.`,
+    };
+  }
+  return {
+    needs_review: false,
+    review_reason: null,
+  };
+}
+
+function rebuildPreviewSummary(
+  preview: ExamImportPreview,
+  chapterDefinitions: Map<number, string>,
+  startedAt: number
+): ExamImportPreview {
+  preview.questions = preview.questions.map((question) => {
+    const reviewState = buildQuestionReviewState(question, chapterDefinitions);
+    return {
+      ...question,
+      media_url: question.media?.url ?? question.media_url ?? null,
+      ...reviewState,
+    };
+  });
+
+  const totalParsed = preview.questions.length;
+  const needsReview = preview.questions.filter((question) => question.needs_review).length;
+  const missingMedia = preview.questions.filter((question) => question.media?.status === "missing").length;
+
+  preview.parse_summary = {
+    total_parsed: totalParsed,
+    auto_ok: totalParsed - needsReview,
+    needs_review: needsReview,
+    missing_media: missingMedia,
+    parse_time_ms: Date.now() - startedAt,
+  };
+
+  return preview;
+}
+
+async function resolveMediaArchiveEntries(
+  mediaArchiveBuffer: Buffer,
+  warnings: string[]
+): Promise<Map<string, ArchiveMediaEntry[]>> {
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(mediaArchiveBuffer);
+  } catch {
+    throw new Error("File mediaArchive không phải ZIP hợp lệ hoặc đã bị lỗi.");
+  }
+
+  const entries = new Map<string, ArchiveMediaEntry[]>();
+  const skippedUnsupported: string[] = [];
+
+  zip.forEach((relativePath, file) => {
+    if (file.dir) return;
+    const normalizedLookupKey = normalizeMediaLookupKey(relativePath);
+    if (!normalizedLookupKey) return;
+
+    const mediaType = getMediaTypeFromFilename(normalizedLookupKey);
+    if (!mediaType) {
+      skippedUnsupported.push(relativePath);
+      return;
+    }
+
+    const normalizedPath = relativePath.replace(/\\/g, "/");
+    const list = entries.get(normalizedLookupKey) ?? [];
+    list.push({
+      archivePath: normalizedPath,
+      normalizedLookupKey,
+      mediaType,
+      mimeType: getMimeTypeFromFilename(normalizedLookupKey, mediaType),
+      file,
+    });
+    entries.set(normalizedLookupKey, list);
+  });
+
+  if (skippedUnsupported.length > 0) {
+    const sample = skippedUnsupported.slice(0, 3).join(", ");
+    warnings.push(
+      `ZIP có ${skippedUnsupported.length} file không phải media đã bị bỏ qua${
+        sample ? `: ${sample}` : ""
+      }.`
+    );
+  }
+
+  return entries;
+}
+
+export async function resolveMediaArchiveInPreview(
+  preview: ExamImportPreview,
+  mediaArchiveBuffer: Buffer,
+  startedAt = Date.now()
+): Promise<ExamImportPreview> {
+  const chapterDefinitions = new Map(
+    (preview.chapter_definitions ?? []).map((item) => [item.chapter, item.label])
+  );
+  const archiveEntries = await resolveMediaArchiveEntries(
+    mediaArchiveBuffer,
+    preview.warnings
+  );
+  const referencedNames = new Set<string>();
+  const matchedArchivePaths = new Set<string>();
+  const unmatchedNames = new Set<string>();
+  const ambiguousNames = new Set<string>();
+  const uploadFailedNames = new Set<string>();
+  const uploadCache = new Map<string, string>();
+
+  for (const question of preview.questions) {
+    const media = question.media;
+    if (!media || media.url) continue;
+
+    const lookupKey = normalizeMediaLookupKey(media.filename);
+    if (!lookupKey) continue;
+    referencedNames.add(lookupKey);
+
+    const candidates = archiveEntries.get(lookupKey) ?? [];
+    if (candidates.length === 0) {
+      unmatchedNames.add(media.filename);
+      continue;
+    }
+
+    const typeMatched = candidates.filter((item) => item.mediaType === media.type);
+    if (typeMatched.length === 0) {
+      unmatchedNames.add(media.filename);
+      continue;
+    }
+
+    if (typeMatched.length > 1) {
+      ambiguousNames.add(media.filename);
+      continue;
+    }
+
+    const candidate = typeMatched[0];
+    let mediaUrl = uploadCache.get(candidate.archivePath);
+
+    if (!mediaUrl) {
+      try {
+        const buffer = await candidate.file.async("nodebuffer");
+        const uploaded = await uploadMediaBuffer({
+          buffer,
+          filename: path.posix.basename(candidate.archivePath),
+          mimeType: candidate.mimeType,
+          folder: EXAM_PREVIEW_MEDIA_FOLDER,
+          tags: ["preview-temp", "exam-import-zip"],
+        });
+        mediaUrl = uploaded.secure_url || uploaded.url;
+        uploadCache.set(candidate.archivePath, mediaUrl);
+      } catch (error) {
+        uploadFailedNames.add(media.filename);
+        const reason =
+          error instanceof Error ? error.message : "Cloudinary upload failed.";
+        question.review_reason = `Upload media từ ZIP thất bại cho "${media.filename}": ${reason}`;
+        question.needs_review = true;
+        preview.warnings.push(
+          `Không thể upload media "${media.filename}" từ ZIP: ${reason}`
+        );
+        continue;
+      }
+    }
+
+    matchedArchivePaths.add(candidate.archivePath);
+    question.media = {
+      ...media,
+      status: "found",
+      url: mediaUrl,
+      source: "archive",
+    };
+    question.media_url = mediaUrl;
+  }
+
+  if (ambiguousNames.size > 0) {
+    preview.warnings.push(
+      `ZIP có tên file media bị trùng, hệ thống không thể tự gán: ${[
+        ...ambiguousNames,
+      ].join(", ")}.`
+    );
+  }
+
+  if (unmatchedNames.size > 0) {
+    preview.warnings.push(
+      `Không tìm thấy trong ZIP các file media được tham chiếu: ${[
+        ...unmatchedNames,
+      ].join(", ")}.`
+    );
+  }
+  if (uploadFailedNames.size > 0) {
+    preview.warnings.push(
+      `Có ${uploadFailedNames.size} file media trong ZIP upload thất bại; các câu tương ứng sẽ giữ trạng thái cần xem lại.`
+    );
+  }
+
+  const extraArchiveFiles = [...archiveEntries.values()]
+    .flat()
+    .filter(
+      (entry) =>
+        !matchedArchivePaths.has(entry.archivePath) &&
+        !referencedNames.has(entry.normalizedLookupKey)
+    )
+    .map((entry) => entry.archivePath);
+  if (extraArchiveFiles.length > 0) {
+    const sample = extraArchiveFiles.slice(0, 5).join(", ");
+    preview.warnings.push(
+      `ZIP có ${extraArchiveFiles.length} file media không được dùng trong đề${
+        sample ? `: ${sample}` : ""
+      }.`
+    );
+  }
+
+  return rebuildPreviewSummary(preview, chapterDefinitions, startedAt);
+}
+
 const QUESTION_TYPE_MAP: Record<string, QuestionType> = {
   TN: "mcq",
   TL: "essay",
@@ -87,16 +408,16 @@ const DIFFICULTY_MAP: Record<string, "DE" | "TRUNGBINH" | "KHO"> = {
   KHO: "KHO",
 };
 
-const HEADER_RE = /\[LOAI:(\w+)\]/i;
-/** Dòng bắt đầu câu hỏi: thẻ ở đầu dòng, hoặc dòng metadata mẫu cũ "Loại: [LOAI:...]" */
-const QUESTION_START_RE = /^\[LOAI:\w+\]/i;
-const LEGACY_META_HEADER_RE = /Loại\s*:\s*\[LOAI:\w+\]/i;
+const HEADER_RE = /\[LOAI:([A-Z-]+)\]/i;
+/** Dòng bắt đầu câu hỏi: cho phép dạng "[LOAI:...]" hoặc "CAU 1 [LOAI:...]" */
+const QUESTION_START_RE = /^(?:(?:CAU|CÂU)\s*\d+\s+)?\[LOAI:[A-Z-]+\]/i;
+const LEGACY_META_HEADER_RE = /Loại\s*:\s*\[LOAI:[A-Z-]+\]/i;
 
 function isQuestionStartLine(line: string): boolean {
   if (LEGACY_HEADER_RE.test(line)) return true;
   if (LEGACY_META_HEADER_RE.test(line)) return true;
   if (!QUESTION_START_RE.test(line)) return false;
-  const afterLoai = line.replace(/^\[LOAI:\w+\]\s*/i, "");
+  const afterLoai = line.replace(/^(?:(?:CAU|CÂU)\s*\d+\s+)?\[LOAI:[A-Z-]+\]\s*/i, "");
   if (!afterLoai.trim()) return true;
   if (/^\[[A-Z]+:/i.test(afterLoai)) return true;
   return false;
@@ -177,34 +498,18 @@ function finalizeQuestion(
     }
   }
 
-  let needs_review = false;
-  let review_reason: string | null = null;
-  if (current.media?.status === "missing") {
-    needs_review = true;
-    review_reason = `File ${current.media.type} "${current.media.filename}" không tìm thấy.`;
-  }
-  if (!content) {
-    needs_review = true;
-    review_reason = "Thiếu nội dung câu hỏi.";
-  }
   if (current.chapter == null) {
     errors.push(`Câu ${current.index}: thiếu thẻ [CHUONG:x].`);
-    needs_review = true;
-    review_reason = review_reason ?? "Thiếu thẻ [CHUONG:x] cho câu hỏi.";
   } else if (chapterDefinitions.size > 0 && !chapterDefinitions.has(current.chapter)) {
     errors.push(
       `Câu ${current.index}: [CHUONG:${current.chapter}] chưa được khai báo ở đầu file Word.`
     );
-    needs_review = true;
-    review_reason =
-      review_reason ??
-      `Chương ${current.chapter} chưa được khai báo trong block CHUONG ở đầu file.`;
     current.chapter_label = null;
   } else if (current.chapter != null) {
     current.chapter_label = chapterDefinitions.get(current.chapter) ?? current.chapter_label ?? null;
   }
 
-  questions.push({
+  const nextQuestion: ImportedQuestionDraft = {
     content,
     question_type: current.question_type,
     points: current.points,
@@ -216,9 +521,13 @@ function finalizeQuestion(
     chapter: current.chapter,
     chapter_label: current.chapter_label,
     media: current.media,
-    ai_confidence: needs_review ? 60 : 90,
-    needs_review,
-    review_reason: review_reason,
+    media_url: current.media?.url ?? null,
+  };
+  const reviewState = buildQuestionReviewState(nextQuestion, chapterDefinitions);
+  questions.push({
+    ...nextQuestion,
+    ai_confidence: reviewState.needs_review ? 60 : 90,
+    ...reviewState,
   });
 }
 
@@ -310,6 +619,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
   const questions: ImportedQuestionDraft[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
+  let skippedInstructionLines = 0;
 
   let current: MutableQuestionDraft | null = null;
   let descriptionLines: string[] = [];
@@ -327,6 +637,10 @@ export function parseExamImportText(text: string): ExamImportPreview {
       continue;
     }
 
+    if (SKIP_INSTRUCTION_LINE_RE.test(line)) {
+      skippedInstructionLines += 1;
+      continue;
+    }
     if (shouldSkipLine(line, Boolean(current))) continue;
 
     const legacyHeaderMatch = line.match(LEGACY_HEADER_RE);
@@ -449,6 +763,11 @@ export function parseExamImportText(text: string): ExamImportPreview {
   const chapterDefinitionList: ChapterDefinition[] = [...chapterDefinitions.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([chapter, label]) => ({ chapter, label }));
+  if (skippedInstructionLines > 0) {
+    warnings.push(
+      `Phát hiện ${skippedInstructionLines} dòng hướng dẫn/mẫu trong file Word và hệ thống đã tự bỏ qua. Khi tạo đề thật, nên xóa phần hướng dẫn để nội dung gọn hơn.`
+    );
+  }
   if (chapterDefinitionList.length === 0) {
     errors.unshift(
       "Thiếu block khai báo chương ở đầu file Word. Bắt buộc thêm dòng dạng: CHUONG 1 : Bien."
@@ -491,9 +810,15 @@ export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   return result.value;
 }
 
-export async function parseExamImportDocx(buffer: Buffer): Promise<ExamImportPreview> {
+export async function parseExamImportDocx(
+  buffer: Buffer,
+  mediaArchiveBuffer?: Buffer
+): Promise<ExamImportPreview> {
+  const startedAt = Date.now();
   const result = await mammoth.extractRawText({ buffer });
-  return parseExamImportText(result.value);
+  const preview = parseExamImportText(result.value);
+  if (!mediaArchiveBuffer) return preview;
+  return resolveMediaArchiveInPreview(preview, mediaArchiveBuffer, startedAt);
 }
 
 // ─── AI Recompose via MiniMax ────────────────────────────────────────────────
@@ -581,7 +906,8 @@ function parseAIJsonResponse(raw: string): {
 
 export async function aiRecomposeExam(
   fileBuffer: Buffer,
-  examInfo: ImportedExamDraft
+  examInfo: ImportedExamDraft,
+  mediaArchiveBuffer?: Buffer
 ): Promise<ExamImportPreview> {
   const startTime = Date.now();
   console.log("[aiRecompose] API Key (first 20 chars):", env.MINIMAX_API_KEY?.slice(0, 20));
@@ -594,7 +920,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
 
   // 1. Parse file docx → structured questions + raw text
   const [preview, textFromDocx] = await Promise.all([
-    parseExamImportDocx(fileBuffer),
+    parseExamImportDocx(fileBuffer, mediaArchiveBuffer),
     extractTextFromDocx(fileBuffer),
   ]);
   if (preview.chapter_definitions.length === 0) {
@@ -786,7 +1112,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
     "ms"
   );
 
-  return {
+  let responsePreview: ExamImportPreview = {
     exam: examInfo,
     questions: normalizedQuestions,
     chapter_definitions: preview.chapter_definitions,
@@ -802,4 +1128,12 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
       parse_time_ms: Date.now() - startTime,
     },
   };
+  if (mediaArchiveBuffer) {
+    responsePreview = await resolveMediaArchiveInPreview(
+      responsePreview,
+      mediaArchiveBuffer,
+      startTime
+    );
+  }
+  return responsePreview;
 }
