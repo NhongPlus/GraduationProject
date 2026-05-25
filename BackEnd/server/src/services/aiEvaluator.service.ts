@@ -50,14 +50,17 @@ export interface EvaluationResult {
 }
 
 // ============== System prompt (CỐ ĐỊNH, ngắn) ==============
-const SYSTEM_PROMPT = `Bạn là giáo viên đại học ngành CNTT, đánh giá kết quả học tập của sinh viên dựa trên điểm đã có và so sánh lớp.
-Nhiệm vụ: nhận xét học lực, chỉ ra điểm yếu/mạnh theo nhóm môn, đưa lời khuyên cụ thể — không chỉ nêu con số dự báo.
+const SYSTEM_PROMPT = `Bạn là giáo viên đại học ngành CNTT, đánh giá kết quả học tập của sinh viên dựa trên dữ liệu có sẵn.
+Nhiệm vụ: nhận xét học lực, chỉ ra điểm yếu/mạnh, đưa lời khuyên cụ thể.
 Quy tắc quan trọng:
-- Nếu n_completed ≤ 3: PHẢI nói rõ "dữ liệu còn ít (chỉ N môn), đánh giá mang tính tham khảo". KHÔNG đưa nhận xét mạnh mẽ kiểu "yếu nhất lớp" khi chỉ có 1-2 môn.
-- dtb_hien_tai là trung bình cộng các điểm đã có, KHÔNG phải GPA chính thức (vì SV chưa hoàn thành chương trình).
-- Chỉ nhận xét nhóm_yếu/nhóm_mạnh khi có dữ liệu (giá trị khác "-").
+- CHỈ nhận xét về nhóm môn LIÊN QUAN đến môn đang dự báo. VD: nếu dự báo "Lập trình mobile" (nhóm Phần mềm) thì KHÔNG nhắc đến nhóm Toán/Đại số.
+- Nếu n_completed ≤ 3: PHẢI nói rõ "dữ liệu còn ít (chỉ N môn), đánh giá mang tính tham khảo". KHÔNG đưa nhận xét mạnh kiểu "yếu nhất" khi chỉ có 1-2 môn.
+- dtb_hien_tai là trung bình cộng các điểm đã có, KHÔNG phải GPA chính thức.
+- KHÔNG dùng từ "lớp" (vd: "ĐTB lớp", "so với lớp"). Thay bằng "dữ liệu tham khảo" hoặc "trung bình chung".
+- KHÔNG nói "kiểm tra lại mô hình dự báo". Nếu điểm dự báo chênh lệch, ghi "kết quả chỉ mang tính tham khảo".
 - KHÔNG bịa thêm số liệu ngoài dữ liệu được cung cấp.
-Trả lời ngắn gọn bằng tiếng Việt, đúng cấu trúc JSON đã cho, không thêm chữ ngoài JSON.
+- Chỉ nhận xét nhóm_yếu/nhóm_mạnh khi giá trị khác "-".
+Trả lời ngắn gọn bằng tiếng Việt, đúng cấu trúc JSON, không thêm chữ ngoài JSON.
 KHÔNG suy luận, KHÔNG dùng thẻ <think>, trả ra JSON ngay lập tức.`;
 
 // ============== Builder cho user prompt ==============
@@ -65,8 +68,17 @@ KHÔNG suy luận, KHÔNG dùng thẻ <think>, trả ra JSON ngay lập tức.`;
  * Build user prompt CỰC NGẮN.
  * Mục tiêu: tổng (system + user + output schema) ≤ 400 token.
  */
+function isRelatedGroup(
+  groupLabel: string,
+  subjectGroups: string[]
+): boolean {
+  const gl = groupLabel.toLowerCase();
+  return subjectGroups.some((sg) => gl.includes(sg.toLowerCase()));
+}
+
 function buildUserPrompt(s: EvaluationSummary): string {
   const nCompleted = s.n_completed ?? 0;
+  const targetGroups = s.subject_groups ?? [];
   const exam =
     typeof s.exam_score === "number" ? `, exam=${s.exam_score}` : "";
 
@@ -74,17 +86,21 @@ function buildUserPrompt(s: EvaluationSummary): string {
     ? s.weak_topics.slice(0, 3).join(", ")
     : "-";
 
-  const weakG = (s.weak_groups ?? [])
-    .slice(0, 3)
-    .map((g) => `${g.label}(${g.diff > 0 ? "+" : ""}${g.diff})`)
-    .join(", ") || "-";
+  const relevantWeakG = (s.weak_groups ?? [])
+    .filter((g) => isRelatedGroup(g.label, targetGroups))
+    .slice(0, 3);
+  const weakG = relevantWeakG.length
+    ? relevantWeakG.map((g) => `${g.label}(${g.diff > 0 ? "+" : ""}${g.diff})`).join(", ")
+    : "-";
 
-  const strongG = (s.strong_groups ?? [])
-    .slice(0, 2)
-    .map((g) => `${g.label}(+${g.diff})`)
-    .join(", ") || "-";
+  const relevantStrongG = (s.strong_groups ?? [])
+    .filter((g) => isRelatedGroup(g.label, targetGroups))
+    .slice(0, 2);
+  const strongG = relevantStrongG.length
+    ? relevantStrongG.map((g) => `${g.label}(+${g.diff})`).join(", ")
+    : "-";
 
-  const subjGroups = (s.subject_groups ?? []).join(",");
+  const subjGroups = targetGroups.join(",");
   const groupCtx = subjGroups ? ` [nhóm:${subjGroups}]` : "";
 
   const dataWarning = nCompleted <= 3
@@ -97,11 +113,11 @@ function buildUserPrompt(s: EvaluationSummary): string {
 - môn_dự_báo="${s.subject}"${groupCtx}
 - predicted=${s.predicted_score}, class_avg=${s.class_avg}, percentile=${s.percentile}%${exam}
 - môn_yếu=[${weakSubj}]
-- nhóm_yếu=[${weakG}]
-- nhóm_mạnh=[${strongG}]${dataWarning}
+- nhóm_yếu_liên_quan=[${weakG}]
+- nhóm_mạnh_liên_quan=[${strongG}]${dataWarning}
 
 Trả về CHỈ JSON:
-{"remark":"1-2 câu nhận xét học lực, gắn với nhóm môn","weaknesses":["…"],"advice":["…","…"],"comparison":"so với lớp, 1 câu nhấn vào nhóm"}`;
+{"remark":"1-2 câu nhận xét học lực, gắn với nhóm môn đang dự báo","weaknesses":["…"],"advice":["…","…"],"comparison":"so với dữ liệu tham khảo, 1 câu"}`;
 }
 
 // ============== Builder summary từ Tầng 1 output ==============
@@ -235,26 +251,27 @@ function mockEvaluate(s: EvaluationSummary): EvaluationResult {
     : "";
   let remark: string;
   if (s.predicted_score >= 8.5) {
-    remark = `Đánh giá: học lực giỏi tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff > 0 ? "trên" : "bằng"} ĐTB lớp${dataQualifier}.`;
+    remark = `Đánh giá: học lực giỏi tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff > 0 ? "trên" : "bằng"} trung bình${dataQualifier}.`;
   } else if (s.predicted_score >= 7) {
-    remark = `Đánh giá: học lực khá tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff >= 0 ? "trên" : "dưới"} ĐTB lớp ${Math.abs(diff)}đ${dataQualifier}.`;
+    remark = `Đánh giá: học lực khá tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff >= 0 ? "trên" : "dưới"} trung bình ${Math.abs(diff)} điểm${dataQualifier}.`;
   } else if (s.predicted_score >= 5.5) {
     remark = `Đánh giá: học lực trung bình tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), cần củng cố thêm${dataQualifier}.`;
   } else {
-    remark = `Đánh giá: môn "${s.subject}" đang ở mức thấp (ước lượng ${s.predicted_score}/10)${dataQualifier}.`;
+    remark = `Đánh giá: môn "${s.subject}" đang ở mức thấp (ước lượng ${s.predicted_score}/10), kết quả chỉ mang tính tham khảo${dataQualifier}.`;
   }
 
   const weaknesses = s.weak_topics.length
     ? s.weak_topics.map((t) => `Cần củng cố kiến thức môn ${t}`)
     : ["Chưa phát hiện điểm yếu rõ rệt từ dữ liệu lịch sử"];
 
+  const targetGroups = s.subject_groups ?? [];
   const advice: string[] = [];
   const targetGroupIsWeak = (s.weak_groups ?? []).find((g) =>
-    (s.subject_groups ?? []).some((sg) => g.label.toLowerCase().includes(sg))
+    targetGroups.some((sg) => g.label.toLowerCase().includes(sg))
   );
   if (targetGroupIsWeak) {
     advice.push(
-      `Nhóm "${targetGroupIsWeak.label}" đang yếu ${targetGroupIsWeak.diff}đ so với lớp — môn này nằm trong nhóm đó, cần ôn tập sớm`
+      `Nhóm "${targetGroupIsWeak.label}" đang dưới trung bình ${targetGroupIsWeak.diff} điểm — môn này nằm trong nhóm đó, cần ôn tập sớm`
     );
   } else if (s.predicted_score < s.class_avg) {
     advice.push(
@@ -266,28 +283,32 @@ function mockEvaluate(s: EvaluationSummary): EvaluationResult {
   } else if (s.percentile > 70) {
     advice.push("Duy trì phong độ, có thể thử các bài nâng cao");
   } else {
-    advice.push("Luyện tập đều đặn 30-60 phút/ngày để cải thiện percentile");
+    advice.push("Luyện tập đều đặn 30-60 phút/ngày để cải thiện kết quả");
   }
-  if ((s.strong_groups ?? []).length > 0) {
-    const sg = s.strong_groups![0];
-    advice.push(`Tận dụng thế mạnh nhóm "${sg.label}" (+${sg.diff}đ) làm động lực`);
+  const relevantStrong = (s.strong_groups ?? []).filter((g) =>
+    targetGroups.some((sg) => g.label.toLowerCase().includes(sg))
+  );
+  if (relevantStrong.length > 0) {
+    const sg = relevantStrong[0];
+    advice.push(`Tận dụng thế mạnh nhóm "${sg.label}" (+${sg.diff} điểm) làm động lực`);
   }
   if (typeof s.exam_score === "number") {
     const examDiff = +(s.exam_score - s.predicted_score).toFixed(2);
     if (Math.abs(examDiff) >= 1) {
       advice.push(
-        `Điểm thi thực (${s.exam_score}) lệch ${examDiff > 0 ? "+" : ""}${examDiff}đ so với dự đoán — xem lại đề thi/lực học gần đây`
+        `Điểm thi thực tế (${s.exam_score}) chênh ${examDiff > 0 ? "+" : ""}${examDiff} điểm so với dự đoán — kết quả chỉ mang tính tham khảo`
       );
     }
   }
 
-  const weakGroupTxt = (s.weak_groups ?? [])
+  const relevantWeakTxt = (s.weak_groups ?? [])
+    .filter((g) => targetGroups.some((sg) => g.label.toLowerCase().includes(sg)))
     .slice(0, 2)
-    .map((g) => `${g.label} ${g.diff}đ`)
+    .map((g) => `${g.label} ${g.diff} điểm`)
     .join(", ");
   const comparison =
-    `Percentile ${s.percentile}% (cao hơn ${s.percentile}% lớp), chênh lệch ${diff > 0 ? "+" : ""}${diff}đ so với ĐTB` +
-    (weakGroupTxt ? `. Đáng chú ý nhóm yếu: ${weakGroupTxt}.` : ".");
+    `Percentile ${s.percentile}%, chênh lệch ${diff > 0 ? "+" : ""}${diff} điểm so với trung bình` +
+    (relevantWeakTxt ? `. Nhóm liên quan cần cải thiện: ${relevantWeakTxt}.` : ". Kết quả mang tính tham khảo.");
 
   return {
     remark,

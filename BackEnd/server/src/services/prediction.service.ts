@@ -109,9 +109,9 @@ function gpaFromScores(scores: Record<string, number>, fallback: number): number
 
 function vsClassAvgText(score: number, classAvg: number): string {
   const diff = +(score - classAvg).toFixed(1);
-  if (Math.abs(diff) < 0.05) return `bằng ĐTB lớp (${classAvg})`;
-  if (diff > 0) return `cao hơn ĐTB lớp ${diff} điểm (ĐTB lớp: ${classAvg})`;
-  return `thấp hơn ĐTB lớp ${Math.abs(diff)} điểm (ĐTB lớp: ${classAvg})`;
+  if (Math.abs(diff) < 0.05) return `bằng trung bình (${classAvg})`;
+  if (diff > 0) return `cao hơn trung bình ${diff} điểm (ĐTB: ${classAvg})`;
+  return `thấp hơn trung bình ${Math.abs(diff)} điểm (ĐTB: ${classAvg})`;
 }
 
 function buildMathPredictions(
