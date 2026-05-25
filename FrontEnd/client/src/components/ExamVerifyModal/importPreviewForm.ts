@@ -10,7 +10,8 @@ export type ImportQuestionRowForm = {
   optionD: string;
   correct_answer: string;
   difficulty: 'DE' | 'TRUNGBINH' | 'KHO';
-  chapter: number;
+  chapter: number | null;
+  chapter_label?: string | null;
   answer_hint: string;
   display_order: number;
   ai_confidence?: number;
@@ -36,7 +37,8 @@ export function draftToFormRow(q: ImportedQuestionDraft): ImportQuestionRowForm 
     optionD: q.options?.D ?? '',
     correct_answer: Array.isArray(correct) ? correct.join(',') : (correct ?? '') || '',
     difficulty: q.difficulty ?? 'DE',
-    chapter: q.chapter ?? 1,
+    chapter: q.chapter ?? null,
+    chapter_label: q.chapter_label ?? null,
     answer_hint: q.answer_hint ?? '',
     display_order: q.display_order,
     ai_confidence: q.ai_confidence,
@@ -66,7 +68,8 @@ export function formRowToDraft(row: ImportQuestionRowForm): ImportedQuestionDraf
     correct_answer: isMcq ? row.correct_answer || null : null,
     display_order: row.display_order,
     difficulty: row.difficulty,
-    chapter: row.chapter,
+    chapter: row.chapter ?? null,
+    chapter_label: row.chapter_label ?? null,
     answer_hint: isMcq ? null : row.answer_hint || null,
     media: row.media ?? null,
     media_url: row.media_url ?? row.media?.url ?? null,

@@ -30,6 +30,8 @@ export type BankPickTarget = {
   options: Record<string, string> | null;
   correct_answer: string | string[] | null;
   difficulty?: QuestionBankItem['difficulty'];
+  chapter?: number | null;
+  answer_hint?: string | null;
 };
 
 type Props = {
@@ -134,6 +136,8 @@ export default function ExamQuestionBankPicker({
         options: item.options,
         correct_answer: item.correct_answer,
         difficulty: item.difficulty,
+        chapter: item.chapter,
+        answer_hint: item.answer_hint,
       }))
     );
     setSelected(new Set());

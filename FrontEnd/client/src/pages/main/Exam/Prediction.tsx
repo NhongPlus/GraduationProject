@@ -313,39 +313,119 @@ const Prediction = () => {
             <Text size="sm" c="dimmed">
               {predictionResult.just_completed.score}/10 — {predictionResult.just_completed.vs_class_avg}
             </Text>
-            {predictionResult.just_completed.analysis && (
-              <Text size="sm" mt="xs" fs="italic">{predictionResult.just_completed.analysis}</Text>
-            )}
           </Paper>
         )}
 
-        {targetPrediction && (
-          <Group grow>
-            <Paper withBorder radius="md" p="md">
-              <Text size="sm" c="dimmed">{t('prediction.predicted_score_label')}</Text>
-              <Group gap="xs" align="flex-end">
-                <Text fw={700} size="xl">{targetPrediction.predicted_score.toFixed(1)}/10</Text>
-                <Badge color={targetPrediction.grade.startsWith('A') ? 'green' : 'blue'}>{targetPrediction.grade}</Badge>
-              </Group>
-              <Progress
-                value={targetPrediction.predicted_score * 10}
-                mt="xs"
-                color={targetPrediction.predicted_score >= 8 ? 'green' : targetPrediction.predicted_score >= 6 ? 'blue' : 'orange'}
-              />
-              <Text size="xs" c="dimmed" mt="xs" lineClamp={3}>{targetPrediction.reasoning}</Text>
-            </Paper>
-            <Paper withBorder radius="md" p="md">
-              <Text size="sm" c="dimmed">{t('prediction.readiness')}</Text>
-              <Text fw={700} size="xl">
-                {targetPrediction.confidence >= 0.8
-                  ? t('prediction.readiness_high')
-                  : targetPrediction.confidence >= 0.6
-                    ? t('prediction.readiness_medium')
-                    : t('prediction.readiness_low')}
+        {predictionResult?.learning_assessment && (
+          <Paper withBorder radius="md" p="md" bg="teal.0">
+            <Text fw={700} mb="md">{t('prediction.assessment_title')}</Text>
+            <Stack gap="sm">
+              <Box>
+                <Text size="sm" c="dimmed">{t('prediction.assessment_remark')}</Text>
+                <Text size="sm" mt={4}>{predictionResult.learning_assessment.remark}</Text>
+              </Box>
+              {predictionResult.learning_assessment.comparison && (
+                <Box>
+                  <Text size="sm" c="dimmed">{t('prediction.assessment_comparison')}</Text>
+                  <Text size="sm" mt={4}>{predictionResult.learning_assessment.comparison}</Text>
+                </Box>
+              )}
+              {predictionResult.learning_assessment.weaknesses.length > 0 && (
+                <Box>
+                  <Text size="sm" c="dimmed">{t('prediction.assessment_weaknesses')}</Text>
+                  <Stack gap={4} mt={4}>
+                    {predictionResult.learning_assessment.weaknesses.map((line, i) => (
+                      <Text key={i} size="sm">• {line}</Text>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+              {predictionResult.learning_assessment.advice.length > 0 && (
+                <Alert color="blue" variant="light" title={t('prediction.advice_title')}>
+                  <Stack gap={4}>
+                    {predictionResult.learning_assessment.advice.map((line, i) => (
+                      <Text key={i} size="sm">• {line}</Text>
+                    ))}
+                  </Stack>
+                </Alert>
+              )}
+            </Stack>
+          </Paper>
+        )}
+
+        {!predictionResult?.learning_assessment && predictionResult?.just_completed?.analysis && (
+          <Alert color="teal" variant="light" title={t('prediction.assessment_remark')}>
+            {predictionResult.just_completed.analysis}
+          </Alert>
+        )}
+
+        {(predictionResult?.learning_assessment?.quantitative || targetPrediction) && (
+          <Paper withBorder radius="md" p="md">
+            <Text fw={600} mb="sm">{t('prediction.forecast_title')}</Text>
+            <Group grow>
+              <Paper withBorder radius="md" p="md">
+                <Text size="sm" c="dimmed">{t('prediction.predicted_score_label')}</Text>
+                <Group gap="xs" align="flex-end">
+                  <Text fw={700} size="xl">
+                    {(predictionResult.learning_assessment?.quantitative?.predicted_score ??
+                      targetPrediction?.predicted_score ??
+                      0).toFixed(1)}
+                    /10
+                  </Text>
+                  <Badge color="blue">
+                    {predictionResult.learning_assessment?.quantitative?.predicted_grade ??
+                      targetPrediction?.grade ??
+                      '—'}
+                  </Badge>
+                </Group>
+                {targetPrediction && (
+                  <Progress
+                    value={targetPrediction.predicted_score * 10}
+                    mt="xs"
+                    color={
+                      targetPrediction.predicted_score >= 8
+                        ? 'green'
+                        : targetPrediction.predicted_score >= 6
+                          ? 'blue'
+                          : 'orange'
+                    }
+                  />
+                )}
+              </Paper>
+              {predictionResult.learning_assessment?.quantitative && (
+                <Paper withBorder radius="md" p="md">
+                  <Text size="sm" c="dimmed">{t('prediction.class_avg_label')}</Text>
+                  <Text fw={700} size="xl">
+                    {predictionResult.learning_assessment.quantitative.class_avg.toFixed(1)}/10
+                  </Text>
+                  <Text size="xs" c="dimmed" mt="xs">
+                    {t('prediction.percentile_label')}:{' '}
+                    {predictionResult.learning_assessment.quantitative.percentile}%
+                  </Text>
+                </Paper>
+              )}
+              {targetPrediction && !predictionResult.learning_assessment?.quantitative && (
+                <Paper withBorder radius="md" p="md">
+                  <Text size="sm" c="dimmed">{t('prediction.readiness')}</Text>
+                  <Text fw={700} size="xl">
+                    {targetPrediction.confidence >= 0.8
+                      ? t('prediction.readiness_high')
+                      : targetPrediction.confidence >= 0.6
+                        ? t('prediction.readiness_medium')
+                        : t('prediction.readiness_low')}
+                  </Text>
+                  <Text size="xs" c="dimmed" mt="xs">
+                    R² ≈ {targetPrediction.confidence.toFixed(2)}
+                  </Text>
+                </Paper>
+              )}
+            </Group>
+            {targetPrediction?.reasoning && (
+              <Text size="xs" c="dimmed" mt="sm" lineClamp={4}>
+                {targetPrediction.reasoning}
               </Text>
-              <Text size="xs" c="dimmed" mt="xs">R² ≈ {targetPrediction.confidence.toFixed(2)}</Text>
-            </Paper>
-          </Group>
+            )}
+          </Paper>
         )}
 
         {predictionResult?.improvement && predictionResult.improvement.length > 0 && (
@@ -373,7 +453,7 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {predictionResult?.overall_advice && (
+        {predictionResult?.overall_advice && !predictionResult.learning_assessment && (
           <Alert color="blue" variant="light" title={t('prediction.advice_title')}>
             {predictionResult.overall_advice}
           </Alert>

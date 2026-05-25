@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 /** Dữ liệu chuẩn 12 nhóm + 52 môn CNTT (dùng chung reseed & sync). */
 export type GroupSeed = {
   code: string;
@@ -13,6 +16,21 @@ export type SubjectSeed = {
   category: string;
   credits?: number;
   semester?: number;
+};
+
+type CurriculumProgram = {
+  program_code?: string;
+  program_name?: string;
+  subjects?: Array<{
+    code?: string;
+    name?: string;
+    semester?: number;
+  }>;
+};
+
+type CurriculumLookup = {
+  byCode: Map<string, number>;
+  byName: Map<string, number>;
 };
 
 export const CNTT_CATALOG_GROUPS: GroupSeed[] = [
@@ -139,3 +157,105 @@ export function scopeForCnttGroup(code: string): "base" | "shared" | "catalog" {
 
 /** Mã nhóm CNTT chuẩn (không prefix ngành khác). */
 export const CNTT_GROUP_CODES = new Set(CNTT_CATALOG_GROUPS.map((g) => g.code));
+
+const CURRICULUM_FILE_CANDIDATES = [
+  path.resolve(__dirname, "../../../scripts/dainam_cntt_subjects.json"),
+  path.resolve(__dirname, "../../../scripts/dainam_subjects.json"),
+  path.resolve(
+    "C:/Users/admin/OneDrive/Luu drive/OneDrive/May tinh/craw/dainam_subjects.json"
+  ),
+  path.resolve(
+    "C:/Users/admin/OneDrive/Lưu drive/OneDrive/Máy tính/craw/dainam_subjects.json"
+  ),
+];
+
+const SUBJECT_NAME_ALIASES: Record<string, string[]> = {
+  "Lý thuyết, thiết kế cơ sở dữ liệu": ["Lý thuyết và thiết kế cơ sở dữ liệu"],
+  "Tiếng Anh P5": ["Tiếng Anh chuyên ngành"],
+};
+
+let curriculumLookupCache: CurriculumLookup | null | undefined;
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\bva\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeCode(value: string): string {
+  return value
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, "");
+}
+
+function loadCurriculumLookup(): CurriculumLookup | null {
+  if (curriculumLookupCache !== undefined) return curriculumLookupCache;
+
+  for (const candidate of CURRICULUM_FILE_CANDIDATES) {
+    if (!fs.existsSync(candidate)) continue;
+
+    const raw = JSON.parse(fs.readFileSync(candidate, "utf8")) as CurriculumProgram[] | CurriculumProgram;
+    const programs = Array.isArray(raw) ? raw : [raw];
+    const cntt = programs.find((program) => {
+      const code = normalizeText(program.program_code ?? "");
+      const name = normalizeText(program.program_name ?? "");
+      return code === "cong nghe thong tin" || name === "cong nghe thong tin";
+    });
+
+    if (!cntt?.subjects?.length) continue;
+
+    const byCode = new Map<string, number>();
+    const byName = new Map<string, number>();
+
+    for (const subject of cntt.subjects) {
+      if (typeof subject.semester !== "number") continue;
+
+      const code = normalizeCode(subject.code ?? "");
+      if (code) byCode.set(code, subject.semester);
+
+      const name = normalizeText(subject.name ?? "");
+      if (name) byName.set(name, subject.semester);
+    }
+
+    curriculumLookupCache = { byCode, byName };
+    return curriculumLookupCache;
+  }
+
+  curriculumLookupCache = null;
+  return curriculumLookupCache;
+}
+
+export function enrichCnttSubjectFromCurriculum(subject: SubjectSeed): SubjectSeed {
+  const lookup = loadCurriculumLookup();
+  if (!lookup) {
+    return subject.groupCode === "pe" && subject.semester === undefined
+      ? { ...subject, semester: 0 }
+      : subject;
+  }
+
+  const codeSemester = lookup.byCode.get(normalizeCode(subject.code));
+  if (codeSemester !== undefined) {
+    return { ...subject, semester: codeSemester };
+  }
+
+  const candidateNames = [subject.name, ...(SUBJECT_NAME_ALIASES[subject.name] ?? [])];
+  for (const name of candidateNames) {
+    const semester = lookup.byName.get(normalizeText(name));
+    if (semester !== undefined) {
+      return { ...subject, semester };
+    }
+  }
+
+  if (subject.groupCode === "pe" && subject.semester === undefined) {
+    return { ...subject, semester: 0 };
+  }
+
+  return subject;
+}

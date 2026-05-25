@@ -3,49 +3,14 @@
  * Không xóa đề thi — chỉ tạo/cập nhật môn catalog (PE001, ND001, …) và gán lại program_subjects.
  * Chạy: npm run sync-cntt-catalog
  */
-import fs from "fs";
-import path from "path";
 import pool from "../src/config/db";
 import {
   CNTT_CATALOG_GROUPS,
   CNTT_CATALOG_SUBJECTS,
+  enrichCnttSubjectFromCurriculum,
   scopeForCnttGroup,
   type SubjectSeed,
 } from "./cntt-catalog-data";
-
-type GradesMeta = { credits: number; semester: number };
-
-function loadCnttGradesByCode(): Map<string, GradesMeta> {
-  const gradesPath = path.resolve(__dirname, "../../../cntt1602_grades.json");
-  const raw = JSON.parse(fs.readFileSync(gradesPath, "utf8")) as {
-    subjects?: Array<{ code?: string; credits?: number; semester?: number }>;
-  };
-  const map = new Map<string, GradesMeta>();
-  for (const row of raw.subjects ?? []) {
-    const code = row.code?.trim().toUpperCase();
-    if (!code) continue;
-    const semester =
-      typeof row.semester === "number" && row.semester >= 0 ? row.semester : 0;
-    map.set(code, {
-      credits: Number(row.credits) || 0,
-      semester,
-    });
-  }
-  return map;
-}
-
-function enrichFromGrades(
-  s: SubjectSeed,
-  grades: Map<string, GradesMeta>
-): SubjectSeed {
-  const meta = grades.get(s.code.trim().toUpperCase());
-  if (!meta) return s;
-  return {
-    ...s,
-    credits: s.credits ?? meta.credits,
-    semester: s.semester ?? meta.semester,
-  };
-}
 
 async function upsertCnttGroup(
   client: import("pg").PoolClient,
@@ -149,10 +114,9 @@ async function main() {
       );
     }
 
-    const gradesByCode = loadCnttGradesByCode();
     const catalogSubjectIds: string[] = [];
     for (const raw of CNTT_CATALOG_SUBJECTS) {
-      const s = enrichFromGrades(raw, gradesByCode);
+      const s = enrichCnttSubjectFromCurriculum(raw);
       const groupId = groupIdByCode.get(s.groupCode);
       if (!groupId) throw new Error(`Missing group ${s.groupCode}`);
       const subjectId = await upsertCatalogSubject(client, s, groupId);

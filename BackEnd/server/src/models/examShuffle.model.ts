@@ -9,7 +9,7 @@ import pool from "~/config/db";
 export const getQuestionsByExam = async (examId: string): Promise<{ id: string; chapter: number | null; display_order: number }[]> => {
   const result = await pool.query(
     `SELECT q.id, q.display_order,
-            COALESCE(qb.chapter, 0) AS chapter
+            COALESCE(q.chapter, qb.chapter, 0) AS chapter
      FROM questions q
      LEFT JOIN question_bank qb ON q.question_bank_id = qb.id
      WHERE q.exam_id = $1
@@ -84,10 +84,10 @@ export const getExamChapterMap = async (examId: string): Promise<Map<string, num
 
 export const getChaptersUsedByExam = async (examId: string): Promise<number[]> => {
   const result = await pool.query(
-    `SELECT DISTINCT COALESCE(qb.chapter, 0) AS chapter
+    `SELECT DISTINCT COALESCE(q.chapter, qb.chapter, 0) AS chapter
      FROM questions q
      LEFT JOIN question_bank qb ON q.question_bank_id = qb.id
-     WHERE q.exam_id = $1 AND qb.chapter IS NOT NULL
+     WHERE q.exam_id = $1 AND COALESCE(q.chapter, qb.chapter) IS NOT NULL
      ORDER BY chapter ASC`,
     [examId]
   );

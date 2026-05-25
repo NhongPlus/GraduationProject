@@ -1,6 +1,7 @@
 import pool from "~/config/db";
 
 export type QuestionType = "mcq" | "essay";
+export type QuestionDifficulty = "DE" | "TRUNGBINH" | "KHO";
 
 export interface Question {
   id: string;
@@ -10,6 +11,10 @@ export interface Question {
   options: Record<string, string> | null;
   correct_answer: string | string[] | null;
   media_url: string | null;
+  difficulty: QuestionDifficulty;
+  chapter: number | null;
+  chapter_label: string | null;
+  answer_hint: string | null;
   points: number;
   display_order: number;
   version_index: number;
@@ -18,7 +23,7 @@ export interface Question {
   explanation: string | null;
 }
 
-export type PublicQuestion = Omit<Question, "correct_answer">;
+export type PublicQuestion = Omit<Question, "correct_answer" | "answer_hint" | "explanation">;
 
 function parseJson<T>(v: unknown, fallback: T): T {
   if (v == null) return fallback;
@@ -49,6 +54,10 @@ function mapQuestionRow(row: any): Question {
         ? null
         : parseJson<string | string[]>(row.correct_answer, null as any),
     media_url: row.media_url ?? null,
+    difficulty: (row.difficulty as QuestionDifficulty) || "TRUNGBINH",
+    chapter: row.chapter != null ? Number(row.chapter) : null,
+    chapter_label: row.chapter_label ?? null,
+    answer_hint: row.answer_hint ?? null,
     points: Number(row.points),
     display_order: Number(row.display_order ?? 0),
     version_index: Number(row.version_index ?? 0),
@@ -68,13 +77,14 @@ export const getQuestionsByExam = async (examId: string): Promise<Question[]> =>
 
 export const getPublicQuestionsByExam = async (examId: string): Promise<PublicQuestion[]> => {
   const result = await pool.query(
-    `SELECT id, exam_id, content, question_type, options, points, display_order, created_at, media_url
+    `SELECT id, exam_id, content, question_type, options, points, display_order, created_at, media_url,
+            difficulty, chapter, chapter_label
      FROM questions WHERE exam_id = $1 ORDER BY display_order ASC, created_at ASC`,
     [examId]
   );
   return result.rows.map((row) => {
     const q = mapQuestionRow(row);
-    const { correct_answer: _, ...pub } = q;
+    const { correct_answer: _, answer_hint: _hint, explanation: _expl, ...pub } = q;
     return pub;
   });
 };
@@ -95,7 +105,11 @@ export const createQuestion = async (
   mediaUrl?: string | null,
   displayOrder?: number,
   versionIndex?: number,
-  questionBankId?: string | null
+  questionBankId?: string | null,
+  difficulty?: QuestionDifficulty,
+  chapter?: number | null,
+  chapterLabel?: string | null,
+  answerHint?: string | null
 ): Promise<Question> => {
   const opts =
     questionType === "essay" ? null : options != null ? JSON.stringify(options) : JSON.stringify({});
@@ -107,7 +121,10 @@ export const createQuestion = async (
         : null;
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index, question_bank_id)
+    `INSERT INTO questions (
+       exam_id, content, question_type, options, correct_answer, media_url,
+       points, display_order, version_index, question_bank_id, difficulty, chapter, chapter_label, answer_hint
+     )
      VALUES (
        $1,
        $2,
@@ -118,7 +135,11 @@ export const createQuestion = async (
        $7,
        COALESCE($8, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1 AND version_index = COALESCE($9, 0))),
        COALESCE($9, 0),
-       $10
+       $10,
+       $11,
+       $12,
+       $13,
+       $14
      )
      RETURNING *`,
     [
@@ -132,6 +153,10 @@ export const createQuestion = async (
       displayOrder ?? null,
       versionIndex ?? 0,
       questionBankId ?? null,
+      difficulty ?? "TRUNGBINH",
+      chapter ?? null,
+      chapterLabel ?? null,
+      answerHint ?? null,
     ]
   );
   if (questionBankId) {
@@ -159,6 +184,10 @@ export const updateQuestionForExam = async (
     correct_answer: string | string[] | null;
     media_url: string | null;
     display_order: number;
+    difficulty?: QuestionDifficulty;
+    chapter?: number | null;
+    chapter_label?: string | null;
+    answer_hint?: string | null;
   }
 ): Promise<Question | null> => {
   const opts =
@@ -182,8 +211,12 @@ export const updateQuestionForExam = async (
       correct_answer = $4,
       media_url = $5,
       points = $6,
-      display_order = $7
-    WHERE id = $8 AND exam_id = $9
+      display_order = $7,
+      difficulty = COALESCE($8, difficulty),
+      chapter = CASE WHEN $9::int IS NULL THEN chapter ELSE $9 END,
+      chapter_label = CASE WHEN $10::text IS NULL THEN chapter_label ELSE $10 END,
+      answer_hint = CASE WHEN $11::text IS NULL THEN answer_hint ELSE $11 END
+    WHERE id = $12 AND exam_id = $13
     RETURNING *`,
     [
       data.content,
@@ -193,6 +226,10 @@ export const updateQuestionForExam = async (
       data.media_url,
       data.points,
       data.display_order,
+      data.difficulty ?? null,
+      data.chapter ?? null,
+      data.chapter_label ?? null,
+      data.answer_hint ?? null,
       questionId,
       examId,
     ]

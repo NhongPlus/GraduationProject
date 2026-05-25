@@ -1,5 +1,9 @@
 import { env } from "~/config/enviroment";
 import {
+  evaluateStudent,
+  summaryFromPrediction,
+} from "~/services/aiEvaluator.service";
+import {
   loadModelWeights,
   predictGrade,
 } from "~/services/gradePredictor.service";
@@ -47,11 +51,27 @@ export interface SubjectPrediction {
   reasoning: string;
 }
 
+/** Đánh giá kết quả học tập (Tầng 2 AI + số liệu Tầng 1). */
+export interface LearningAssessment {
+  remark: string;
+  weaknesses: string[];
+  advice: string[];
+  comparison: string;
+  quantitative?: {
+    predicted_score: number;
+    class_avg: number;
+    percentile: number;
+    predicted_grade: string;
+  };
+}
+
 export interface PredictionResult {
   target_subject?: string;
   target_subject_id?: string;
   just_completed: JustCompleted;
   predictions: SubjectPrediction[];
+  /** Đánh giá học lực — trọng tâm đề tài. */
+  learning_assessment?: LearningAssessment;
   overall_advice: string;
   wrong_summary?: WrongItem[];
   improvement?: string[];
@@ -290,13 +310,66 @@ export async function predictScore(
     groupLabels
   );
 
-  const commentary = await fetchAiCommentary(
-    req,
-    groupLabels,
-    predictions,
-    vsClassAvg,
-    wrongItems
-  );
+  const targetName =
+    explicitTargets?.[0] ?? targets[0] ?? req.just_completed.subject;
+  const targetId = resolveSubjectId(targetName);
+
+  let learning_assessment: LearningAssessment | undefined;
+  if (targetId) {
+    try {
+      const pred = predictGrade({ subject_id: targetId, scores, gpa });
+      const evaluation = await evaluateStudent(
+        summaryFromPrediction(pred, gpa, req.just_completed.score)
+      );
+      learning_assessment = {
+        remark: evaluation.remark,
+        weaknesses: evaluation.weaknesses,
+        advice: evaluation.advice,
+        comparison: evaluation.comparison,
+        quantitative: {
+          predicted_score: pred.predicted_score,
+          class_avg: pred.class_avg,
+          percentile: pred.percentile,
+          predicted_grade: pred.predicted_grade,
+        },
+      };
+    } catch {
+      /* fallback commentary bên dưới */
+    }
+  }
+
+  const commentary =
+    learning_assessment == null
+      ? await fetchAiCommentary(
+          req,
+          groupLabels,
+          predictions,
+          vsClassAvg,
+          wrongItems
+        )
+      : {
+          analysis: learning_assessment.remark,
+          overall_advice: [
+            learning_assessment.comparison,
+            ...learning_assessment.advice,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          improvement: [
+            ...learning_assessment.weaknesses,
+            ...learning_assessment.advice,
+          ].slice(0, 8),
+        };
+
+  const wrongImprovement =
+    wrongItems.length > 0
+      ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
+      : [];
+  const improvement = [
+    ...(learning_assessment?.weaknesses ?? []),
+    ...(learning_assessment?.advice ?? commentary.improvement),
+    ...wrongImprovement,
+  ].filter((line, i, arr) => arr.indexOf(line) === i);
 
   return {
     just_completed: {
@@ -307,12 +380,12 @@ export async function predictScore(
       analysis: commentary.analysis,
     },
     predictions,
+    learning_assessment,
     overall_advice:
       predictions.length === 0
-        ? `Môn "${req.just_completed.subject}" thuộc nhóm ${groupLabels.join(", ") || "chưa phân loại"}. Không còn môn cùng nhóm cần dự đoán tiếp theo lịch sử hiện tại. ${commentary.overall_advice}`
+        ? `Môn "${req.just_completed.subject}" thuộc nhóm ${groupLabels.join(", ") || "chưa phân loại"}. ${commentary.overall_advice}`
         : commentary.overall_advice,
     wrong_summary: wrongItems.length > 0 ? wrongItems : undefined,
-    improvement:
-      commentary.improvement.length > 0 ? commentary.improvement : undefined,
+    improvement: improvement.length > 0 ? improvement : undefined,
   };
 }

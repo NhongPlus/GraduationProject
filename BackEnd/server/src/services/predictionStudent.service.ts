@@ -15,7 +15,7 @@ export async function generatePredictionForStudent(
 ) {
   const trimmed = targetSubjectId?.trim();
   if (!trimmed) {
-    throw httpError(400, "Vui lòng chọn môn cần dự đoán");
+    throw httpError(400, "Vui lòng chọn môn cần đánh giá");
   }
 
   const built = await buildStudentPredictionInput(
@@ -24,7 +24,7 @@ export async function generatePredictionForStudent(
     trimmed
   );
   if (!built) {
-    throw httpError(400, "Chưa đủ dữ liệu bài thi đã hoàn thành để dự đoán");
+    throw httpError(400, "Chưa đủ dữ liệu bài thi đã hoàn thành để đánh giá học lực");
   }
 
   const wrongItems = await buildWrongAnswerBundle(built.contextSession);

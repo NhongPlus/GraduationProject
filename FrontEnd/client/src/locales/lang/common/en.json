@@ -167,7 +167,7 @@
     "class_avg": "Class avg"
   },
   "prediction": {
-    "title": "AI score prediction",
+    "title": "Learning outcome assessment (AI)",
     "subtitle": "Based on your previous subject scores",
     "subtitle_cached": "Results are computed in a batch by an administrator; you only view the saved report (no AI call from your browser).",
     "subtitle_student": "Pick a subject to predict; we check prerequisites in its group, then analyze a related exam (max 5 concurrent, up to 2 minutes).",
@@ -351,7 +351,7 @@
     "status": "Status",
     "correct": "Correct",
     "wrong": "Wrong",
-    "view_prediction": "View AI prediction",
+    "view_prediction": "View learning assessment (AI)",
     "correct_label": "Correct answers",
     "score_label": "Total score (scale 10)",
     "raw_score_hint": "Raw exam points: {{raw}}",
@@ -492,7 +492,7 @@
     "exam_sessions": "Exam sessions",
     "question_bank": "Question bank",
     "score_analytics": "Score analytics",
-    "prediction": "Prediction",
+    "prediction": "Learning assessment (AI)",
     "student_management": "Student management",
     "user_management": "User management",
     "subject_management": "Subject management",

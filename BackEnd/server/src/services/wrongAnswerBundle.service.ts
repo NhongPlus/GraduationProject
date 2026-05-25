@@ -9,6 +9,9 @@ const MAX_EXPLANATION_LEN = 120;
 export interface WrongItem {
   q: number;
   stem: string;
+  difficulty?: "DE" | "TRUNGBINH" | "KHO";
+  chapter?: number | null;
+  chapter_label?: string | null;
   explanation_short?: string;
 }
 
@@ -68,7 +71,13 @@ export async function buildWrongAnswerBundle(
     if (!meta) continue;
     const stem = truncate(stripHtml(meta.q.content), MAX_STEM_LEN);
     const expl = meta.q.explanation?.trim();
-    const item: WrongItem = { q: meta.order, stem };
+    const item: WrongItem = {
+      q: meta.order,
+      stem,
+      difficulty: meta.q.difficulty,
+      chapter: meta.q.chapter ?? null,
+      chapter_label: meta.q.chapter_label ?? null,
+    };
     if (expl) {
       item.explanation_short = truncate(stripHtml(expl), MAX_EXPLANATION_LEN);
     }

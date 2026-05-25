@@ -48,7 +48,8 @@ export interface EvaluationResult {
 }
 
 // ============== System prompt (CỐ ĐỊNH, ngắn) ==============
-const SYSTEM_PROMPT = `Bạn là giáo viên đại học ngành CNTT, đánh giá học lực sinh viên.
+const SYSTEM_PROMPT = `Bạn là giáo viên đại học ngành CNTT, đánh giá kết quả học tập của sinh viên dựa trên điểm đã có và so sánh lớp.
+Nhiệm vụ: nhận xét học lực, chỉ ra điểm yếu/mạnh theo nhóm môn, đưa lời khuyên cụ thể — không chỉ nêu con số dự báo.
 Trả lời ngắn gọn bằng tiếng Việt, đúng cấu trúc JSON đã cho, không thêm chữ ngoài JSON.
 KHÔNG suy luận, KHÔNG dùng thẻ <think>, trả ra JSON ngay lập tức.`;
 
@@ -215,13 +216,13 @@ function mockEvaluate(s: EvaluationSummary): EvaluationResult {
   const diff = +(s.predicted_score - s.class_avg).toFixed(2);
   let remark: string;
   if (s.predicted_score >= 8.5) {
-    remark = `Học lực giỏi: dự đoán ${s.predicted_score}/10 ở môn "${s.subject}", vượt ĐTB lớp ${diff > 0 ? "+" : ""}${diff}đ.`;
+    remark = `Đánh giá: học lực giỏi tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff > 0 ? "trên" : "bằng"} ĐTB lớp.`;
   } else if (s.predicted_score >= 7) {
-    remark = `Học lực khá: dự đoán ${s.predicted_score}/10, ${diff >= 0 ? "trên" : "dưới"} ĐTB lớp ${Math.abs(diff)}đ.`;
+    remark = `Đánh giá: học lực khá tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff >= 0 ? "trên" : "dưới"} ĐTB lớp ${Math.abs(diff)}đ.`;
   } else if (s.predicted_score >= 5.5) {
-    remark = `Học lực trung bình: dự đoán ${s.predicted_score}/10, dưới ĐTB lớp ${Math.abs(diff)}đ — cần chú ý.`;
+    remark = `Đánh giá: học lực trung bình tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), cần củng cố thêm.`;
   } else {
-    remark = `Cảnh báo: dự đoán ${s.predicted_score}/10 thấp, có nguy cơ không đạt.`;
+    remark = `Cảnh báo học tập: môn "${s.subject}" đang ở mức thấp (ước lượng ${s.predicted_score}/10), có nguy cơ không đạt yêu cầu.`;
   }
 
   const weaknesses = s.weak_topics.length

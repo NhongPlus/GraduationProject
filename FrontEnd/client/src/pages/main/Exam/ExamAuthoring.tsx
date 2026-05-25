@@ -256,6 +256,10 @@ export default function ExamAuthoring() {
                 points: question.points,
                 options: question.options,
                 correct_answer: question.correct_answer ?? null,
+                difficulty: question.difficulty,
+                chapter: question.chapter ?? undefined,
+                chapter_label: question.chapter_label ?? null,
+                answer_hint: question.answer_hint ?? null,
                 display_order: question.display_order ?? index + 1,
                 version_index: question.version_index ?? 0,
                 question_bank_id: question.question_bank_id ?? undefined,
@@ -358,6 +362,8 @@ export default function ExamAuthoring() {
       version_index: activeVersion,
       question_bank_id: p.question_bank_id,
       difficulty: p.difficulty,
+      chapter: p.chapter ?? undefined,
+      answer_hint: p.answer_hint ?? null,
     }));
     setQuestions((prev) => normalizeQuestions([...prev, ...mapped]));
     setNotice(
@@ -624,6 +630,10 @@ export default function ExamAuthoring() {
             options: question.options ?? null,
             correct_answer: question.correct_answer ?? null,
             media_url: question.media_url ?? question.media?.url ?? null,
+            difficulty: question.difficulty,
+            chapter: question.chapter ?? null,
+            chapter_label: question.chapter_label ?? null,
+            answer_hint: question.answer_hint ?? null,
             display_order: question.display_order,
           });
         }
@@ -635,6 +645,10 @@ export default function ExamAuthoring() {
             options: question.options ?? undefined,
             correct_answer: question.correct_answer ?? undefined,
             media_url: question.media_url ?? question.media?.url ?? null,
+            difficulty: question.difficulty,
+            chapter: question.chapter ?? null,
+            chapter_label: question.chapter_label ?? null,
+            answer_hint: question.answer_hint ?? null,
             version_index: question.version_index ?? 0,
             question_bank_id: question.question_bank_id,
           });

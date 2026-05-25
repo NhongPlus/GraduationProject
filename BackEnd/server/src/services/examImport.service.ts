@@ -17,7 +17,8 @@ export interface ImportedQuestionDraft {
   correct_answer?: string | string[] | null;
   display_order: number;
   difficulty?: "DE" | "TRUNGBINH" | "KHO";
-  chapter?: number;
+  chapter?: number | null;
+  chapter_label?: string | null;
   media?: MediaInfo | null;
   answer_hint?: string | null;
   ai_confidence?: number;
@@ -37,9 +38,15 @@ export interface ImportedExamDraft {
   teacher?: string;
 }
 
+export interface ChapterDefinition {
+  chapter: number;
+  label: string;
+}
+
 export interface ExamImportPreview {
   exam: ImportedExamDraft;
   questions: ImportedQuestionDraft[];
+  chapter_definitions: ChapterDefinition[];
   errors: string[];
   warnings: string[];
   parse_summary?: {
@@ -60,7 +67,8 @@ interface MutableQuestionDraft {
   correct_answer: string | string[] | null;
   answer_hint: string | null;
   difficulty: "DE" | "TRUNGBINH" | "KHO";
-  chapter: number;
+  chapter: number | null;
+  chapter_label: string | null;
   media: MediaInfo | null;
 }
 
@@ -100,6 +108,7 @@ const ANH_RE = /\[ANH:([^\]]+)\]/i;
 const AUDIO_RE = /\[AUDIO:([^\]]+)\]/i;
 const VIDEO_RE = /\[VIDEO:([^\]]+)\]/i;
 const DAPAN_RE = /\[DAPAN:([^\]]+)\]/i;
+const CHAPTER_DEF_RE = /^(?:CHUONG|CHƯƠNG)\s+(\d+)\s*:\s*(.+)$/i;
 
 const LEGACY_HEADER_RE = /^Q(?:uestion)?\s*(\d+)?\s*\[(mcq|essay)\]\s*\[(\d+(?:\.\d+)?)\]\s*$/i;
 const LEGACY_OPTION_RE = /^([A-Z])[\.)]\s+(.+)$/;
@@ -149,7 +158,8 @@ function finalizeQuestion(
   current: MutableQuestionDraft | null,
   questions: ImportedQuestionDraft[],
   errors: string[],
-  warnings: string[]
+  warnings: string[],
+  chapterDefinitions: Map<number, string>
 ) {
   if (!current) return;
 
@@ -177,6 +187,22 @@ function finalizeQuestion(
     needs_review = true;
     review_reason = "Thiếu nội dung câu hỏi.";
   }
+  if (current.chapter == null) {
+    errors.push(`Câu ${current.index}: thiếu thẻ [CHUONG:x].`);
+    needs_review = true;
+    review_reason = review_reason ?? "Thiếu thẻ [CHUONG:x] cho câu hỏi.";
+  } else if (chapterDefinitions.size > 0 && !chapterDefinitions.has(current.chapter)) {
+    errors.push(
+      `Câu ${current.index}: [CHUONG:${current.chapter}] chưa được khai báo ở đầu file Word.`
+    );
+    needs_review = true;
+    review_reason =
+      review_reason ??
+      `Chương ${current.chapter} chưa được khai báo trong block CHUONG ở đầu file.`;
+    current.chapter_label = null;
+  } else if (current.chapter != null) {
+    current.chapter_label = chapterDefinitions.get(current.chapter) ?? current.chapter_label ?? null;
+  }
 
   questions.push({
     content,
@@ -188,6 +214,7 @@ function finalizeQuestion(
     display_order: questions.length + 1,
     difficulty: current.difficulty,
     chapter: current.chapter,
+    chapter_label: current.chapter_label,
     media: current.media,
     ai_confidence: needs_review ? 60 : 90,
     needs_review,
@@ -199,7 +226,7 @@ function extractQuestionMetadata(line: string): {
   question_type: QuestionType;
   points: number;
   difficulty: "DE" | "TRUNGBINH" | "KHO";
-  chapter: number;
+  chapter: number | null;
   media: MediaInfo | null;
 } {
   const typeMatch = line.match(HEADER_RE);
@@ -222,7 +249,7 @@ function extractQuestionMetadata(line: string): {
     : "DE";
 
   const chuongMatch = line.match(CHUONG_RE);
-  const chapter = chuongMatch ? parseInt(chuongMatch[1]) : 1;
+  const chapter = chuongMatch ? parseInt(chuongMatch[1]) : null;
 
   const anhMatch = line.match(ANH_RE);
   const audioMatch = line.match(AUDIO_RE);
@@ -287,13 +314,24 @@ export function parseExamImportText(text: string): ExamImportPreview {
   let current: MutableQuestionDraft | null = null;
   let descriptionLines: string[] = [];
   let isLegacyMode = false;
+  const chapterDefinitions = new Map<number, string>();
 
   for (const line of lines) {
+    const chapterDefMatch = line.match(CHAPTER_DEF_RE);
+    if (!current && chapterDefMatch) {
+      const chapterNo = Number(chapterDefMatch[1]);
+      const chapterLabel = chapterDefMatch[2]?.trim();
+      if (Number.isFinite(chapterNo) && chapterNo > 0 && chapterLabel) {
+        chapterDefinitions.set(chapterNo, chapterLabel);
+      }
+      continue;
+    }
+
     if (shouldSkipLine(line, Boolean(current))) continue;
 
     const legacyHeaderMatch = line.match(LEGACY_HEADER_RE);
     if (legacyHeaderMatch) {
-      if (current) finalizeQuestion(current, questions, errors, warnings);
+      if (current) finalizeQuestion(current, questions, errors, warnings, chapterDefinitions);
       isLegacyMode = true;
       const parsedPoints = Number(legacyHeaderMatch[3]);
       current = {
@@ -305,14 +343,15 @@ export function parseExamImportText(text: string): ExamImportPreview {
         correct_answer: null,
         answer_hint: null,
         difficulty: "DE",
-        chapter: 1,
+        chapter: null,
+        chapter_label: null,
         media: null,
       };
       continue;
     }
 
     if (isQuestionStartLine(line)) {
-      if (current) finalizeQuestion(current, questions, errors, warnings);
+      if (current) finalizeQuestion(current, questions, errors, warnings, chapterDefinitions);
       isLegacyMode = false;
 
       const meta = extractQuestionMetadata(line);
@@ -328,6 +367,8 @@ export function parseExamImportText(text: string): ExamImportPreview {
         answer_hint: isHint ? line.replace(DAPAN_RE, "").trim() : null,
         difficulty: meta.difficulty,
         chapter: meta.chapter,
+        chapter_label:
+          meta.chapter != null ? chapterDefinitions.get(meta.chapter) ?? null : null,
         media: meta.media,
       };
       continue;
@@ -403,8 +444,16 @@ export function parseExamImportText(text: string): ExamImportPreview {
     }
   }
 
-  finalizeQuestion(current, questions, errors, warnings);
+  finalizeQuestion(current, questions, errors, warnings, chapterDefinitions);
   if (descriptionLines.length) exam.description = descriptionLines.join("\n");
+  const chapterDefinitionList: ChapterDefinition[] = [...chapterDefinitions.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([chapter, label]) => ({ chapter, label }));
+  if (chapterDefinitionList.length === 0) {
+    errors.unshift(
+      "Thiếu block khai báo chương ở đầu file Word. Bắt buộc thêm dòng dạng: CHUONG 1 : Bien."
+    );
+  }
   if (!questions.length && errors.length === 0) {
     errors.push(
       "Không tìm thấy câu hỏi. Mỗi câu cần dòng bắt đầu có [LOAI:TN] hoặc [LOAI:TL] (hoặc Q1 [mcq] [1]). Xem file mẫu exam_template_GiaoVien.docx."
@@ -424,6 +473,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
   return {
     exam,
     questions,
+    chapter_definitions: chapterDefinitionList,
     errors,
     warnings,
     parse_summary: {
@@ -455,7 +505,9 @@ Sửa các lỗi sau:
 - Thiếu điểm số hoặc điểm = 0
 - Content quá ngắn hoặc trống
 - Câu trắc nghiệm thiếu đáp án
-- Điền thông tin mặc định hợp lý (difficulty: DE, chapter: 1)
+- Điền thông tin mặc định hợp lý (difficulty: DE)
+- CHUONG là bắt buộc, nhưng KHÔNG được tự đoán chương nếu input không có hoặc chương không nằm trong danh sách chapter_definitions
+- Nếu không xác định được chương hợp lệ thì trả chapter = null, chapter_label = null, needs_review = true
 
 Trả về JSON theo schema:
 {
@@ -467,7 +519,8 @@ Trả về JSON theo schema:
     "correct_answer": "A" | ["A","C"] | null,
     "display_order": số,
     "difficulty": "DE" | "TRUNGBINH" | "KHO",
-    "chapter": số,
+    "chapter": số | null,
+    "chapter_label": string | null,
     "media": null | {type, filename, status},
     "answer_hint": null | "gợi ý",
     "ai_confidence": 0-100,
@@ -544,6 +597,11 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
     parseExamImportDocx(fileBuffer),
     extractTextFromDocx(fileBuffer),
   ]);
+  if (preview.chapter_definitions.length === 0) {
+    throw new Error(
+      "File Word chưa khai báo block CHUONG ở đầu file. Bắt buộc thêm CHUONG 1 : ... trước khi gửi AI."
+    );
+  }
 
   console.log("[aiRecompose] File buffer size:", fileBuffer.length, "bytes");
   console.log(
@@ -556,6 +614,7 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
   // 2. Build input payload cho AI
   const inputPayload = {
     exam: examInfo,
+    chapter_definitions: preview.chapter_definitions,
     questions: preview.questions,
     raw_docx_text: textFromDocx.slice(0, 5000), // context backup, không vượt token limit
     note: "Ưu tiên sửa dựa trên questions. Chỉ dùng raw_docx_text khi thiếu dữ liệu.",
@@ -677,6 +736,43 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
     fixed: 0,
     needs_review: parsed.questions.filter((q) => q.needs_review).length,
   };
+  const chapterLookup = new Map(
+    preview.chapter_definitions.map((item) => [item.chapter, item.label])
+  );
+  const chapterErrors = new Set<string>();
+  const normalizedQuestions = parsed.questions.map((question, index) => {
+    const chapter = question.chapter ?? null;
+    let chapterLabel = question.chapter_label ?? null;
+    let needsReview = question.needs_review === true;
+    let reviewReason = question.review_reason ?? null;
+
+    if (chapter == null) {
+      chapterErrors.add(`Câu ${index + 1}: thiếu thẻ [CHUONG:x].`);
+      needsReview = true;
+      reviewReason = reviewReason ?? "Thiếu thẻ [CHUONG:x] cho câu hỏi.";
+      chapterLabel = null;
+    } else if (!chapterLookup.has(chapter)) {
+      chapterErrors.add(
+        `Câu ${index + 1}: [CHUONG:${chapter}] chưa được khai báo trong block CHUONG ở đầu file.`
+      );
+      needsReview = true;
+      reviewReason =
+        reviewReason ??
+        `Chương ${chapter} chưa được khai báo trong block CHUONG ở đầu file.`;
+      chapterLabel = null;
+    } else {
+      chapterLabel = chapterLookup.get(chapter) ?? null;
+    }
+
+    return {
+      ...question,
+      chapter,
+      chapter_label: chapterLabel,
+      needs_review: needsReview,
+      review_reason: reviewReason,
+    };
+  });
+  const normalizedNeedsReview = normalizedQuestions.filter((q) => q.needs_review).length;
 
   console.log(
     "[aiRecompose] Done. Questions:",
@@ -692,16 +788,17 @@ console.log("[aiRecompose] API Key length:", env.MINIMAX_API_KEY?.length);
 
   return {
     exam: examInfo,
-    questions: parsed.questions,
-    errors: [],
+    questions: normalizedQuestions,
+    chapter_definitions: preview.chapter_definitions,
+    errors: [...chapterErrors],
     warnings: [
-      `AI đã xử lý ${summary.fixed} câu. ${summary.needs_review} câu cần xem lại.`,
+      `AI đã xử lý ${summary.fixed} câu. ${normalizedNeedsReview} câu cần xem lại.`,
     ],
     parse_summary: {
       total_parsed: summary.total,
-      auto_ok: summary.total - summary.needs_review,
-      needs_review: summary.needs_review,
-      missing_media: parsed.questions.filter((q) => q.media?.status === "missing").length,
+      auto_ok: summary.total - normalizedNeedsReview,
+      needs_review: normalizedNeedsReview,
+      missing_media: normalizedQuestions.filter((q) => q.media?.status === "missing").length,
       parse_time_ms: Date.now() - startTime,
     },
   };

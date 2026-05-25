@@ -14,6 +14,7 @@ export interface QuestionBankItem {
   points: number;
   difficulty: QBDifficulty;
   chapter: number | null;
+  answer_hint?: string | null;
   subject_id: string | null;
   tags: string[];
   usage_count: number;

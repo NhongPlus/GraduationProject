@@ -264,6 +264,10 @@ export const addQuestionController = async (req: Request, res: Response, next: N
       media_url,
       version_index,
       question_bank_id,
+      difficulty,
+      chapter,
+      chapter_label,
+      answer_hint,
     } = req.body;
     if (!content || points === undefined || points === null) {
       return res.status(400).json({ success: false, message: "content và points là bắt buộc" });
@@ -282,7 +286,11 @@ export const addQuestionController = async (req: Request, res: Response, next: N
       media_url ?? null,
       undefined,
       version_index != null ? Number(version_index) : 0,
-      typeof question_bank_id === "string" ? question_bank_id : null
+      typeof question_bank_id === "string" ? question_bank_id : null,
+      difficulty,
+      chapter != null ? Number(chapter) : null,
+      typeof chapter_label === "string" ? chapter_label.trim() || null : null,
+      typeof answer_hint === "string" ? answer_hint.trim() || null : null
     );
     res.status(201).json({ success: true, data: q });
   } catch (err) {
@@ -292,7 +300,19 @@ export const addQuestionController = async (req: Request, res: Response, next: N
 
 export const updateQuestionController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { content, options, correct_answer, points, question_type, media_url, display_order } = req.body;
+    const {
+      content,
+      options,
+      correct_answer,
+      points,
+      question_type,
+      media_url,
+      display_order,
+      difficulty,
+      chapter,
+      chapter_label,
+      answer_hint,
+    } = req.body;
     if (!content || points === undefined || points === null || display_order === undefined) {
       return res
         .status(400)
@@ -310,6 +330,10 @@ export const updateQuestionController = async (req: Request, res: Response, next
       correct_answer: correct_answer ?? null,
       media_url: media_url ?? null,
       display_order: Number(display_order),
+      difficulty,
+      chapter: chapter != null ? Number(chapter) : undefined,
+      chapter_label: typeof chapter_label === "string" ? chapter_label.trim() || null : undefined,
+      answer_hint: typeof answer_hint === "string" ? answer_hint.trim() || null : undefined,
     });
     res.json({ success: true, data: q });
   } catch (err) {

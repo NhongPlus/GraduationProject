@@ -3,6 +3,7 @@
  * Chạy: npm run reseed-cntt-catalog
  */
 import pool from "../src/config/db";
+import { enrichCnttSubjectFromCurriculum } from "./cntt-catalog-data";
 
 type GroupSeed = { code: string; name: string; description?: string; sort_order: number };
 type SubjectSeed = { name: string; code: string; groupCode: string; category: string; credits?: number; semester?: number };
@@ -184,7 +185,8 @@ async function main() {
     }
 
     let subjectCount = 0;
-    for (const s of SUBJECTS) {
+    for (const raw of SUBJECTS) {
+      const s = enrichCnttSubjectFromCurriculum(raw);
       const groupId = groupIdByCode.get(s.groupCode);
       if (!groupId) throw new Error(`Missing group ${s.groupCode}`);
       await client.query(

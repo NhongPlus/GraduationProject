@@ -113,6 +113,8 @@ const ExamResult = () => {
         : null;
   const summaryTone = getSummaryResultTone(questions);
   const partialEssay = hasPartialCreditEssay(questions);
+  const learningSummary = review.learning_assessment_summary;
+  const topWeakChapters = learningSummary?.chapter_summary.slice(0, 3) ?? [];
   const scoreColor =
     summaryTone === 'all_correct'
       ? 'green'
@@ -124,7 +126,6 @@ const ExamResult = () => {
 
   const renderStatusIcon = (q: (typeof questions)[0]) => {
     const kind = getQuestionStatusIcon(q);
-    const color = getQuestionStatusColor(q);
     const size = 12;
     if (kind === 'clock') return <IconClock size={size} />;
     if (kind === 'partial') return <IconCircleHalf2 size={size} />;
@@ -224,6 +225,67 @@ const ExamResult = () => {
             )}
           </Paper>
         </Group>
+
+        {learningSummary && topWeakChapters.length > 0 && (
+          <Paper withBorder radius="md" p="md">
+            <Stack gap="sm">
+              <Box>
+                <Text fw={600}>Danh gia hoc tap theo chuong</Text>
+                <Text size="sm" c="dimmed">
+                  Sai {learningSummary.wrong_count}/{learningSummary.total_questions} cau (
+                  {Math.round(learningSummary.wrong_rate * 100)}%). Che do payload AI:{' '}
+                  <strong>{learningSummary.mode}</strong>
+                </Text>
+              </Box>
+
+              <Stack gap="xs">
+                {topWeakChapters.map((chapter) => (
+                  <Paper key={`${chapter.chapter}-${chapter.chapter_label ?? 'none'}`} withBorder radius="md" p="sm">
+                    <Group justify="space-between" align="flex-start" wrap="wrap">
+                      <Box>
+                        <Text fw={600}>
+                          {chapter.chapter_label
+                            ? `Chuong ${chapter.chapter ?? 0}: ${chapter.chapter_label}`
+                            : `Chuong ${chapter.chapter ?? 0}`}
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          Sai {chapter.wrong}/{chapter.total} cau ({Math.round(chapter.wrong_rate * 100)}%)
+                        </Text>
+                      </Box>
+                      <Group gap="xs">
+                        <Badge color="green" variant="light">De: {chapter.easy_wrong}</Badge>
+                        <Badge color="yellow" variant="light">TB: {chapter.medium_wrong}</Badge>
+                        <Badge color="red" variant="light">Kho: {chapter.hard_wrong}</Badge>
+                      </Group>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+
+              {learningSummary.representative_wrong_items.length > 0 && (
+                <Box>
+                  <Text fw={500} mb="xs">Cau sai dai dien</Text>
+                  <Stack gap="xs">
+                    {learningSummary.representative_wrong_items.map((item) => (
+                      <Paper key={`${item.q}-${item.chapter ?? 0}-${item.stem.slice(0, 16)}`} withBorder radius="md" p="sm">
+                        <Text size="sm" fw={500}>
+                          Cau {item.q}
+                          {item.chapter_label ? ` - ${item.chapter_label}` : ''}
+                        </Text>
+                        <Text size="sm" c="dimmed">{item.stem}</Text>
+                        {item.explanation_short && (
+                          <Text size="xs" mt={4}>
+                            Goi y: {item.explanation_short}
+                          </Text>
+                        )}
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          </Paper>
+        )}
 
         {hasPendingEssay && (
           <Alert color="yellow" variant="light" icon={<IconAlertCircle size={16} />}>

@@ -100,7 +100,7 @@ export async function assessPredictionEligibility(
       message =
         "Chưa đủ dữ kiện: cần ít nhất một bài thi môn cùng nhóm hoặc môn tiên quyết trên hệ thống.";
     } else {
-      message = "Đủ dữ kiện để dự đoán.";
+      message = "Đủ dữ liệu để đánh giá học lực và dự báo điểm.";
     }
 
     return {

@@ -37,6 +37,7 @@ export interface Exam {
 }
 
 export type QuestionType = 'mcq' | 'essay';
+export type QuestionDifficulty = 'DE' | 'TRUNGBINH' | 'KHO';
 
 export interface Question {
   id: string;
@@ -49,6 +50,10 @@ export interface Question {
   created_at: string;
   correct_answer?: string | string[];
   media_url?: string | null;
+  difficulty?: QuestionDifficulty;
+  chapter?: number | null;
+  chapter_label?: string | null;
+  answer_hint?: string | null;
   explanation?: string | null;
   version_index?: number;
   question_bank_id?: string | null;
@@ -126,6 +131,30 @@ export interface SubmitResult {
   correct_count: number;
   total_questions: number;
   grading_status: 'pending_manual' | 'complete';
+  learning_assessment_summary?: {
+    total_questions: number;
+    wrong_count: number;
+    wrong_rate: number;
+    mode: 'full_wrong_details' | 'chapter_samples' | 'summary_only' | 'all_wrong_summary';
+    chapter_summary: Array<{
+      chapter: number | null;
+      chapter_label: string | null;
+      total: number;
+      wrong: number;
+      wrong_rate: number;
+      easy_wrong: number;
+      medium_wrong: number;
+      hard_wrong: number;
+    }>;
+    representative_wrong_items: Array<{
+      q: number;
+      stem: string;
+      chapter: number | null;
+      chapter_label: string | null;
+      difficulty: QuestionDifficulty;
+      explanation_short?: string;
+    }>;
+  };
   details: Array<{
     question_id: string;
     question_type: QuestionType;
@@ -195,12 +224,16 @@ export interface SessionReview {
   score: number | null;
   max_points: number | null;
   grading_status: 'pending_manual' | 'complete' | null;
+  learning_assessment_summary?: SubmitResult['learning_assessment_summary'];
   questions: Array<{
     question_id: string;
     question_type: QuestionType;
     content: string;
     options: Record<string, string> | null;
     explanation: string | null;
+    difficulty?: QuestionDifficulty;
+    chapter?: number | null;
+    chapter_label?: string | null;
     submitted: string | string[] | null;
     correct: string | string[] | null;
     is_correct: boolean;
@@ -225,8 +258,9 @@ export interface ImportedQuestionDraft {
   options?: Record<string, string> | null;
   correct_answer?: string | string[] | null;
   display_order: number;
-  difficulty?: "DE" | "TRUNGBINH" | "KHO";
-  chapter?: number;
+  difficulty?: QuestionDifficulty;
+  chapter?: number | null;
+  chapter_label?: string | null;
   media?: { type: "image" | "audio" | "video"; filename: string; status: "found" | "missing" | "embedded"; url?: string } | null;
   /** URL sau upload (Cloudinary); BE commit/import đọc kèm media.url */
   media_url?: string | null;
@@ -245,6 +279,10 @@ export interface ExamImportPreview {
     description?: string;
   };
   questions: ImportedQuestionDraft[];
+  chapter_definitions: Array<{
+    chapter: number;
+    label: string;
+  }>;
   errors: string[];
   warnings: string[];
   parse_summary?: {
@@ -300,11 +338,25 @@ export interface PredictionEligibility {
   message: string;
 }
 
+export interface LearningAssessment {
+  remark: string;
+  weaknesses: string[];
+  advice: string[];
+  comparison: string;
+  quantitative?: {
+    predicted_score: number;
+    class_avg: number;
+    percentile: number;
+    predicted_grade: string;
+  };
+}
+
 export interface PredictionResult {
   target_subject?: string;
   target_subject_id?: string;
   just_completed: JustCompleted;
   predictions: PredictionSubject[];
+  learning_assessment?: LearningAssessment;
   overall_advice: string;
   wrong_summary?: WrongItemSummary[];
   improvement?: string[];
@@ -378,6 +430,10 @@ const examApi = {
       options?: Record<string, string>;
       correct_answer?: string | string[];
       media_url?: string | null;
+      difficulty?: QuestionDifficulty;
+      chapter?: number | null;
+      chapter_label?: string | null;
+      answer_hint?: string | null;
       version_index?: number;
       question_bank_id?: string;
     }
@@ -399,6 +455,10 @@ const examApi = {
       options?: Record<string, string> | null;
       correct_answer?: string | string[] | null;
       media_url?: string | null;
+      difficulty?: QuestionDifficulty;
+      chapter?: number | null;
+      chapter_label?: string | null;
+      answer_hint?: string | null;
       display_order: number;
     }
   ): Promise<Question> => {

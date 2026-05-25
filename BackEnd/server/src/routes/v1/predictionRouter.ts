@@ -84,9 +84,9 @@ router.post(
         return res.status(408).json({ success: false, message: err.message, code: "prediction_timeout" });
       }
       const status = (err as { status?: number })?.status;
-      const message = err instanceof Error ? err.message : "Lỗi dự đoán";
+      const message = err instanceof Error ? err.message : "Lỗi đánh giá học lực";
       if (message.includes("MINIMAX_API_KEY")) {
-        return res.status(503).json({ success: false, message: "Dịch vụ AI dự đoán chưa được cấu hình" });
+        return res.status(503).json({ success: false, message: "Dịch vụ AI đánh giá học lực chưa được cấu hình" });
       }
       if (status === 400) {
         return res.status(400).json({ success: false, message });

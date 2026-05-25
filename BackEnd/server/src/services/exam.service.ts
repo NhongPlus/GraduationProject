@@ -20,6 +20,7 @@ import {
   updateQuestionForExam,
   Question,
   PublicQuestion,
+  QuestionDifficulty,
   QuestionType,
 } from "~/models/question.model";
 import {
@@ -96,6 +97,10 @@ import { formatScoreScale10Pair } from "~/utils/gradeScale";
 import { shouldAutoSubmitByViolationCount, STRIKE_EVENT_TYPES } from "~/utils/examIntegrityPolicy";
 import { canManageExamRetake } from "~/services/examRetake.service";
 import type { ImportedQuestionDraft } from "~/services/examImport.service";
+import {
+  buildLearningAssessmentSummary,
+  type LearningAssessmentSummary,
+} from "~/services/learningAssessmentSummary.service";
 
 export function httpError(status: number, message: string): Error & { status: number } {
   const e = new Error(message) as Error & { status: number };
@@ -281,8 +286,15 @@ export const addQuestion = async (
   mediaUrl?: string | null,
   displayOrder?: number,
   versionIndex?: number,
-  questionBankId?: string | null
+  questionBankId?: string | null,
+  difficulty?: QuestionDifficulty,
+  chapter?: number | null,
+  chapterLabel?: string | null,
+  answerHint?: string | null
 ): Promise<Question> => {
+  if (!Number.isInteger(chapter) || Number(chapter) <= 0) {
+    throw httpError(400, "Câu hỏi bắt buộc phải có chương hợp lệ");
+  }
   if (questionType === "mcq") {
     if (!options || Object.keys(options).length === 0) {
       throw httpError(400, "Câu trắc nghiệm cần options");
@@ -301,7 +313,11 @@ export const addQuestion = async (
     mediaUrl ?? null,
     displayOrder,
     versionIndex ?? 0,
-    questionBankId ?? null
+    questionBankId ?? null,
+    difficulty ?? "TRUNGBINH",
+    chapter ?? null,
+    chapterLabel ?? null,
+    answerHint ?? null
   );
 };
 
@@ -318,9 +334,16 @@ export const updateQuestionInExam = async (
     correct_answer?: string | string[] | null;
     media_url?: string | null;
     display_order: number;
+    difficulty?: QuestionDifficulty;
+    chapter?: number | null;
+    chapter_label?: string | null;
+    answer_hint?: string | null;
   }
 ): Promise<Question> => {
   const qt = body.question_type;
+  if (!Number.isInteger(body.chapter) || Number(body.chapter) <= 0) {
+    throw httpError(400, "Câu hỏi bắt buộc phải có chương hợp lệ");
+  }
   if (qt === "mcq") {
     if (!body.options || Object.keys(body.options).length === 0) {
       throw httpError(400, "Câu trắc nghiệm cần options");
@@ -337,6 +360,10 @@ export const updateQuestionInExam = async (
     correct_answer: qt === "essay" ? null : body.correct_answer ?? null,
     media_url: body.media_url ?? null,
     display_order: body.display_order,
+    difficulty: body.difficulty,
+    chapter: body.chapter,
+    chapter_label: body.chapter_label,
+    answer_hint: body.answer_hint,
   });
   if (!updated) throw httpError(404, "Không tìm thấy câu hỏi");
   return updated;
@@ -361,6 +388,9 @@ export interface CreateExamWithQuestionsPayload {
 function validateQuestionDraft(question: ImportedQuestionDraft, index: number) {
   const label = `Câu ${index + 1}`;
   if (!question.content?.trim()) throw httpError(400, `${label}: thiếu nội dung`);
+  if (!Number.isInteger(question.chapter) || Number(question.chapter) <= 0) {
+    throw httpError(400, `${label}: bắt buộc phải có [CHUONG:x] hợp lệ`);
+  }
   if (question.question_type !== "mcq" && question.question_type !== "essay") {
     throw httpError(400, `${label}: question_type không hợp lệ`);
   }
@@ -457,8 +487,11 @@ export const createExamWithQuestionsService = async (
           ? (q as { question_bank_id: string }).question_bank_id
           : null;
       const questionResult = await client.query(
-        `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, media_url, points, display_order, version_index, question_bank_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        `INSERT INTO questions (
+           exam_id, content, question_type, options, correct_answer, media_url,
+           points, display_order, version_index, question_bank_id, difficulty, chapter, chapter_label, answer_hint
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           exam.id,
           q.content.trim(),
@@ -470,6 +503,10 @@ export const createExamWithQuestionsService = async (
           q.display_order || i + 1,
           versionIndex,
           bankId,
+          q.difficulty ?? "TRUNGBINH",
+          q.chapter ?? null,
+          q.chapter_label ?? null,
+          q.answer_hint ?? null,
         ]
       );
       if (bankId) {
@@ -487,6 +524,10 @@ export const createExamWithQuestionsService = async (
         options: row.options ?? null,
         correct_answer: row.correct_answer ?? null,
         media_url: row.media_url ?? null,
+        difficulty: row.difficulty ?? "TRUNGBINH",
+        chapter: row.chapter != null ? Number(row.chapter) : null,
+        chapter_label: row.chapter_label ?? null,
+        answer_hint: row.answer_hint ?? null,
         points: Number(row.points),
         display_order: Number(row.display_order ?? i + 1),
         version_index: Number(row.version_index ?? 0),
@@ -739,6 +780,7 @@ export interface SubmitResult {
   correct_count: number;
   total_questions: number;
   grading_status: GradingStatus;
+  learning_assessment_summary?: LearningAssessmentSummary;
   details: Array<{
     question_id: string;
     question_type: QuestionType;
@@ -1261,6 +1303,10 @@ export const submitSessionService = async (
   }).filter(Boolean) as GradedDetailRow[];
 
   const gradingStatus: GradingStatus = hasEssay ? "pending_manual" : "complete";
+  const learningAssessmentSummary = buildLearningAssessmentSummary(
+    allQuestions,
+    gradedRows
+  );
 
   const updated = await finalizeSessionSubmit(sessionId, {
     score,
@@ -1319,6 +1365,7 @@ export const submitSessionService = async (
     correct_count: correctCount,
     total_questions: questionOrder.length,
     grading_status: gradingStatus,
+    learning_assessment_summary: learningAssessmentSummary,
     details: studentDetails,
   };
 };
@@ -1361,6 +1408,9 @@ export interface ReviewDetailRow {
   content: string;
   options: Record<string, string> | null;
   explanation: string | null;
+  difficulty: QuestionDifficulty;
+  chapter: number | null;
+  chapter_label: string | null;
   submitted: string | string[] | null;
   correct: string | string[] | null;
   is_correct: boolean;
@@ -1376,6 +1426,7 @@ export interface SessionReviewPayload {
   score: number | null;
   max_points: number | null;
   grading_status: GradingStatus | null;
+  learning_assessment_summary?: LearningAssessmentSummary;
   questions: ReviewDetailRow[];
 }
 
@@ -1496,6 +1547,9 @@ async function buildReviewQuestionsForSession(
       content: q.content,
       options: displayOptions,
       explanation: q.explanation ?? null,
+      difficulty: q.difficulty ?? "TRUNGBINH",
+      chapter: q.chapter ?? null,
+      chapter_label: q.chapter_label ?? null,
       submitted: submittedForUi,
       correct: correctForUi,
       is_correct: isCorrect,
@@ -1595,6 +1649,10 @@ export const getSessionReview = async (
     reviewQuestions,
     allQuestions
   );
+  const learningAssessmentSummary = buildLearningAssessmentSummary(
+    allQuestions,
+    repaired.gradedDetails
+  );
 
   return {
     session: repaired.session,
@@ -1603,6 +1661,7 @@ export const getSessionReview = async (
     max_points:
       repaired.session.max_points != null ? Number(repaired.session.max_points) : null,
     grading_status: repaired.session.grading_status,
+    learning_assessment_summary: learningAssessmentSummary,
     questions: reviewQuestions,
   };
 };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type UseFormReturnType } from '@mantine/form';
 import {
   Modal,
@@ -36,7 +36,6 @@ import {
 import type { ExamImportPreview, ImportedQuestionDraft } from '@/services/examApi';
 import examApi from '@/services/examApi';
 import {
-  draftToFormRow,
   draftsToFormValues,
   formRowToDraft,
   type ImportPreviewFormValues,
@@ -68,6 +67,12 @@ type MediaPreview = {
   name: string;
 };
 
+type ChapterOption = {
+  value: string;
+  label: string;
+  chapterLabel: string;
+};
+
 function QuestionCard({
   form,
   idx,
@@ -78,6 +83,7 @@ function QuestionCard({
   onMediaChange,
   uploading,
   uploadError,
+  chapterOptions,
 }: {
   form: UseFormReturnType<ImportPreviewFormValues>;
   idx: number;
@@ -88,6 +94,7 @@ function QuestionCard({
   onMediaChange: (idx: number, file: File | null) => void;
   uploading?: boolean;
   uploadError?: string;
+  chapterOptions: ChapterOption[];
 }) {
   const base = `questions.${idx}` as const;
   const meta = TYPE_META[q.question_type] || TYPE_META.mcq;
@@ -99,6 +106,7 @@ function QuestionCard({
   const mediaType = mediaPreview?.type || q.media?.type;
   const mediaName = mediaPreview?.name || q.media?.filename;
   const needsMediaUpload = q.media?.status === 'missing' && !mediaPreview;
+  const chapterMissing = q.chapter == null;
 
   const handleTypeChange = (value: string) => {
     if (value === q.question_type) return;
@@ -128,7 +136,11 @@ function QuestionCard({
               {q.difficulty === 'DE' ? 'Dễ' : q.difficulty === 'TRUNGBINH' ? 'Trung bình' : 'Khó'}
             </Badge>
             <Badge variant="light" color="gray">
-              Ch.{q.chapter || 1}
+              {q.chapter != null
+                ? q.chapter_label
+                  ? `Ch.${q.chapter} - ${q.chapter_label}`
+                  : `Ch.${q.chapter}`
+                : 'Chưa chọn chương'}
             </Badge>
           </Group>
 
@@ -293,13 +305,30 @@ function QuestionCard({
               { value: 'KHO', label: 'Khó' },
             ]}
           />
-          <NumberInput
-            size="xs"
-            label="Chương"
-            min={1}
-            key={form.key(`${base}.chapter`)}
-            {...form.getInputProps(`${base}.chapter`)}
-          />
+          {chapterOptions.length > 0 ? (
+            <Select
+              size="xs"
+              label="Chương"
+              placeholder="Chọn chương"
+              data={chapterOptions}
+              value={q.chapter != null ? String(q.chapter) : null}
+              onChange={(value) => {
+                const selected = chapterOptions.find((item) => item.value === value) ?? null;
+                form.setFieldValue(`${base}.chapter`, value ? Number(value) : null);
+                form.setFieldValue(`${base}.chapter_label`, selected?.chapterLabel ?? null);
+              }}
+              allowDeselect={false}
+            />
+          ) : (
+            <NumberInput
+              size="xs"
+              label="Chương"
+              min={1}
+              placeholder="Bắt buộc khai báo CHUONG trong file Word"
+              value={q.chapter}
+              disabled
+            />
+          )}
           {isMcq && (
             <Select
               size="xs"
@@ -317,6 +346,11 @@ function QuestionCard({
             {q.review_reason}
           </Alert>
         )}
+        {chapterMissing && chapterOptions.length > 0 && (
+          <Alert color="orange" variant="light" icon={<IconAlertCircle size={14} />}>
+            Câu này chưa được gán chương. Hãy chọn một chương từ danh sách đã khai báo trong file Word.
+          </Alert>
+        )}
       </Stack>
     </Paper>
   );
@@ -328,11 +362,13 @@ export default function ExamImportPreviewModal({
   onClose,
 }: ExamImportPreviewModalProps) {
   const [, setFormTick] = useState(0);
+  const [confirmError, setConfirmError] = useState('');
   const form = useForm<ImportPreviewFormValues>({
     mode: 'uncontrolled',
     initialValues: draftsToFormValues(preview.questions),
     onValuesChange: () => {
       setFormTick((n) => n + 1);
+      setConfirmError('');
     },
   });
 
@@ -351,6 +387,24 @@ export default function ExamImportPreviewModal({
   const needsReviewCount = questions.filter((q) => q.needs_review).length;
   const mcqCount = questions.filter((q) => q.question_type === 'mcq').length;
   const essayCount = questions.filter((q) => q.question_type === 'essay').length;
+  const chapterDefinitions = preview.chapter_definitions ?? [];
+  const chapterOptions = useMemo<ChapterOption[]>(
+    () =>
+      chapterDefinitions.map((item) => ({
+        value: String(item.chapter),
+        label: `Ch.${item.chapter} - ${item.label}`,
+        chapterLabel: item.label,
+      })),
+    [chapterDefinitions]
+  );
+  const chapterLabelByNumber = useMemo(
+    () => new Map(chapterDefinitions.map((item) => [item.chapter, item.label])),
+    [chapterDefinitions]
+  );
+  const hasChapterDefinitions = chapterDefinitions.length > 0;
+  const invalidChapterCount = questions.filter(
+    (q) => q.chapter == null || !chapterLabelByNumber.has(q.chapter)
+  ).length;
 
   useEffect(() => {
     mediaPreviewRef.current = mediaPreviews;
@@ -448,6 +502,12 @@ export default function ExamImportPreviewModal({
   };
 
   const handleRecompose = async () => {
+    if (!hasChapterDefinitions) {
+      setRecomposeError(
+        'File Word chưa có block CHUONG ở đầu file. Bắt buộc khai báo CHUONG trước khi gửi AI.'
+      );
+      return;
+    }
     if (!recomposeFile) {
       setShowFileUpload(true);
       return;
@@ -462,6 +522,7 @@ export default function ExamImportPreviewModal({
       form.reset();
       setShowFileUpload(false);
       setRecomposeFile(null);
+      setConfirmError('');
       setMediaFiles({});
       setMediaPreviews({});
     } catch (err: unknown) {
@@ -474,7 +535,29 @@ export default function ExamImportPreviewModal({
 
   const handleConfirm = () => {
     const rows = form.getValues().questions;
-    onConfirm(rows.map((row) => formRowToDraft(row)));
+    if (!hasChapterDefinitions) {
+      setConfirmError(
+        'File Word chưa khai báo danh sách CHUONG ở đầu file. Bắt buộc thêm CHUONG 1 : ... trước khi import.'
+      );
+      return;
+    }
+    const invalidIndex = rows.findIndex(
+      (row) => row.chapter == null || !chapterLabelByNumber.has(row.chapter)
+    );
+    if (invalidIndex >= 0) {
+      setConfirmError(
+        `Câu ${invalidIndex + 1} chưa có chương hợp lệ. Hãy chọn chương từ danh sách đã khai báo trong file Word.`
+      );
+      return;
+    }
+    const normalizedRows = rows.map((row) => ({
+      ...row,
+      chapter: row.chapter,
+      chapter_label:
+        row.chapter != null ? chapterLabelByNumber.get(row.chapter) ?? row.chapter_label ?? null : null,
+    }));
+    setConfirmError('');
+    onConfirm(normalizedRows.map((row) => formRowToDraft(row)));
   };
 
   const handleDeleteQuestion = (idx: number) => {
@@ -524,7 +607,8 @@ export default function ExamImportPreviewModal({
           optionD: '',
           correct_answer: 'A',
           difficulty: 'DE',
-          chapter: 1,
+          chapter: null,
+          chapter_label: null,
           answer_hint: '',
           display_order: newOrder,
           ai_confidence: 100,
@@ -585,6 +669,11 @@ export default function ExamImportPreviewModal({
                   Parse {preview.parse_summary.parse_time_ms}ms
                 </Text>
               )}
+              {hasChapterDefinitions && (
+                <Badge variant="light" color="grape">
+                  {chapterDefinitions.length} chương khai báo
+                </Badge>
+              )}
             </Group>
           </Stack>
 
@@ -605,11 +694,16 @@ export default function ExamImportPreviewModal({
               color="teal"
               leftSection={recomposing ? <Loader size={12} color="#fff" /> : <IconWand size={12} />}
               onClick={handleRecompose}
-              disabled={recomposing || (showFileUpload && !recomposeFile)}
+              disabled={recomposing || (showFileUpload && !recomposeFile) || !hasChapterDefinitions}
             >
               AI Sửa Lại
             </Button>
-            <Button size="xs" color="cyan" onClick={handleConfirm}>
+            <Button
+              size="xs"
+              color="cyan"
+              onClick={handleConfirm}
+              disabled={!hasChapterDefinitions || invalidChapterCount > 0}
+            >
               Xác nhận ({questions.length})
             </Button>
             <Button size="xs" variant="default" onClick={onClose}>
@@ -621,6 +715,24 @@ export default function ExamImportPreviewModal({
         {recomposeError && (
           <Alert mt="xs" color="red" variant="light">
             {recomposeError}
+          </Alert>
+        )}
+        {!hasChapterDefinitions && (
+          <Alert mt="xs" color="red" variant="light" icon={<IconAlertCircle size={14} />}>
+            File Word chưa khai báo danh sách chương. Bắt buộc thêm block dạng `CHUONG 1 : Bien`,
+            `CHUONG 2 : Vong lap` ở đầu file trước khi import hoặc gửi AI.
+          </Alert>
+        )}
+        {hasChapterDefinitions && (
+          <Alert mt="xs" color={invalidChapterCount > 0 ? 'orange' : 'teal'} variant="light">
+            {invalidChapterCount > 0
+              ? `Còn ${invalidChapterCount} câu chưa có chương hợp lệ. Hãy chọn chương bằng dropdown trước khi xác nhận.`
+              : `Đã nhận ${chapterDefinitions.length} chương từ file Word. Các câu hỏi sẽ chỉ được chọn trong danh sách chương này.`}
+          </Alert>
+        )}
+        {confirmError && (
+          <Alert mt="xs" color="red" variant="light" icon={<IconAlertCircle size={14} />}>
+            {confirmError}
           </Alert>
         )}
       </Paper>
@@ -649,6 +761,7 @@ export default function ExamImportPreviewModal({
               onMediaChange={handleMediaChange}
               uploading={mediaUploading[idx]}
               uploadError={mediaErrors[idx]}
+              chapterOptions={chapterOptions}
             />
           ))}
         </SimpleGrid>

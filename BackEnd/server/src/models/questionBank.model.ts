@@ -224,6 +224,9 @@ export const importToExam = async (
 ): Promise<{ question_id: string }> => {
   const qb = await getQuestionBankById(questionBankId);
   if (!qb) throw new Error("Question bank item not found");
+  if (!Number.isInteger(qb.chapter) || Number(qb.chapter) <= 0) {
+    throw new Error("Question bank item phải có chương hợp lệ trước khi thêm vào đề");
+  }
 
   const optionsJson = qb.question_type === "essay"
     ? null
@@ -234,11 +237,14 @@ export const importToExam = async (
   const versionIndex = Math.max(0, Math.min(3, Number(opts?.versionIndex ?? 0)));
 
   const result = await pool.query(
-    `INSERT INTO questions (exam_id, content, question_type, options, correct_answer, points, display_order, question_bank_id, version_index)
+    `INSERT INTO questions (
+       exam_id, content, question_type, options, correct_answer, points,
+       display_order, question_bank_id, version_index, difficulty, chapter, answer_hint
+     )
      VALUES (
        $1, $2, $3, $4, $5, $6,
        COALESCE($7, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM questions WHERE exam_id = $1 AND version_index = $8)),
-       $9, $8
+       $9, $8, $10, $11, $12
      )
      RETURNING id`,
     [
@@ -251,6 +257,9 @@ export const importToExam = async (
       opts?.displayOrder ?? null,
       versionIndex,
       questionBankId,
+      qb.difficulty,
+      qb.chapter,
+      qb.answer_hint ?? null,
     ]
   );
 
