@@ -301,6 +301,7 @@ export async function predictScore(
 
   const scores = buildScoresMap(req, completedId);
   const gpa = gpaFromScores(scores, req.just_completed.score);
+  const nCompleted = req.history.length + 1;
 
   const predictions = buildMathPredictions(
     targets,
@@ -319,7 +320,7 @@ export async function predictScore(
     try {
       const pred = predictGrade({ subject_id: targetId, scores, gpa });
       const evaluation = await evaluateStudent(
-        summaryFromPrediction(pred, gpa, req.just_completed.score)
+        summaryFromPrediction(pred, gpa, req.just_completed.score, nCompleted)
       );
       learning_assessment = {
         remark: evaluation.remark,

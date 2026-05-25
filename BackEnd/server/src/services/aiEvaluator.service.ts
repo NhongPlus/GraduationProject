@@ -29,13 +29,15 @@ export interface EvaluationSummary {
   predicted_score: number;
   class_avg: number;
   percentile: number;
-  weak_topics: string[]; // tên người-đọc-được (không phải mã)
+  weak_topics: string[];
   /** Nhóm SV YẾU hơn lớp (vd: [{label:"Phần mềm", diff:-0.6}]). */
   weak_groups?: Array<{ label: string; diff: number }>;
   /** Nhóm SV MẠNH hơn lớp. */
   strong_groups?: Array<{ label: string; diff: number }>;
   /** Điểm thi thực tế nếu đã có (so sánh với dự đoán). */
   exam_score?: number;
+  /** Số môn đã hoàn thành (dùng để cảnh báo AI khi data ít). */
+  n_completed?: number;
 }
 
 export interface EvaluationResult {
@@ -50,6 +52,11 @@ export interface EvaluationResult {
 // ============== System prompt (CỐ ĐỊNH, ngắn) ==============
 const SYSTEM_PROMPT = `Bạn là giáo viên đại học ngành CNTT, đánh giá kết quả học tập của sinh viên dựa trên điểm đã có và so sánh lớp.
 Nhiệm vụ: nhận xét học lực, chỉ ra điểm yếu/mạnh theo nhóm môn, đưa lời khuyên cụ thể — không chỉ nêu con số dự báo.
+Quy tắc quan trọng:
+- Nếu n_completed ≤ 3: PHẢI nói rõ "dữ liệu còn ít (chỉ N môn), đánh giá mang tính tham khảo". KHÔNG đưa nhận xét mạnh mẽ kiểu "yếu nhất lớp" khi chỉ có 1-2 môn.
+- dtb_hien_tai là trung bình cộng các điểm đã có, KHÔNG phải GPA chính thức (vì SV chưa hoàn thành chương trình).
+- Chỉ nhận xét nhóm_yếu/nhóm_mạnh khi có dữ liệu (giá trị khác "-").
+- KHÔNG bịa thêm số liệu ngoài dữ liệu được cung cấp.
 Trả lời ngắn gọn bằng tiếng Việt, đúng cấu trúc JSON đã cho, không thêm chữ ngoài JSON.
 KHÔNG suy luận, KHÔNG dùng thẻ <think>, trả ra JSON ngay lập tức.`;
 
@@ -59,6 +66,7 @@ KHÔNG suy luận, KHÔNG dùng thẻ <think>, trả ra JSON ngay lập tức.`;
  * Mục tiêu: tổng (system + user + output schema) ≤ 400 token.
  */
 function buildUserPrompt(s: EvaluationSummary): string {
+  const nCompleted = s.n_completed ?? 0;
   const exam =
     typeof s.exam_score === "number" ? `, exam=${s.exam_score}` : "";
 
@@ -79,13 +87,18 @@ function buildUserPrompt(s: EvaluationSummary): string {
   const subjGroups = (s.subject_groups ?? []).join(",");
   const groupCtx = subjGroups ? ` [nhóm:${subjGroups}]` : "";
 
+  const dataWarning = nCompleted <= 3
+    ? `\n⚠ SV mới hoàn thành ${nCompleted} môn — dữ liệu rất ít, PHẢI nêu rõ trong remark.`
+    : "";
+
   return `Tóm tắt SV:
-- gpa=${s.student_gpa}
-- môn="${s.subject}"${groupCtx}
+- n_completed=${nCompleted}
+- dtb_hien_tai=${s.student_gpa} (trung bình ${nCompleted} môn, KHÔNG phải GPA chính thức)
+- môn_dự_báo="${s.subject}"${groupCtx}
 - predicted=${s.predicted_score}, class_avg=${s.class_avg}, percentile=${s.percentile}%${exam}
 - môn_yếu=[${weakSubj}]
 - nhóm_yếu=[${weakG}]
-- nhóm_mạnh=[${strongG}]
+- nhóm_mạnh=[${strongG}]${dataWarning}
 
 Trả về CHỈ JSON:
 {"remark":"1-2 câu nhận xét học lực, gắn với nhóm môn","weaknesses":["…"],"advice":["…","…"],"comparison":"so với lớp, 1 câu nhấn vào nhóm"}`;
@@ -99,7 +112,8 @@ Trả về CHỈ JSON:
 export function summaryFromPrediction(
   pred: PredictOutput,
   gpa: number,
-  examScore?: number
+  examScore?: number,
+  nCompleted?: number
 ): EvaluationSummary {
   return {
     student_gpa: +gpa.toFixed(2),
@@ -115,6 +129,7 @@ export function summaryFromPrediction(
       diff: g.diff,
     })),
     exam_score: examScore,
+    n_completed: nCompleted,
   };
 }
 
@@ -214,15 +229,19 @@ export async function evaluateStudent(
 // ============== Mock (rule-based, không tốn token) ==============
 function mockEvaluate(s: EvaluationSummary): EvaluationResult {
   const diff = +(s.predicted_score - s.class_avg).toFixed(2);
+  const nCompleted = s.n_completed ?? 0;
+  const dataQualifier = nCompleted <= 3
+    ? ` (lưu ý: chỉ có ${nCompleted} môn hoàn thành, đánh giá mang tính tham khảo)`
+    : "";
   let remark: string;
   if (s.predicted_score >= 8.5) {
-    remark = `Đánh giá: học lực giỏi tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff > 0 ? "trên" : "bằng"} ĐTB lớp.`;
+    remark = `Đánh giá: học lực giỏi tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff > 0 ? "trên" : "bằng"} ĐTB lớp${dataQualifier}.`;
   } else if (s.predicted_score >= 7) {
-    remark = `Đánh giá: học lực khá tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff >= 0 ? "trên" : "dưới"} ĐTB lớp ${Math.abs(diff)}đ.`;
+    remark = `Đánh giá: học lực khá tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), ${diff >= 0 ? "trên" : "dưới"} ĐTB lớp ${Math.abs(diff)}đ${dataQualifier}.`;
   } else if (s.predicted_score >= 5.5) {
-    remark = `Đánh giá: học lực trung bình tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), cần củng cố thêm.`;
+    remark = `Đánh giá: học lực trung bình tại môn "${s.subject}" (ước lượng ${s.predicted_score}/10), cần củng cố thêm${dataQualifier}.`;
   } else {
-    remark = `Cảnh báo học tập: môn "${s.subject}" đang ở mức thấp (ước lượng ${s.predicted_score}/10), có nguy cơ không đạt yêu cầu.`;
+    remark = `Đánh giá: môn "${s.subject}" đang ở mức thấp (ước lượng ${s.predicted_score}/10)${dataQualifier}.`;
   }
 
   const weaknesses = s.weak_topics.length

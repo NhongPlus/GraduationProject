@@ -187,6 +187,7 @@ function normalCdf(z: number): number {
 // ============== Group-level analysis ==============
 const WEAK_GROUP_THRESHOLD = 0.3; // diff (SV - class) ≤ -0.3đ → "yếu" trong nhóm
 const STRONG_GROUP_THRESHOLD = 0.3;
+const MIN_SUBJECTS_FOR_GROUP_COMPARISON = 2;
 
 interface GroupDiff {
   group_id: string;
@@ -209,7 +210,7 @@ function analyzeGroups(
     const studentScores = g.subjects
       .map((sid) => scores[sid])
       .filter((v): v is number => typeof v === "number" && v > MISSING_SENTINEL);
-    if (studentScores.length === 0) continue;
+    if (studentScores.length < MIN_SUBJECTS_FOR_GROUP_COMPARISON) continue;
     const studentAvg =
       studentScores.reduce((a, b) => a + b, 0) / studentScores.length;
     const diff = +(studentAvg - g.mean).toFixed(2);
@@ -331,6 +332,13 @@ export function predictGrade(input: PredictInput): PredictOutput {
   const z =
     subjectMeta.std > 0 ? (predicted - subjectMeta.mean) / subjectMeta.std : 0;
   const percentile = Math.round(normalCdf(z) * 100);
+
+  const nActualScores = featuresUsed.filter((f) => !f.imputed).length;
+  if (nActualScores <= 2) {
+    notes.push(
+      `Chỉ có ${nActualScores} môn thực sự có điểm trong ${subjectModel.features.length} feature — phần lớn dùng ĐTB lớp thay thế, độ chính xác thấp.`
+    );
+  }
 
   if (subjectModel.r2 < 0.3) {
     notes.push(
