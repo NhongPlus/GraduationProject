@@ -775,7 +775,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
   }
   if (!questions.length && errors.length === 0) {
     errors.push(
-      "Không tìm thấy câu hỏi. Mỗi câu cần dòng bắt đầu có [LOAI:TN] hoặc [LOAI:TL] (hoặc Q1 [mcq] [1]). Xem file mẫu exam_template_GiaoVien.docx."
+      "Không tìm thấy câu hỏi. Mỗi câu cần dòng bắt đầu có [LOAI:TN] hoặc [LOAI:TL]. Xem file mẫu exam_template_GiaoVien.docx."
     );
   }
   if (

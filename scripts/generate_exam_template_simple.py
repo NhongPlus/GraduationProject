@@ -180,7 +180,6 @@ def main() -> None:
             line.startswith("HƯỚNG DẪN")
             or line.startswith("GHI CHÚ")
             or line.startswith("BẢNG")
-            or line.startswith("PHỤ LỤC")
             or line.startswith("CHECKLIST")
             or line.startswith("PHẦN MẪU")
             or line.startswith("THÔNG TIN")
