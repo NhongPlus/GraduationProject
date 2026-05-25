@@ -472,12 +472,6 @@ const Prediction = () => {
                 <Text size="sm" c="dimmed">{t('prediction.assessment_remark')}</Text>
                 <Text size="sm" mt={4}>{predictionResult.learning_assessment.remark}</Text>
               </Box>
-              {predictionResult.learning_assessment.comparison && (
-                <Box>
-                  <Text size="sm" c="dimmed">{t('prediction.assessment_comparison')}</Text>
-                  <Text size="sm" mt={4}>{predictionResult.learning_assessment.comparison}</Text>
-                </Box>
-              )}
               {predictionResult.learning_assessment.weaknesses.length > 0 && (
                 <Box>
                   <Text size="sm" c="dimmed">{t('prediction.assessment_weaknesses')}</Text>

@@ -131,6 +131,31 @@ function formatChapterLabel(item: Pick<WrongItem, "chapter" | "chapter_label">):
   return "Chủ điểm chưa gán chương";
 }
 
+function normalizeLineKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/^can cung co\s+/i, "")
+    .replace(/[.:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const key = normalizeLineKey(trimmed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 function buildWeakChapterInsights(wrongItems: WrongItem[]): ChapterInsight[] {
   const grouped = new Map<string, ChapterInsight>();
   for (const item of wrongItems) {
@@ -168,6 +193,10 @@ function buildChapterImprovementLines(chapters: ChapterInsight[]): string[] {
     const refs = chapter.question_numbers.join(", ");
     return `${chapter.label}: nên ôn lại trước, sai ở các câu ${refs}.`;
   });
+}
+
+function buildChapterWeaknessLines(chapters: ChapterInsight[]): string[] {
+  return chapters.map((chapter) => chapter.label);
 }
 
 function buildMathPredictions(
@@ -329,6 +358,7 @@ export async function predictScore(
 ): Promise<PredictionResult> {
   const wrongItems = options.wrong_items ?? [];
   const chapterInsights = buildWeakChapterInsights(wrongItems);
+  const chapterWeakness = buildChapterWeaknessLines(chapterInsights);
   const chapterImprovement = buildChapterImprovementLines(chapterInsights);
   const historyNames = req.history.map((h) => h.subject);
   const explicitTargets =
@@ -387,14 +417,18 @@ export async function predictScore(
           chapterInsights.map((item) => item.label)
         )
       );
+      const filteredWeaknesses = evaluation.weaknesses.filter((line) => {
+        const key = normalizeLineKey(line);
+        return !chapterWeakness.some((chapter) => normalizeLineKey(chapter) === key);
+      });
+      const filteredAdvice = evaluation.advice.filter((line) => {
+        const key = normalizeLineKey(line);
+        return !chapterWeakness.some((chapter) => normalizeLineKey(chapter) === key);
+      });
       learning_assessment = {
         remark: evaluation.remark,
-        weaknesses: [...chapterInsights.map((item) => `Cần củng cố ${item.label}`), ...evaluation.weaknesses]
-          .filter((line, i, arr) => arr.indexOf(line) === i)
-          .slice(0, 8),
-        advice: [...chapterImprovement, ...evaluation.advice]
-          .filter((line, i, arr) => arr.indexOf(line) === i)
-          .slice(0, 8),
+        weaknesses: dedupeLines(filteredWeaknesses).slice(0, 8),
+        advice: dedupeLines([...chapterImprovement, ...filteredAdvice]).slice(0, 8),
         comparison: evaluation.comparison,
         quantitative: {
           predicted_score: pred.predicted_score,
@@ -431,17 +465,15 @@ export async function predictScore(
           ].slice(0, 8),
         };
 
-  const wrongImprovement =
+  const fallbackWrongImprovement =
     chapterImprovement.length > 0
       ? chapterImprovement
       : wrongItems.length > 0
         ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
-      : [];
-  const improvement = [
-    ...(learning_assessment?.weaknesses ?? []),
-    ...(learning_assessment?.advice ?? commentary.improvement),
-    ...wrongImprovement,
-  ].filter((line, i, arr) => arr.indexOf(line) === i);
+        : [];
+  const improvement = learning_assessment
+    ? dedupeLines(learning_assessment.advice)
+    : dedupeLines([...commentary.improvement, ...fallbackWrongImprovement]);
 
   return {
     just_completed: {

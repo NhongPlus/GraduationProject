@@ -2,8 +2,6 @@ import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import {
   IconBooks,
   IconCalendarStats,
-  IconClipboardList,
-  IconEye,
   IconFileAnalytics,
   IconGauge,
   IconLock,
@@ -11,7 +9,6 @@ import {
   IconPencilCheck,
   IconSchool,
   IconFolders,
-  IconUsersGroup,
 } from '@tabler/icons-react';
 import authRoute from './authRoute';
 import type { NavGroup, Routes } from '@/@types/routes';
@@ -295,24 +292,6 @@ export const protectedRoutes: Routes = [
       icon: IconFileAnalytics,
       order: 6,
     },
-  },
-  {
-    key: 'proctoring',
-    path: '/proctoring',
-    component: lazy(() => import('@/pages/main/Proctoring/ProctoringList')),
-    authority: ['admin', 'teacher'],
-    nav: {
-      labelKey: 'nav.proctoring',
-      position: 'main',
-      icon: IconEye,
-      order: 7,
-    },
-  },
-  {
-    key: 'proctoring-dashboard',
-    path: '/proctoring/:examId',
-    component: lazy(() => import('@/pages/main/Proctoring/ProctoringDashboard')),
-    authority: ['admin', 'teacher'],
   },
   {
     key: 'audit-log',
