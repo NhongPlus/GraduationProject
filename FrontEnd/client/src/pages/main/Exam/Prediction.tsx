@@ -6,6 +6,7 @@ import examApi, {
   type PredictionRecomputeSummary,
   type PredictionEligibility,
 } from '@/services/examApi';
+import type { SubjectDto } from '@/services/subjectApi';
 import SubjectCategoryPicker from '@/components/Input/SubjectCategoryPicker';
 import { useSubjectPickerCatalog } from '@/hooks/useSubjectPickerCatalog';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -13,7 +14,27 @@ import { useNavigate } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth';
 import { scoreToGrade10, grade10ToLetter } from '@/utils/formatExamScore';
 
-type HistoryRow = { subject: string; score: number; grade: string };
+type HistoryRow = { subjectId: string | null; subject: string; score: number; grade: string };
+
+function normalizeName(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dedupeSubjectsById(list: SubjectDto[]): SubjectDto[] {
+  const seen = new Set<string>();
+  const out: SubjectDto[] = [];
+  for (const item of list) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
 
 const Prediction = () => {
   const { t } = useTranslation();
@@ -35,9 +56,58 @@ const Prediction = () => {
   const [recomputeSummary, setRecomputeSummary] = useState<PredictionRecomputeSummary | null>(null);
   const [recomputeError, setRecomputeError] = useState('');
 
+  const completedSubjectIds = useMemo(
+    () => new Set(pastGrades.map((row) => row.subjectId).filter((id): id is string => Boolean(id))),
+    [pastGrades]
+  );
+
+  const completedSubjectNames = useMemo(
+    () => new Set(pastGrades.map((row) => normalizeName(row.subject)).filter(Boolean)),
+    [pastGrades]
+  );
+
+  const highestCompletedSemester = useMemo(() => {
+    let maxSemester = 0;
+    for (const row of pastGrades) {
+      const matchedSubject =
+        (row.subjectId ? flatSubjects.find((subject) => subject.id === row.subjectId) : null) ??
+        flatSubjects.find((subject) => normalizeName(subject.name) === normalizeName(row.subject));
+      if (matchedSubject && matchedSubject.semester > maxSemester) {
+        maxSemester = matchedSubject.semester;
+      }
+    }
+    return maxSemester;
+  }, [flatSubjects, pastGrades]);
+
+  const predictionGroups = useMemo(
+    () =>
+      pickerGroups
+        .map((group) => ({
+          ...group,
+          subjects: group.subjects.filter((subject) => {
+            const alreadyCompleted =
+              completedSubjectIds.has(subject.id) || completedSubjectNames.has(normalizeName(subject.name));
+            if (alreadyCompleted) return false;
+            if (highestCompletedSemester > 0 && subject.semester > 0) {
+              return subject.semester > highestCompletedSemester;
+            }
+            return true;
+          }),
+        }))
+        .filter((group) => group.subjects.length > 0),
+    [completedSubjectIds, completedSubjectNames, highestCompletedSemester, pickerGroups]
+  );
+
+  const availablePredictionSubjects = useMemo(
+    () => dedupeSubjectsById(predictionGroups.flatMap((group) => group.subjects)),
+    [predictionGroups]
+  );
+
+  const hasFuturePredictionTargets = availablePredictionSubjects.length > 0;
+
   const selectedSubject = useMemo(
-    () => flatSubjects.find((s) => s.id === targetSubjectId) ?? null,
-    [flatSubjects, targetSubjectId]
+    () => availablePredictionSubjects.find((s) => s.id === targetSubjectId) ?? null,
+    [availablePredictionSubjects, targetSubjectId]
   );
 
   const loadStudentView = useCallback(async () => {
@@ -59,6 +129,7 @@ const Prediction = () => {
           const g10 = scoreToGrade10(s.score, s.max_points);
           const grade = g10 != null ? grade10ToLetter(g10) : '—';
           return {
+            subjectId: exam?.subject_id ?? null,
             subject: exam?.subject_name || exam?.title || s.exam_id,
             score: g10 ?? 0,
             grade,
@@ -87,14 +158,21 @@ const Prediction = () => {
       if (!cached) return;
       setPredictionResult(cached);
       const match =
-        flatSubjects.find((s) => s.id === cached.target_subject_id) ??
-        flatSubjects.find(
+        availablePredictionSubjects.find((s) => s.id === cached.target_subject_id) ??
+        availablePredictionSubjects.find(
           (s) =>
             s.name === cached.target_subject || cached.predictions[0]?.subject === s.name
         );
       if (match) setTargetSubjectId(match.id);
     });
-  }, [flatSubjects]);
+  }, [availablePredictionSubjects, flatSubjects]);
+
+  useEffect(() => {
+    if (!targetSubjectId) return;
+    if (availablePredictionSubjects.some((subject) => subject.id === targetSubjectId)) return;
+    setTargetSubjectId(null);
+    setEligibility(null);
+  }, [availablePredictionSubjects, targetSubjectId]);
 
   useEffect(() => {
     if (userRole === 'admin') {
@@ -170,6 +248,7 @@ const Prediction = () => {
   };
 
   const canGenerate =
+    hasFuturePredictionTargets &&
     Boolean(targetSubjectId) &&
     eligibility?.eligible === true &&
     !generateLoading &&
@@ -256,64 +335,84 @@ const Prediction = () => {
         <Title order={2}>{t('prediction.title')}</Title>
         <Text c="dimmed">{t('prediction.subtitle_student')}</Text>
 
-        <SubjectCategoryPicker
-          label={t('prediction.target_subject_label')}
-          placeholder={t('prediction.target_subject_placeholder')}
-          externalGroups={pickerGroups}
-          catalogLoading={catalogLoading}
-          searchMode="global"
-          value={targetSubjectId}
-          onChange={setTargetSubjectId}
-          required
-        />
-
-        {eligibilityLoading && (
-          <Text size="sm" c="dimmed">{t('prediction.checking_eligibility')}</Text>
-        )}
-
-        {eligibility && !eligibility.eligible && (
-          <Alert color="orange" variant="light" title={t('prediction.insufficient_title')}>
-            {eligibility.message}
-            {eligibility.missing_prerequisites.length > 0 && (
+        {!hasFuturePredictionTargets && (
+          <Alert color="blue" variant="light" title={t('prediction.assessment_only_title')}>
+            <Text size="sm">{t('prediction.no_future_subjects')}</Text>
+            {highestCompletedSemester > 0 && (
               <Text size="sm" mt="xs">
-                {t('prediction.missing_prereq', {
-                  list: eligibility.missing_prerequisites.join(', '),
-                })}
+                {t('prediction.latest_completed_semester', { semester: highestCompletedSemester })}
               </Text>
             )}
           </Alert>
         )}
 
-        {eligibility?.eligible && (
-          <Alert color="green" variant="light">
-            {eligibility.message}
-            {eligibility.group_labels.length > 0 && (
-              <Text size="xs" mt={4} c="dimmed">
-                {t('prediction.group_hint', { groups: eligibility.group_labels.join(', ') })}
-              </Text>
+        {hasFuturePredictionTargets && (
+          <>
+            <SubjectCategoryPicker
+              label={t('prediction.target_subject_label')}
+              placeholder={t('prediction.target_subject_placeholder')}
+              externalGroups={predictionGroups}
+              catalogLoading={catalogLoading}
+              searchMode="global"
+              value={targetSubjectId}
+              onChange={setTargetSubjectId}
+              helperText={
+                highestCompletedSemester > 0
+                  ? t('prediction.target_subject_helper', { semester: highestCompletedSemester })
+                  : undefined
+              }
+              required
+            />
+
+            {eligibilityLoading && (
+              <Text size="sm" c="dimmed">{t('prediction.checking_eligibility')}</Text>
             )}
-          </Alert>
+
+            {eligibility && !eligibility.eligible && (
+              <Alert color="orange" variant="light" title={t('prediction.insufficient_title')}>
+                {eligibility.message}
+                {eligibility.missing_prerequisites.length > 0 && (
+                  <Text size="sm" mt="xs">
+                    {t('prediction.missing_prereq', {
+                      list: eligibility.missing_prerequisites.join(', '),
+                    })}
+                  </Text>
+                )}
+              </Alert>
+            )}
+
+            {eligibility?.eligible && (
+              <Alert color="green" variant="light">
+                {eligibility.message}
+                {eligibility.group_labels.length > 0 && (
+                  <Text size="xs" mt={4} c="dimmed">
+                    {t('prediction.group_hint', { groups: eligibility.group_labels.join(', ') })}
+                  </Text>
+                )}
+              </Alert>
+            )}
+
+            <Group>
+              <Button loading={generateLoading} disabled={!canGenerate} onClick={() => void handleGenerate()}>
+                {predictionResult ? t('prediction.regenerate') : t('prediction.generate')}
+              </Button>
+            </Group>
+
+            {generateError && (
+              <Alert color="red" variant="light">
+                {generateError}
+              </Alert>
+            )}
+          </>
         )}
 
-        <Group>
-          <Button loading={generateLoading} disabled={!canGenerate} onClick={() => void handleGenerate()}>
-            {predictionResult ? t('prediction.regenerate') : t('prediction.generate')}
-          </Button>
-        </Group>
-
-        {generateError && (
-          <Alert color="red" variant="light">
-            {generateError}
-          </Alert>
-        )}
-
-        {predictionResult?.target_subject && (
+        {hasFuturePredictionTargets && predictionResult?.target_subject && (
           <Text size="sm" c="dimmed">
             {t('prediction.result_for', { subject: predictionResult.target_subject })}
           </Text>
         )}
 
-        {predictionResult?.just_completed && (
+        {hasFuturePredictionTargets && predictionResult?.just_completed && (
           <Paper withBorder radius="md" p="md">
             <Text size="sm" c="dimmed" mb="xs">{t('prediction.context_exam')}</Text>
             <Group justify="space-between" mb="xs">
@@ -326,7 +425,7 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {predictionResult?.learning_assessment && (
+        {hasFuturePredictionTargets && predictionResult?.learning_assessment && (
           <Paper withBorder radius="md" p="md" bg="teal.0">
             <Text fw={700} mb="md">{t('prediction.assessment_title')}</Text>
             <Stack gap="sm">
@@ -363,13 +462,13 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {!predictionResult?.learning_assessment && predictionResult?.just_completed?.analysis && (
+        {hasFuturePredictionTargets && !predictionResult?.learning_assessment && predictionResult?.just_completed?.analysis && (
           <Alert color="teal" variant="light" title={t('prediction.assessment_remark')}>
             {predictionResult.just_completed.analysis}
           </Alert>
         )}
 
-        {(predictionResult?.learning_assessment?.quantitative || targetPrediction) && (
+        {hasFuturePredictionTargets && (predictionResult?.learning_assessment?.quantitative || targetPrediction) && (
           <Paper withBorder radius="md" p="md">
             <Text fw={600} mb="sm">{t('prediction.forecast_title')}</Text>
             <Group grow>
@@ -442,7 +541,7 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {predictionResult?.improvement && predictionResult.improvement.length > 0 && (
+        {hasFuturePredictionTargets && predictionResult?.improvement && predictionResult.improvement.length > 0 && (
           <Paper withBorder radius="md" p="md">
             <Text fw={600} mb="sm">{t('prediction.improvement_title')}</Text>
             <Stack gap={4}>
@@ -453,7 +552,7 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {predictionResult?.wrong_summary && predictionResult.wrong_summary.length > 0 && (
+        {hasFuturePredictionTargets && predictionResult?.wrong_summary && predictionResult.wrong_summary.length > 0 && (
           <Paper withBorder radius="md" p="md">
             <Text fw={600} mb="sm">{t('prediction.wrong_summary_title')}</Text>
             <Stack gap="xs">
@@ -467,7 +566,7 @@ const Prediction = () => {
           </Paper>
         )}
 
-        {predictionResult?.overall_advice && !predictionResult.learning_assessment && (
+        {hasFuturePredictionTargets && predictionResult?.overall_advice && !predictionResult.learning_assessment && (
           <Alert color="blue" variant="light" title={t('prediction.advice_title')}>
             {predictionResult.overall_advice}
           </Alert>

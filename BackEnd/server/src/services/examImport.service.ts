@@ -788,7 +788,7 @@ export function parseExamImportText(text: string): ExamImportPreview {
   }
   if (chapterDefinitionList.length === 0) {
     errors.unshift(
-      "Thiếu block khai báo chương ở đầu file Word. Bắt buộc thêm dòng dạng: CHUONG 1 : Bien."
+      "Thiếu block khai báo chương ở đầu file Word. Bắt buộc thêm dòng dạng: CHUONG 1 : Biến."
     );
   }
   if (!questions.length && errors.length === 0) {

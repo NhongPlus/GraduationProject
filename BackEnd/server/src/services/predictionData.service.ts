@@ -14,11 +14,60 @@ export type StudentPredictionBuild = {
 };
 
 export type CompletedExamRow = {
+  subject_id: string | null;
   subject: string;
+  semester: number | null;
   score: number;
   grade: string;
   session: ExamSession;
 };
+
+function normalizeName(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSameSubject(row: CompletedExamRow, target: { id: string; name: string }): boolean {
+  return (
+    row.subject_id === target.id ||
+    normalizeName(row.subject) === normalizeName(target.name)
+  );
+}
+
+function assessTargetWindow(
+  rows: CompletedExamRow[],
+  target: { id: string; name: string; semester: number }
+): { allowed: boolean; message?: string } {
+  if (rows.some((row) => isSameSubject(row, target))) {
+    return {
+      allowed: false,
+      message:
+        "Môn này đã hoàn thành. Hệ thống chỉ dự báo cho các môn ở học kỳ sau chưa học.",
+    };
+  }
+
+  const maxCompletedSemester = rows.reduce(
+    (max, row) => (row.semester != null && row.semester > max ? row.semester : max),
+    0
+  );
+  if (
+    target.semester > 0 &&
+    maxCompletedSemester > 0 &&
+    target.semester <= maxCompletedSemester
+  ) {
+    return {
+      allowed: false,
+      message:
+        "Chỉ dự báo cho các môn ở học kỳ sau chưa học. Môn đã chọn không còn thuộc học kỳ tương lai.",
+    };
+  }
+
+  return { allowed: true };
+}
 
 export async function loadStudentCompletedExams(
   studentId: string
@@ -37,11 +86,15 @@ export async function loadStudentCompletedExams(
 
   for (const s of chronological) {
     const exam = await getExamById(s.exam_id);
+    const subjectId = exam?.subject_id ?? null;
+    const subjectMeta = subjectId ? await getSubjectById(subjectId) : null;
     const grade10 = scoreToGrade10(s.score, s.max_points);
     if (grade10 == null) continue;
-    const subject = exam?.subject_name || exam?.title || s.exam_id;
+    const subject = subjectMeta?.name || exam?.subject_name || exam?.title || s.exam_id;
     rows.push({
+      subject_id: subjectId,
       subject,
+      semester: subjectMeta?.semester ?? null,
       score: grade10,
       grade: grade10ToLetter(grade10),
       session: s,
@@ -76,6 +129,19 @@ export async function buildStudentPredictionInput(
   if (!targetSubject) {
     const err = new Error("Không tìm thấy môn cần dự đoán") as Error & { status: number };
     err.status = 404;
+    throw err;
+  }
+
+  const targetWindow = assessTargetWindow(rows, {
+    id: targetSubject.id,
+    name: targetSubject.name,
+    semester: targetSubject.semester,
+  });
+  if (!targetWindow.allowed) {
+    const err = new Error(
+      targetWindow.message ?? "Môn này không còn phù hợp để dự báo."
+    ) as Error & { status: number };
+    err.status = 400;
     throw err;
   }
 
@@ -138,6 +204,24 @@ export async function getStudentEligibility(
       scored_in_group: [] as string[],
       message: "Chưa có bài thi hoàn thành nào.",
     };
+  }
+  if (subject) {
+    const targetWindow = assessTargetWindow(rows, {
+      id: subject.id,
+      name: subject.name,
+      semester: subject.semester,
+    });
+    if (!targetWindow.allowed) {
+      return {
+        eligible: false,
+        target_subject: subject.name,
+        target_id: resolveSubjectId(subject.name),
+        group_labels: [] as string[],
+        missing_prerequisites: [] as string[],
+        scored_in_group: [] as string[],
+        message: targetWindow.message ?? "Môn này không còn phù hợp để dự báo.",
+      };
+    }
   }
   return assessPredictionEligibility(
     targetSubjectId,

@@ -289,13 +289,16 @@ export function assessTargetEligibility(
   }
 
   const hasContextInGroup = scoredInGroup.length > 0;
-  const eligible = missing.length === 0 && hasContextInGroup;
+  const hasAnyCompleted = completedSubjectNames.length > 0;
+  const eligible = missing.length === 0 && hasAnyCompleted;
 
   let message = "";
   if (missing.length > 0) {
     message = `Chưa đủ dữ kiện: cần điểm các môn tiên quyết trong nhóm (${groupLabels.join(", ")}): ${missing.join(", ")}.`;
+  } else if (!hasAnyCompleted) {
+    message = "Chưa có bài thi hoàn thành nào.";
   } else if (!hasContextInGroup) {
-    message = `Chưa đủ dữ kiện: cần hoàn thành ít nhất một bài thi môn cùng nhóm (${groupLabels.join(", ")}) trước khi dự đoán.`;
+    message = `Đủ dữ liệu để dự báo (chưa có môn cùng nhóm ${groupLabels.join(", ")} — kết quả mang tính tham khảo).`;
   } else {
     message = "Đủ dữ kiện để dự đoán.";
   }

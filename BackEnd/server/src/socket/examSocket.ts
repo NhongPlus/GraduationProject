@@ -153,7 +153,7 @@ async function finalizeExamRuntime(io: Server, state: ExamRuntimeState): Promise
     const summary = await forceSubmitActiveSessionsByExamService(examId);
     io.to(roomForExam(examId)).emit("exam:force_submit", {
       examId,
-      message: "Het gio lam bai. He thong da tu dong nop bai tren server.",
+      message: "Hết giờ làm bài. Hệ thống đã tự động nộp bài trên server.",
       at: new Date().toISOString(),
       summary,
     });
@@ -168,7 +168,7 @@ async function finalizeExamRuntime(io: Server, state: ExamRuntimeState): Promise
     console.error(`[socket] force-submit runtime failed exam=${examId}`, error);
     io.to(roomForExam(examId)).emit("exam:force_submit", {
       examId,
-      message: "Het gio lam bai. He thong yeu cau nop bai ngay.",
+      message: "Hết giờ làm bài. Hệ thống yêu cầu nộp bài ngay.",
       at: new Date().toISOString(),
     });
   } finally {
@@ -206,7 +206,7 @@ function startExamRuntime(
   state.final15Timer = setTimeout(() => {
     io.to(roomForExam(examId)).emit("exam:final_15m", {
       examId,
-      message: "Con 15 phut de hoan tat bai thi.",
+      message: "Còn 15 phút để hoàn tất bài thi.",
       at: new Date().toISOString(),
     });
     void notifyEnrolledStudents(examId, "Còn 15 phút!", "Bài thi sắp kết thúc. Vui lòng hoàn thành ngay.", "warning");
@@ -495,17 +495,17 @@ export function registerExamSocket(io: Server): void {
       "exam:start",
       async (payload: { examId?: string }) => {
         if (role !== "admin" && role !== "teacher") {
-          socket.emit("exam:error", { code: "FORBIDDEN", message: "Chi admin hoac teacher" });
+          socket.emit("exam:error", { code: "FORBIDDEN", message: "Chỉ admin hoặc teacher" });
           return;
         }
         const examId = payload?.examId;
         if (!examId || typeof examId !== "string") {
-          socket.emit("exam:error", { code: "BAD_EXAM_ID", message: "examId (string) bat buoc" });
+          socket.emit("exam:error", { code: "BAD_EXAM_ID", message: "examId (string) bắt buộc" });
           return;
         }
         const exam = await getExamById(examId);
         if (!exam) {
-          socket.emit("exam:error", { code: "NOT_FOUND", message: "Khong tim thay bai thi" });
+          socket.emit("exam:error", { code: "NOT_FOUND", message: "Không tìm thấy bài thi" });
           return;
         }
         const durationMin = sanitizeDuration(exam.duration_min);
@@ -566,7 +566,7 @@ export function emitForceSubmitNotification(examId: string, summary: {
   if (!ioInstance) return;
   ioInstance.to(roomForExam(examId)).emit("exam:force_submit", {
     examId,
-    message: "Giang vien da force-submit. He thong da nop bai tren server.",
+    message: "Giảng viên đã force-submit. Hệ thống đã nộp bài trên server.",
     at: new Date().toISOString(),
     summary,
   });
@@ -633,7 +633,7 @@ export async function startExamRuntimeFromServer(
 
   const exam = await getExamById(examId);
   if (!exam) {
-    throw new Error("Khong tim thay bai thi");
+    throw new Error("Không tìm thấy bài thi");
   }
 
   const durationMin = sanitizeDuration(exam.duration_min);
@@ -643,15 +643,15 @@ export async function startExamRuntimeFromServer(
 
   if (mode === "scheduled") {
     if (!exam.opens_at || !exam.ends_at) {
-      throw new Error("Bai thi chua dat lich opens_at/ends_at");
+      throw new Error("Bài thi chưa đặt lịch opens_at/ends_at");
     }
     const opensMs = new Date(exam.opens_at).getTime();
     const endsMs = new Date(exam.ends_at).getTime();
     if (!Number.isFinite(opensMs) || !Number.isFinite(endsMs) || opensMs >= endsMs) {
-      throw new Error("Lich thi khong hop le");
+      throw new Error("Lịch thi không hợp lệ");
     }
     if (endsMs <= nowMs) {
-      throw new Error("Bai thi da het gio ket thuc");
+      throw new Error("Bài thi đã hết giờ kết thúc");
     }
     const windowMin = Math.max(1, Math.ceil((endsMs - opensMs) / 60_000));
     state = startExamRuntime(ioInstance, examId, windowMin, {
@@ -661,7 +661,7 @@ export async function startExamRuntimeFromServer(
   } else {
     const endAt = exam.ends_at ? new Date(exam.ends_at).getTime() : null;
     if (endAt != null && Number.isFinite(endAt) && endAt <= nowMs) {
-      throw new Error("Bai thi da het gio ket thuc");
+      throw new Error("Bài thi đã hết giờ kết thúc");
     }
     state = startExamRuntime(ioInstance, examId, durationMin);
   }

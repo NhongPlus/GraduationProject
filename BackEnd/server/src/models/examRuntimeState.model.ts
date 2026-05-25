@@ -110,7 +110,7 @@ export const restoreExamRuntimes = async (
       state.final15Timer = setTimeout(() => {
         io.to(`exam:${runtime.exam_id}`).emit("exam:final_15m", {
           examId: runtime.exam_id,
-          message: "Con 15 phut de hoan tat bai thi.",
+          message: "Còn 15 phút để hoàn tất bài thi.",
           at: new Date().toISOString(),
         });
       }, msUntilFinal15);
@@ -119,7 +119,7 @@ export const restoreExamRuntimes = async (
     state.endTimer = setTimeout(async () => {
       io.to(`exam:${runtime.exam_id}`).emit("exam:force_submit", {
         examId: runtime.exam_id,
-        message: "Het gio lam bai. He thong da tu dong nop bai tren server.",
+        message: "Hết giờ làm bài. Hệ thống đã tự động nộp bài trên server.",
         at: new Date().toISOString(),
       });
       await saveExamRuntimeEnd(runtime.exam_id);

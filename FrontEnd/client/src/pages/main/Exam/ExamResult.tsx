@@ -22,6 +22,23 @@ import {
 } from './examResultDisplay';
 import { formatScoreScale10Pair, scoreToPointPercent } from '@/utils/formatExamScore';
 
+function formatLearningSummaryMode(
+  mode: 'full_wrong_details' | 'chapter_samples' | 'summary_only' | 'all_wrong_summary'
+) {
+  switch (mode) {
+    case 'full_wrong_details':
+      return 'Chi tiết toàn bộ câu sai';
+    case 'chapter_samples':
+      return 'Mẫu câu sai theo chương';
+    case 'summary_only':
+      return 'Tóm tắt tổng hợp';
+    case 'all_wrong_summary':
+      return 'Tóm tắt toàn bộ câu sai';
+    default:
+      return mode;
+  }
+}
+
 const ExamResult = () => {
   const { t } = useTranslation();
   const { examId } = useParams<{ examId: string }>();
@@ -230,11 +247,11 @@ const ExamResult = () => {
           <Paper withBorder radius="md" p="md">
             <Stack gap="sm">
               <Box>
-                <Text fw={600}>Danh gia hoc tap theo chuong</Text>
+                <Text fw={600}>Đánh giá học tập theo chương</Text>
                 <Text size="sm" c="dimmed">
-                  Sai {learningSummary.wrong_count}/{learningSummary.total_questions} cau (
-                  {Math.round(learningSummary.wrong_rate * 100)}%). Che do payload AI:{' '}
-                  <strong>{learningSummary.mode}</strong>
+                  Sai {learningSummary.wrong_count}/{learningSummary.total_questions} câu (
+                  {Math.round(learningSummary.wrong_rate * 100)}%). Chế độ tổng hợp AI:{' '}
+                  <strong>{formatLearningSummaryMode(learningSummary.mode)}</strong>
                 </Text>
               </Box>
 
@@ -245,17 +262,17 @@ const ExamResult = () => {
                       <Box>
                         <Text fw={600}>
                           {chapter.chapter_label
-                            ? `Chuong ${chapter.chapter ?? 0}: ${chapter.chapter_label}`
-                            : `Chuong ${chapter.chapter ?? 0}`}
+                            ? `Chương ${chapter.chapter ?? 0}: ${chapter.chapter_label}`
+                            : `Chương ${chapter.chapter ?? 0}`}
                         </Text>
                         <Text size="sm" c="dimmed">
-                          Sai {chapter.wrong}/{chapter.total} cau ({Math.round(chapter.wrong_rate * 100)}%)
+                          Sai {chapter.wrong}/{chapter.total} câu ({Math.round(chapter.wrong_rate * 100)}%)
                         </Text>
                       </Box>
                       <Group gap="xs">
-                        <Badge color="green" variant="light">De: {chapter.easy_wrong}</Badge>
-                        <Badge color="yellow" variant="light">TB: {chapter.medium_wrong}</Badge>
-                        <Badge color="red" variant="light">Kho: {chapter.hard_wrong}</Badge>
+                        <Badge color="green" variant="light">Dễ: {chapter.easy_wrong}</Badge>
+                        <Badge color="yellow" variant="light">Trung bình: {chapter.medium_wrong}</Badge>
+                        <Badge color="red" variant="light">Khó: {chapter.hard_wrong}</Badge>
                       </Group>
                     </Group>
                   </Paper>
@@ -264,18 +281,18 @@ const ExamResult = () => {
 
               {learningSummary.representative_wrong_items.length > 0 && (
                 <Box>
-                  <Text fw={500} mb="xs">Cau sai dai dien</Text>
+                  <Text fw={500} mb="xs">Câu sai đại diện</Text>
                   <Stack gap="xs">
                     {learningSummary.representative_wrong_items.map((item) => (
                       <Paper key={`${item.q}-${item.chapter ?? 0}-${item.stem.slice(0, 16)}`} withBorder radius="md" p="sm">
                         <Text size="sm" fw={500}>
-                          Cau {item.q}
+                          Câu {item.q}
                           {item.chapter_label ? ` - ${item.chapter_label}` : ''}
                         </Text>
                         <Text size="sm" c="dimmed">{item.stem}</Text>
                         {item.explanation_short && (
                           <Text size="xs" mt={4}>
-                            Goi y: {item.explanation_short}
+                            Gợi ý: {item.explanation_short}
                           </Text>
                         )}
                       </Paper>

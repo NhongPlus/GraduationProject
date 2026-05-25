@@ -42,7 +42,8 @@ const GradingList = () => {
                   exam_title: exam.title,
                   session_id: session.id,
                   student_id: session.student_id,
-                  student_name: session.full_name || session.email || null,
+                  student_name:
+                    session.student_name || session.full_name || session.student_email || session.email || null,
                   status: session.status,
                   grading_status: session.grading_status ?? 'complete',
                   submitted_at: session.submitted_at ?? session.finished_at ?? null,

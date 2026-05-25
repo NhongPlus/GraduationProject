@@ -105,6 +105,7 @@ export type SubjectPickerCatalogGroup = {
     name: string;
     code: string;
     credits: number;
+    semester: number;
     model_subject_id: string | null;
     prerequisite_ids?: string[];
     prerequisite_names?: string[];

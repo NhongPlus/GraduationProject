@@ -324,6 +324,7 @@ export async function getSubjectPickerCatalog(programId?: string) {
       name: s.name,
       code: s.code,
       credits: s.credits,
+      semester: s.semester,
       model_subject_id: s.model_subject_id,
       prerequisite_ids: s.prerequisite_ids,
       prerequisite_names: s.prerequisite_names,

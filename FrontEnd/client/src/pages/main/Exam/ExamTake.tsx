@@ -333,7 +333,7 @@ const ExamTake = () => {
 
   const applyServerForceSubmit = useCallback(
     (payload?: ForceSubmitPayload) => {
-      const serverMessage = payload?.message?.trim() || 'He thong da tu dong nop bai tren server.';
+      const serverMessage = payload?.message?.trim() || 'Hệ thống đã tự động nộp bài trên server.';
 
       const summary = payload?.summary;
       if (summary) {
@@ -362,7 +362,7 @@ const ExamTake = () => {
       if (autoSubmitted || submitting) return;
       if (!sessionId) {
         setSubmitFailed(false);
-        setRealtimeMessage('He thong dang khoi tao phien thi. Vui long thu lai sau vai giay.');
+        setRealtimeMessage('Hệ thống đang khởi tạo phiên thi. Vui lòng thử lại sau vài giây.');
         return;
       }
 
@@ -379,8 +379,8 @@ const ExamTake = () => {
 
         setRealtimeMessage(
           source === 'auto'
-            ? 'He thong da nop bai tu dong thanh cong.'
-            : 'Nop bai thanh cong.'
+            ? 'Hệ thống đã nộp bài tự động thành công.'
+            : 'Nộp bài thành công.'
         );
         setServerForceSummaryText('');
       } catch (error: unknown) {
@@ -388,11 +388,11 @@ const ExamTake = () => {
         const responseStatus = (error as ErrorWithStatus)?.response?.status;
         if (source === 'auto' && (responseStatus === 400 || responseStatus === 409)) {
           setSubmitFailed(false);
-          setRealtimeMessage('Phien thi da duoc he thong ket thuc va nop bai tren server.');
+          setRealtimeMessage('Phiên thi đã được hệ thống kết thúc và nộp bài trên server.');
           setServerForceSummaryText('');
         } else {
           setSubmitFailed(true);
-          setRealtimeMessage('Khong the nop bai len server. Vui long lien he giam thi.');
+          setRealtimeMessage('Không thể nộp bài lên server. Vui lòng liên hệ giám thị.');
           setServerForceSummaryText('');
         }
       } finally {
@@ -423,7 +423,7 @@ const ExamTake = () => {
     try {
       const startData = await examApi.startSession(activeExamId);
       if (!startData.questions?.length) {
-        throw new Error('Khong co cau hoi cho ma de nay');
+        throw new Error('Không có câu hỏi cho mã đề này');
       }
 
       const { questions: sessionQuestions, idMap } = mapSessionQuestionsToUi(startData.questions);
@@ -450,7 +450,7 @@ const ExamTake = () => {
       setExamStarted(true);
       setBootError('');
     } catch {
-      setBootError('Khong the khoi tao phien thi.');
+      setBootError('Không thể khởi tạo phiên thi.');
       setExamStarted(false);
     } finally {
       sessionStartingRef.current = false;
@@ -503,7 +503,7 @@ const ExamTake = () => {
   const forceAutoSubmit = useCallback(() => {
     if (autoSubmitted || submitting) return;
     if (!sessionId) {
-      setRealtimeMessage('He thong dang khoi tao phien thi, chua the tu dong nop bai.');
+      setRealtimeMessage('Hệ thống đang khởi tạo phiên thi, chưa thể tự động nộp bài.');
       return;
     }
     void submitCurrentSession('auto');
@@ -768,7 +768,7 @@ const ExamTake = () => {
         const examData = await examApi.getExam(activeExamId);
         if (canceled) return;
 
-        setExamTitle(examData.title || 'Bai thi');
+        setExamTitle(examData.title || 'Bài thi');
         setExamSection(examData.subject_name || examData.description || '');
         setQuestions([]);
         setQuestionIdByNumber({});

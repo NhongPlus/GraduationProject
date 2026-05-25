@@ -91,14 +91,13 @@ export async function assessPredictionEligibility(
           .filter((l): l is string => Boolean(l));
 
     const hasContext = scoredInGroup.length > 0;
-    const eligible = missing.length === 0 && hasContext;
+    const eligible = missing.length === 0 && completedSubjectNames.length > 0;
 
     let message = "";
     if (missing.length > 0) {
       message = `Chưa đủ dữ kiện: cần hoàn thành môn tiên quyết: ${missing.join(", ")}.`;
     } else if (!hasContext) {
-      message =
-        "Chưa đủ dữ kiện: cần ít nhất một bài thi môn cùng nhóm hoặc môn tiên quyết trên hệ thống.";
+      message = "Đủ dữ liệu để dự báo (chưa có môn cùng nhóm — kết quả mang tính tham khảo).";
     } else {
       message = "Đủ dữ liệu để đánh giá học lực và dự báo điểm.";
     }

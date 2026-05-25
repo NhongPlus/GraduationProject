@@ -388,7 +388,7 @@ describe('useExamTakeState', () => {
     }
 
     const header: ExamTakeHeaderProps = {
-      title: 'Bai thi',
+      title: 'Bài thi',
       section: 'Programming 101',
       remainingLabel: '01 : 30 : 00',
       onSubmit: () => {},

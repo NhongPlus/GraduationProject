@@ -5,7 +5,7 @@ import { readDraftAnswers } from '@/services/examAutosaveClient';
 export function useExamTakeState(activeExamId: string) {
   const [questions, setQuestions] = useState<MockExamQuestion[]>([]);
   const [questionIdByNumber, setQuestionIdByNumber] = useState<Record<number, string>>({});
-  const [examTitle, setExamTitle] = useState('Bai thi');
+  const [examTitle, setExamTitle] = useState('Bài thi');
   const [examSection, setExamSection] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [bootLoading, setBootLoading] = useState(true);

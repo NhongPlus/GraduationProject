@@ -180,24 +180,24 @@ def build_media_zip() -> None:
 
 
 def build_readme() -> str:
-    return f"""BO MAU IMPORT DE THI
+    return f"""BỘ MẪU IMPORT ĐỀ THI
 
-File dinh kem:
+File đính kèm:
 1. exam_template_GiaoVien.docx
 2. exam_template_media_samples.zip
 
-Cach test nhanh:
-- Mo file Word mau va import len he thong
-- Neu co media, chon them file ZIP media mau di kem
-- He thong se tu doi chieu:
+Cách test nhanh:
+- Mở file Word mẫu và import lên hệ thống
+- Nếu có media, chọn thêm file ZIP media mẫu đi kèm
+- Hệ thống sẽ tự đối chiếu:
   * [ANH:{IMAGE_NAME}]
   * [AUDIO:{AUDIO_NAME}]
   * [VIDEO:{VIDEO_NAME}]
 
-Luu y:
-- Ten file trong ZIP phai khop voi the trong Word
-- He thong khong phan biet hoa/thuong va bo qua thu muc con
-- Space / "-" / "_" duoc coi la tuong duong khi doi chieu
+Lưu ý:
+- Tên file trong ZIP phải khớp với thẻ trong Word
+- Hệ thống không phân biệt hoa/thường và bỏ qua thư mục con
+- Space / "-" / "_" được coi là tương đương khi đối chiếu
 """
 
 

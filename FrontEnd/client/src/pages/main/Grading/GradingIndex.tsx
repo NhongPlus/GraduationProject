@@ -80,7 +80,8 @@ const GradingIndex = () => {
       const examMeta = exams[session.exam_id];
       const subjectName = examMeta?.subject_name ?? null;
       const examTitle = examMeta?.title ?? session.exam_id;
-      const studentName = session.full_name || session.email || session.student_id;
+      const studentName =
+        session.student_name || session.full_name || session.student_email || session.email || session.student_id;
       const submittedAt = session.submitted_at || session.finished_at || null;
 
       const matchesKeyword = !keywordLower
@@ -212,7 +213,7 @@ const GradingIndex = () => {
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm">
-                        {session.full_name || session.email || session.student_id}
+                        {session.student_name || session.full_name || session.student_email || session.email || session.student_id}
                       </Text>
                     </Table.Td>
                     <Table.Td>

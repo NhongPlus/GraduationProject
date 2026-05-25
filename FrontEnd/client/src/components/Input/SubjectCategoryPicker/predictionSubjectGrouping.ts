@@ -12,6 +12,7 @@ export type SubjectPickerCatalogGroupDto = {
     name: string;
     code: string;
     credits: number;
+    semester: number;
     model_subject_id: string | null;
   }>;
 };
@@ -28,7 +29,7 @@ export function catalogToPickerGroups(
         name: s.name,
         code: s.code,
         credits: s.credits,
-        semester: 0,
+        semester: s.semester,
         category: g.id,
         is_active: true,
         created_at: '',
