@@ -5,8 +5,8 @@
  * Output:     { predicted_score, percentile, vs_class_avg, weak_subjects, ... }
  *
  * Thuật toán:
- *   predicted = intercept + gpa_coeff * gpa
- *             + Σ feature_coeff_i * score_of_feature_i (impute mean nếu thiếu)
+ *   predicted = intercept + Σ feature_coeff_i * score_of_feature_i
+ *   (impute mean lớp nếu thiếu điểm feature)
  *
  * Trọng số được nạp 1 lần (singleton) từ src/data/model_weights.json
  * — file do scripts/train-grade-predictor.ts sinh ra.
@@ -22,7 +22,7 @@ export interface SubjectModel {
   feature_names: string[];
   feature_groups: string[][];
   uses_gpa: boolean;
-  coeffs: number[]; // [gpa_coeff, feature_1_coeff, feature_2_coeff, ...]
+  coeffs: number[]; // [feature_1_coeff, feature_2_coeff, ...] hoặc tương thích cũ nếu uses_gpa=true
   intercept: number;
   r2: number;
   n_train: number;
@@ -67,7 +67,7 @@ export interface ModelWeightsFile {
 
 // ============== Input/Output API ==============
 export interface PredictInput {
-  /** GPA của SV. Nếu không có, sẽ tự tính từ scores. */
+  /** Giữ tương thích API cũ; model hiện tại không bắt buộc dùng GPA. */
   gpa?: number;
   /** Bảng điểm đã có của SV: { subject_id: score }. Điểm 0 hoặc thiếu coi như chưa học. */
   scores: Record<string, number>;
@@ -248,47 +248,29 @@ export function predictGrade(input: PredictInput): PredictOutput {
     throw new Error(`Không có dữ liệu meta cho môn ${input.subject_id}`);
   }
 
-  const gpa =
-    typeof input.gpa === "number" && input.gpa > 0
-      ? input.gpa
-      : gpaFromScores(input.scores);
-
   const { weak: weakGroups, strong: strongGroups } = analyzeGroups(
     input.scores,
     model
   );
 
-  // Fallback khi không train được model cho môn này → trả về class avg + GPA shift
   if (!subjectModel) {
-    notes.push(
-      `Môn ${input.subject_id} chưa có model riêng (thiếu dữ liệu lịch sử). Dùng ĐTB lớp + điều chỉnh theo GPA.`
+    throw new Error(
+      `Môn ${input.subject_id} chưa có đủ feature hợp lệ theo nhóm/học kỳ để tạo model dự báo.`
     );
-    const adj = (gpa - model.global_stats.overall_mean) * 0.5;
-    const predicted = clamp(subjectMeta.mean + adj, 0, 10);
-    const z = subjectMeta.std > 0 ? (predicted - subjectMeta.mean) / subjectMeta.std : 0;
-    return {
-      subject_id: input.subject_id,
-      subject_name: subjectMeta.name,
-      subject_groups: subjectMeta.groups,
-      predicted_score: +predicted.toFixed(2),
-      predicted_grade: scoreToGrade(predicted),
-      class_avg: subjectMeta.mean,
-      class_std: subjectMeta.std,
-      vs_class_avg: +(predicted - subjectMeta.mean).toFixed(2),
-      percentile: Math.round(normalCdf(z) * 100),
-      confidence: 0.2,
-      features_used: [],
-      weak_subjects: [],
-      weak_groups: weakGroups,
-      strong_groups: strongGroups,
-      model_r2: 0,
-      notes,
-    };
   }
 
   // ---- Áp công thức hồi quy ----
-  const gpaCoeff = subjectModel.coeffs[0];
-  let predicted = subjectModel.intercept + gpaCoeff * gpa;
+  const gpa =
+    typeof input.gpa === "number" && input.gpa > 0
+      ? input.gpa
+      : gpaFromScores(input.scores);
+  let predicted = subjectModel.intercept;
+  let coeffOffset = 0;
+  if (subjectModel.uses_gpa) {
+    const gpaCoeff = subjectModel.coeffs[0] ?? 0;
+    predicted += gpaCoeff * gpa;
+    coeffOffset = 1;
+  }
 
   const featuresUsed: PredictOutput["features_used"] = [];
   const weakSubjects: PredictOutput["weak_subjects"] = [];
@@ -296,7 +278,7 @@ export function predictGrade(input: PredictInput): PredictOutput {
 
   for (let i = 0; i < subjectModel.features.length; i++) {
     const fid = subjectModel.features[i];
-    const fCoeff = subjectModel.coeffs[i + 1]; // +1 vì index 0 là gpa
+    const fCoeff = subjectModel.coeffs[i + coeffOffset] ?? 0;
     const fMeta = model.subject_meta[fid];
     const fGroups = subjectModel.feature_groups[i] ?? [];
     const studentScore = input.scores[fid];

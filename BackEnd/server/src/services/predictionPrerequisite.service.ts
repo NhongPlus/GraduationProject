@@ -3,6 +3,7 @@ import { expandPrerequisites } from "~/services/subjectPrerequisite.service";
 import {
   assessTargetEligibility as assessByModelName,
   getGroupsForSubject,
+  hasPredictionModel,
   loadGroupsFile,
   resolveSubjectId,
   subjectInSameGroupAsTarget,
@@ -89,6 +90,19 @@ export async function assessPredictionEligibility(
       : getGroupsForSubject(subject.name)
           .map((gid) => loadGroupsFile().groups[gid]?.label)
           .filter((l): l is string => Boolean(l));
+
+    if (!modelId || !hasPredictionModel(modelId)) {
+      return {
+        eligible: false,
+        target_subject: subject.name,
+        target_id: modelId,
+        group_labels: groupLabels,
+        missing_prerequisites: [],
+        scored_in_group: scoredInGroup,
+        message:
+          "Môn này hiện chưa có đủ feature hợp lệ theo nhóm/học kỳ để tạo model dự báo điểm.",
+      };
+    }
 
     const hasContext = scoredInGroup.length > 0;
     const eligible = missing.length === 0 && completedSubjectNames.length > 0;

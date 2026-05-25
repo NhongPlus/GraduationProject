@@ -36,6 +36,13 @@ function dedupeSubjectsById(list: SubjectDto[]): SubjectDto[] {
   return out;
 }
 
+function formatChapterLabel(chapter?: number | null, chapterLabel?: string | null): string {
+  if (chapterLabel && typeof chapter === 'number') return `Chương ${chapter} - ${chapterLabel}`;
+  if (chapterLabel) return chapterLabel;
+  if (typeof chapter === 'number') return `Chương ${chapter}`;
+  return 'Chưa gán chương';
+}
+
 const Prediction = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -79,6 +86,26 @@ const Prediction = () => {
     return maxSemester;
   }, [flatSubjects, pastGrades]);
 
+  const hiddenUnavailablePredictionCount = useMemo(
+    () =>
+      pickerGroups.reduce(
+        (count, group) =>
+          count +
+          group.subjects.filter((subject) => {
+            const alreadyCompleted =
+              completedSubjectIds.has(subject.id) || completedSubjectNames.has(normalizeName(subject.name));
+            if (alreadyCompleted) return false;
+            if (subject.has_prediction_model !== false) return false;
+            if (highestCompletedSemester > 0 && subject.semester > 0) {
+              return subject.semester > highestCompletedSemester;
+            }
+            return true;
+          }).length,
+        0
+      ),
+    [completedSubjectIds, completedSubjectNames, highestCompletedSemester, pickerGroups]
+  );
+
   const predictionGroups = useMemo(
     () =>
       pickerGroups
@@ -88,6 +115,7 @@ const Prediction = () => {
             const alreadyCompleted =
               completedSubjectIds.has(subject.id) || completedSubjectNames.has(normalizeName(subject.name));
             if (alreadyCompleted) return false;
+            if (subject.has_prediction_model === false) return false;
             if (highestCompletedSemester > 0 && subject.semester > 0) {
               return subject.semester > highestCompletedSemester;
             }
@@ -343,11 +371,22 @@ const Prediction = () => {
                 {t('prediction.latest_completed_semester', { semester: highestCompletedSemester })}
               </Text>
             )}
+            {hiddenUnavailablePredictionCount > 0 && (
+              <Text size="sm" mt="xs">
+                {`Đã ẩn ${hiddenUnavailablePredictionCount} môn chưa có model dự báo điểm hợp lệ.`}
+              </Text>
+            )}
           </Alert>
         )}
 
         {hasFuturePredictionTargets && (
           <>
+            {hiddenUnavailablePredictionCount > 0 && (
+              <Alert color="blue" variant="light">
+                {`Danh sách dưới đây đã ẩn ${hiddenUnavailablePredictionCount} môn chưa có model dự báo điểm hợp lệ.`}
+              </Alert>
+            )}
+
             <SubjectCategoryPicker
               label={t('prediction.target_subject_label')}
               placeholder={t('prediction.target_subject_placeholder')}
@@ -496,7 +535,7 @@ const Prediction = () => {
                   />
                 )}
               </Paper>
-              {predictionResult.learning_assessment?.quantitative && (
+              {predictionResult?.learning_assessment?.quantitative && (
                 <Paper withBorder radius="md" p="md">
                   <Text size="sm" c="dimmed">{t('prediction.class_avg_label')}</Text>
                   <Text fw={700} size="xl">
@@ -508,7 +547,7 @@ const Prediction = () => {
                   </Text>
                 </Paper>
               )}
-              {targetPrediction && !predictionResult.learning_assessment?.quantitative && (
+              {targetPrediction && !predictionResult?.learning_assessment?.quantitative && (
                 <Paper withBorder radius="md" p="md">
                   <Text size="sm" c="dimmed">{t('prediction.readiness')}</Text>
                   <Text fw={700} size="xl">
@@ -552,6 +591,24 @@ const Prediction = () => {
           </Paper>
         )}
 
+        {hasFuturePredictionTargets && predictionResult?.weak_chapters && predictionResult.weak_chapters.length > 0 && (
+          <Paper withBorder radius="md" p="md">
+            <Text fw={600} mb="sm">Chủ điểm cần ôn từ bài thi gần nhất</Text>
+            <Stack gap="xs">
+              {predictionResult.weak_chapters.map((item, i) => (
+                <Box key={`${item.label}-${i}`}>
+                  <Text size="sm" fw={500}>
+                    {item.label}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    {`Sai ${item.wrong_count} câu: ${item.question_numbers.map((q) => `Câu ${q}`).join(', ')}`}
+                  </Text>
+                </Box>
+              ))}
+            </Stack>
+          </Paper>
+        )}
+
         {hasFuturePredictionTargets && predictionResult?.wrong_summary && predictionResult.wrong_summary.length > 0 && (
           <Paper withBorder radius="md" p="md">
             <Text fw={600} mb="sm">{t('prediction.wrong_summary_title')}</Text>
@@ -559,6 +616,9 @@ const Prediction = () => {
               {predictionResult.wrong_summary.map((w) => (
                 <Box key={w.q}>
                   <Text size="sm" fw={500}>{t('prediction.wrong_item', { q: w.q })}</Text>
+                  <Text size="xs" c="dimmed">
+                    {formatChapterLabel(w.chapter, w.chapter_label)}
+                  </Text>
                   <Text size="sm" c="dimmed">{w.stem}</Text>
                 </Box>
               ))}

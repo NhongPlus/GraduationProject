@@ -65,7 +65,11 @@ export async function recomputePredictionsForAllStudents(): Promise<RecomputeSum
       const result = await runWithPredictionAiSlot(() =>
         predictScore(built.request, { wrong_items: wrongItems })
       );
-      await upsertPredictionCache(u.id, result);
+      await upsertPredictionCache(u.id, {
+        ...result,
+        target_subject: targetRow.name,
+        target_subject_id: targetRow.id,
+      });
       summary.computed += 1;
     } catch (e: unknown) {
       summary.failed += 1;

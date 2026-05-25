@@ -14,6 +14,7 @@ export type SubjectPickerCatalogGroupDto = {
     credits: number;
     semester: number;
     model_subject_id: string | null;
+    has_prediction_model?: boolean;
   }>;
 };
 
@@ -30,6 +31,7 @@ export function catalogToPickerGroups(
         code: s.code,
         credits: s.credits,
         semester: s.semester,
+        has_prediction_model: s.has_prediction_model ?? false,
         category: g.id,
         is_active: true,
         created_at: '',

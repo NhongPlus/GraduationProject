@@ -22,6 +22,12 @@ export interface SubjectNameEntry {
 
 let groupsCache: SubjectGroupsFile | null = null;
 let nameToIdCache: Map<string, string> | null = null;
+let modelIdsCache: Set<string> | null = null;
+
+type ModelWeightsIndex = {
+  subject_meta: Record<string, { name: string }>;
+  models?: Record<string, unknown>;
+};
 
 function normalizeName(s: string): string {
   return s
@@ -47,20 +53,23 @@ export function loadGroupsFile(): SubjectGroupsFile {
   throw new Error("subject_groups.json không tìm thấy");
 }
 
-/** Nạp map tên môn → Sxx từ model_weights.json */
-export function loadSubjectNameIndex(): Map<string, string> {
-  if (nameToIdCache) return nameToIdCache;
+function loadModelWeightsIndex(): ModelWeightsIndex {
   const candidates = [
     path.resolve(__dirname, "../data/model_weights.json"),
     path.resolve(__dirname, "../../src/data/model_weights.json"),
   ];
-  let raw: { subject_meta: Record<string, { name: string }> } | null = null;
   for (const p of candidates) {
     if (fs.existsSync(p)) {
-      raw = JSON.parse(fs.readFileSync(p, "utf-8"));
-      break;
+      return JSON.parse(fs.readFileSync(p, "utf-8")) as ModelWeightsIndex;
     }
   }
+  return { subject_meta: {}, models: {} };
+}
+
+/** Nạp map tên môn → Sxx từ model_weights.json */
+export function loadSubjectNameIndex(): Map<string, string> {
+  if (nameToIdCache) return nameToIdCache;
+  const raw = loadModelWeightsIndex();
   const map = new Map<string, string>();
   if (raw?.subject_meta) {
     for (const [id, meta] of Object.entries(raw.subject_meta)) {
@@ -70,6 +79,15 @@ export function loadSubjectNameIndex(): Map<string, string> {
   }
   nameToIdCache = map;
   return map;
+}
+
+export function hasPredictionModel(subjectId: string): boolean {
+  if (!subjectId?.trim()) return false;
+  if (!modelIdsCache) {
+    const raw = loadModelWeightsIndex();
+    modelIdsCache = new Set(Object.keys(raw.models ?? {}));
+  }
+  return modelIdsCache.has(subjectId);
 }
 
 export function resolveSubjectId(subjectLabel: string): string | null {
@@ -167,7 +185,9 @@ export function getPredictionTargets(
 
     if (g.ordered) {
       for (const nid of nextOrderedInGroup(gid, completedId)) {
-        if (!historyHasSubject(completedSet, nid)) targetIds.add(nid);
+        if (!historyHasSubject(completedSet, nid) && hasPredictionModel(nid)) {
+          targetIds.add(nid);
+        }
       }
       continue;
     }
@@ -175,6 +195,7 @@ export function getPredictionTargets(
     for (const sid of g.subjects) {
       if (sid === completedId) continue;
       if (historyHasSubject(completedSet, sid)) continue;
+      if (!hasPredictionModel(sid)) continue;
       targetIds.add(sid);
     }
   }
@@ -288,6 +309,20 @@ export function assessTargetEligibility(
     }
   }
 
+  const predictionAvailable = hasPredictionModel(targetId);
+  if (!predictionAvailable) {
+    return {
+      eligible: false,
+      target_subject: targetSubjectName,
+      target_id: targetId,
+      group_labels: groupLabels,
+      missing_prerequisites: [],
+      scored_in_group: scoredInGroup,
+      message:
+        "Môn này hiện chưa có đủ feature hợp lệ theo nhóm/học kỳ để tạo model dự báo điểm.",
+    };
+  }
+
   const hasContextInGroup = scoredInGroup.length > 0;
   const hasAnyCompleted = completedSubjectNames.length > 0;
   const eligible = missing.length === 0 && hasAnyCompleted;
@@ -377,4 +412,5 @@ export function subjectInSameGroupAsTarget(
 export function resetSubjectGroupsCache(): void {
   groupsCache = null;
   nameToIdCache = null;
+  modelIdsCache = null;
 }

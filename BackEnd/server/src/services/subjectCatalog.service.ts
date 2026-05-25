@@ -1,6 +1,6 @@
 import pool from "~/config/db";
 import { getSubjectGroupsByProgram } from "~/models/subjectGroup.model";
-import { resolveSubjectId } from "~/utils/subjectGroups.util";
+import { hasPredictionModel, resolveSubjectId } from "~/utils/subjectGroups.util";
 
 export type GroupScope = "base" | "shared" | "catalog";
 
@@ -14,6 +14,7 @@ export type CatalogSubject = {
   sub_category: string | null;
   subject_group_id: string | null;
   model_subject_id: string | null;
+  has_prediction_model?: boolean;
   prerequisite_ids: string[];
   prerequisite_names: string[];
   /** Gán trực tiếp vào ngành (không qua nhóm) */
@@ -86,6 +87,7 @@ function toCatalogSubject(
   },
   allById: Map<string, { name: string }>
 ): CatalogSubject {
+  const modelSubjectId = resolveSubjectId(row.name);
   const prereqIds = Array.isArray(row.prerequisites)
     ? row.prerequisites.filter((x): x is string => typeof x === "string")
     : [];
@@ -101,7 +103,8 @@ function toCatalogSubject(
     category: row.category ?? "general",
     sub_category: row.sub_category,
     subject_group_id: row.subject_group_id,
-    model_subject_id: resolveSubjectId(row.name),
+    model_subject_id: modelSubjectId,
+    has_prediction_model: modelSubjectId ? hasPredictionModel(modelSubjectId) : false,
     prerequisite_ids: prereqIds,
     prerequisite_names: prereqNames,
     assigned_direct: row.assigned_direct,
@@ -326,6 +329,7 @@ export async function getSubjectPickerCatalog(programId?: string) {
       credits: s.credits,
       semester: s.semester,
       model_subject_id: s.model_subject_id,
+      has_prediction_model: s.has_prediction_model ?? false,
       prerequisite_ids: s.prerequisite_ids,
       prerequisite_names: s.prerequisite_names,
     })),

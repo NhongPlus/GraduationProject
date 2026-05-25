@@ -331,7 +331,16 @@ export interface JustCompleted {
 export interface WrongItemSummary {
   q: number;
   stem: string;
+  chapter?: number | null;
+  chapter_label?: string | null;
   explanation_short?: string;
+}
+
+export interface ChapterInsightSummary {
+  chapter: number | null;
+  label: string;
+  wrong_count: number;
+  question_numbers: number[];
 }
 
 export interface PredictionEligibility {
@@ -364,6 +373,7 @@ export interface PredictionResult {
   predictions: PredictionSubject[];
   learning_assessment?: LearningAssessment;
   overall_advice: string;
+  weak_chapters?: ChapterInsightSummary[];
   wrong_summary?: WrongItemSummary[];
   improvement?: string[];
 }

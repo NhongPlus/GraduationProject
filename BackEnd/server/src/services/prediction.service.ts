@@ -51,6 +51,13 @@ export interface SubjectPrediction {
   reasoning: string;
 }
 
+export interface ChapterInsight {
+  chapter: number | null;
+  label: string;
+  wrong_count: number;
+  question_numbers: number[];
+}
+
 /** Đánh giá kết quả học tập (Tầng 2 AI + số liệu Tầng 1). */
 export interface LearningAssessment {
   remark: string;
@@ -73,6 +80,7 @@ export interface PredictionResult {
   /** Đánh giá học lực — trọng tâm đề tài. */
   learning_assessment?: LearningAssessment;
   overall_advice: string;
+  weak_chapters?: ChapterInsight[];
   wrong_summary?: WrongItem[];
   improvement?: string[];
 }
@@ -114,12 +122,59 @@ function vsClassAvgText(score: number, classAvg: number): string {
   return `thấp hơn trung bình ${Math.abs(diff)} điểm (ĐTB: ${classAvg})`;
 }
 
+function formatChapterLabel(item: Pick<WrongItem, "chapter" | "chapter_label">): string {
+  if (item.chapter_label && item.chapter != null) {
+    return `Chương ${item.chapter} - ${item.chapter_label}`;
+  }
+  if (item.chapter_label) return item.chapter_label;
+  if (item.chapter != null) return `Chương ${item.chapter}`;
+  return "Chủ điểm chưa gán chương";
+}
+
+function buildWeakChapterInsights(wrongItems: WrongItem[]): ChapterInsight[] {
+  const grouped = new Map<string, ChapterInsight>();
+  for (const item of wrongItems) {
+    const label = formatChapterLabel(item);
+    const key = `${item.chapter ?? "none"}::${item.chapter_label ?? ""}`;
+    const current = grouped.get(key);
+    if (current) {
+      current.wrong_count += 1;
+      current.question_numbers.push(item.q);
+      continue;
+    }
+    grouped.set(key, {
+      chapter: item.chapter ?? null,
+      label,
+      wrong_count: 1,
+      question_numbers: [item.q],
+    });
+  }
+
+  return [...grouped.values()]
+    .map((item) => ({
+      ...item,
+      question_numbers: [...item.question_numbers].sort((a, b) => a - b),
+    }))
+    .sort((a, b) => {
+      const diff = b.wrong_count - a.wrong_count;
+      if (diff !== 0) return diff;
+      return (a.chapter ?? Number.MAX_SAFE_INTEGER) - (b.chapter ?? Number.MAX_SAFE_INTEGER);
+    })
+    .slice(0, 3);
+}
+
+function buildChapterImprovementLines(chapters: ChapterInsight[]): string[] {
+  return chapters.map((chapter) => {
+    const refs = chapter.question_numbers.join(", ");
+    return `${chapter.label}: nên ôn lại trước, sai ở các câu ${refs}.`;
+  });
+}
+
 function buildMathPredictions(
   targetNames: string[],
   scores: Record<string, number>,
   gpa: number,
-  completedId: string | null,
-  groupLabels: string[]
+  completedId: string | null
 ): SubjectPrediction[] {
   const weights = loadModelWeights();
   const out: SubjectPrediction[] = [];
@@ -143,9 +198,6 @@ function buildMathPredictions(
           : p.vs_class_avg <= -0.3
             ? "down"
             : "stable";
-      const sameGroupNote = groupLabels.length
-        ? `Cùng nhóm: ${groupLabels.join(", ")}. `
-        : "";
       out.push({
         subject: name,
         semester: 0,
@@ -155,11 +207,7 @@ function buildMathPredictions(
         confidence: p.confidence,
         trend,
         correlation_r,
-        reasoning: `${sameGroupNote}Mô hình hồi quy (R²=${p.model_r2}); ${p.features_used
-          .filter((f) => f.same_group)
-          .map((f) => f.name)
-          .slice(0, 2)
-          .join(", ") || "dựa trên GPA và điểm các môn liên quan"}.`,
+        reasoning: "",
       });
     } catch {
       /* bỏ qua môn không predict được */
@@ -175,10 +223,14 @@ async function fetchAiCommentary(
   vsClassAvg: string,
   wrongItems: WrongItem[]
 ): Promise<{ analysis: string; overall_advice: string; improvement: string[] }> {
+  const chapterInsights = buildWeakChapterInsights(wrongItems);
+  const chapterImprovement = buildChapterImprovementLines(chapterInsights);
   const fallbackImprovement =
-    wrongItems.length > 0
-      ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
-      : [];
+    chapterImprovement.length > 0
+      ? chapterImprovement
+      : wrongItems.length > 0
+        ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
+        : [];
   const fallback = {
     analysis: `Kết quả ${req.just_completed.grade} ở môn ${req.just_completed.subject}, ${vsClassAvg}.`,
     overall_advice:
@@ -197,6 +249,12 @@ async function fetchAiCommentary(
     exam_subject: req.just_completed.subject,
     exam_score_10: req.just_completed.score,
     wrong_items: wrongItems,
+    weak_chapters: chapterInsights.map((item) => ({
+      chapter: item.chapter,
+      label: item.label,
+      wrong_count: item.wrong_count,
+      question_numbers: item.question_numbers,
+    })),
     predict_targets: predictions.map((p) => ({
       subject: p.subject,
       score_math: p.predicted_score,
@@ -210,7 +268,7 @@ ${JSON.stringify(diagnosticPayload)}
 Quy tắc:
 - KHÔNG đổi score_math trong predict_targets.
 - Chỉ nhận xét môn trong predict_targets / nhóm: ${groupLabels.join(", ") || "—"}.
-- improvement: gợi ý ôn cụ thể từ stem/explanation_short (trích q nếu cần).
+- improvement: ưu tiên gợi ý ôn theo weak_chapters; nếu cần mới tham chiếu stem/explanation_short (trích q nếu cần).
 Trả CHỈ JSON: {"analysis":"1 câu về bài vừa thi","overall_advice":"1-2 câu","improvement":["gợi ý 1","gợi ý 2"]}`;
 
   const response = await fetch(`${env.MINIMAX_BASE_URL}/text/chatcompletion_v2`, {
@@ -270,6 +328,8 @@ export async function predictScore(
   options: PredictScoreOptions = {}
 ): Promise<PredictionResult> {
   const wrongItems = options.wrong_items ?? [];
+  const chapterInsights = buildWeakChapterInsights(wrongItems);
+  const chapterImprovement = buildChapterImprovementLines(chapterInsights);
   const historyNames = req.history.map((h) => h.subject);
   const explicitTargets =
     req.target_subjects && req.target_subjects.length > 0
@@ -307,8 +367,7 @@ export async function predictScore(
     targets,
     scores,
     gpa,
-    completedId,
-    groupLabels
+    completedId
   );
 
   const targetName =
@@ -320,12 +379,22 @@ export async function predictScore(
     try {
       const pred = predictGrade({ subject_id: targetId, scores, gpa });
       const evaluation = await evaluateStudent(
-        summaryFromPrediction(pred, gpa, req.just_completed.score, nCompleted)
+        summaryFromPrediction(
+          pred,
+          gpa,
+          req.just_completed.score,
+          nCompleted,
+          chapterInsights.map((item) => item.label)
+        )
       );
       learning_assessment = {
         remark: evaluation.remark,
-        weaknesses: evaluation.weaknesses,
-        advice: evaluation.advice,
+        weaknesses: [...chapterInsights.map((item) => `Cần củng cố ${item.label}`), ...evaluation.weaknesses]
+          .filter((line, i, arr) => arr.indexOf(line) === i)
+          .slice(0, 8),
+        advice: [...chapterImprovement, ...evaluation.advice]
+          .filter((line, i, arr) => arr.indexOf(line) === i)
+          .slice(0, 8),
         comparison: evaluation.comparison,
         quantitative: {
           predicted_score: pred.predicted_score,
@@ -363,8 +432,10 @@ export async function predictScore(
         };
 
   const wrongImprovement =
-    wrongItems.length > 0
-      ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
+    chapterImprovement.length > 0
+      ? chapterImprovement
+      : wrongItems.length > 0
+        ? wrongItems.map((w) => `Ôn lại nội dung câu ${w.q}`)
       : [];
   const improvement = [
     ...(learning_assessment?.weaknesses ?? []),
@@ -386,6 +457,7 @@ export async function predictScore(
       predictions.length === 0
         ? `Môn "${req.just_completed.subject}" thuộc nhóm ${groupLabels.join(", ") || "chưa phân loại"}. ${commentary.overall_advice}`
         : commentary.overall_advice,
+    weak_chapters: chapterInsights.length > 0 ? chapterInsights : undefined,
     wrong_summary: wrongItems.length > 0 ? wrongItems : undefined,
     improvement: improvement.length > 0 ? improvement : undefined,
   };
