@@ -1,67 +1,42 @@
 #!/usr/bin/env python3
-"""Generate plain-text style exam template for teachers (no colored boxes)."""
+"""Generate the downloadable Word import sample pack."""
 
+from __future__ import annotations
+
+import math
+import struct
+import tempfile
+import wave
+import zipfile
 from pathlib import Path
 
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw
 from docx import Document
 from docx.shared import Pt
 
-OUTPUT = Path(__file__).resolve().parents[1] / "BackEnd" / "exam_template_GiaoVien.docx"
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND_DIR = ROOT / "BackEnd"
 
-CONTENT = """HƯỚNG DẪN SOẠN ĐỀ THI BẰNG WORD (FORMAT MỚI)
+DOCX_OUTPUT = BACKEND_DIR / "exam_template_GiaoVien.docx"
+MEDIA_ZIP_OUTPUT = BACKEND_DIR / "exam_template_media_samples.zip"
+PACK_OUTPUT = BACKEND_DIR / "exam_import_sample_pack.zip"
 
-GHI CHÚ QUAN TRỌNG CHO GIẢNG VIÊN
-• Chỉ cần gõ chữ trong Word — KHÔNG cần tô màu, vẽ khung, banner hay bố cục phức tạp.
-• Hệ thống hiện dùng format mới có CHƯƠNG bắt buộc.
-• Nếu thiếu block khai báo CHƯƠNG ở đầu file hoặc thiếu [CHUONG:x] ở từng câu, hệ thống sẽ không cho import hoàn chỉnh.
-• Sau khi đã hiểu cách soạn, khi tạo đề thật nên xóa phần hướng dẫn của file mẫu và chỉ giữ lại block CHUONG cùng các câu hỏi thật.
-• Nếu quên xóa, hệ thống sẽ cố gắng tự bỏ qua các dòng hướng dẫn phổ biến và hiển thị cảnh báo khi xem trước.
-• Sau khi soạn xong: vào hệ thống → Soạn đề → chọn file Word (.docx) → nếu có media thì gửi kèm 1 file ZIP → kiểm tra lại → Lưu.
+IMAGE_NAME = "code_python_loop.png"
+AUDIO_NAME = "python_question_01.wav"
+VIDEO_NAME = "python_demo_01.mp4"
+README_NAME = "README_MAU_IMPORT.txt"
 
-────────────────────────────────────────
-BƯỚC 1 — KHAI BÁO DANH SÁCH CHƯƠNG Ở ĐẦU FILE (BẮT BUỘC)
+
+def build_content() -> str:
+    return f"""Tiêu đề: Đề kiểm tra mẫu — Python cơ bản
+Thời gian: 45
+Mô tả: File mẫu sạch để import trực tiếp.
 
 CHUONG 1 : Biến và kiểu dữ liệu
 CHUONG 2 : Cấu trúc điều kiện và vòng lặp
 CHUONG 3 : Hàm
-
-Lưu ý:
-→ Mỗi chương viết trên một dòng riêng
-→ Số chương phải là số nguyên dương
-→ Tên chương là nội dung giáo viên tự đặt theo môn học
-
-────────────────────────────────────────
-BƯỚC 2 — CÁC THẺ (TAG) DÙNG CHO MỖI CÂU HỎI
-
-Thẻ LOAI:TN         — Bắt buộc, loại câu (TN, TL, TN-ANH, TN-AUDIO, TN-VIDEO)
-Thẻ DIEM:0.5        — Điểm câu hỏi (ví dụ: 0.5, 1, 2)
-Thẻ KHO:DE          — Độ khó: DE, TRUNGBINH, KHO
-Thẻ CHUONG:1        — Bắt buộc, phải khớp với danh sách CHUONG đã khai báo ở đầu file
-Thẻ ANH:ten.png     — Tên file ảnh (nếu có), ví dụ: [ANH:code_python_loop.png]
-Thẻ AUDIO:ten.mp3   — Tên file audio (nếu có), ví dụ: [AUDIO:python_question_01.mp3]
-Thẻ VIDEO:ten.mp4   — Tên file video (nếu có), ví dụ: [VIDEO:python_demo_01.mp4]
-Thẻ DAPAN:A         — Đáp án đúng (hoặc có thể viết dòng “Đáp án: A” bên dưới)
-
-Ví dụ dòng thẻ chuẩn:
-CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
-
-Lưu ý khi gõ thẻ:
-→ Mỗi câu phải bắt đầu bằng MỘT dòng thẻ riêng
-→ Dòng thẻ nên bắt đầu bằng CAU 1 [LOAI:...] hoặc trực tiếp [LOAI:...]
-→ [CHUONG:x] là bắt buộc cho mọi câu
-→ Nếu là câu trắc nghiệm thì cần đáp án A/B/C/D và dòng Đáp án
-→ Nếu là câu tự luận thì không cần A/B/C/D, có thể thêm dòng Gợi ý chấm
-→ Khi đối chiếu media từ ZIP: hệ thống so theo tên file gốc, không phân biệt hoa/thường, bỏ qua thư mục con, và coi khoảng trắng / dấu gạch ngang / dấu gạch dưới là tương đương
-
-────────────────────────────────────────
-THÔNG TIN ĐỀ THI (TÙY CHỌN)
-
-Tiêu đề: Đề kiểm tra mẫu — Python cơ bản
-Thời gian: 45
-Mô tả: (có thể ghi thêm yêu cầu chung của đề)
-
-────────────────────────────────────────
-PHẦN MẪU — CÁC CÂU HỎI
 
 CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
 Biến nào sau đây là tên biến hợp lệ trong ngôn ngữ Python?
@@ -81,23 +56,23 @@ C. 0 1 2 3
 D. Lỗi cú pháp
 Đáp án: B
 
-CAU 3 [LOAI:TN-ANH] [DIEM:0.5] [KHO:DE] [CHUONG:2] [ANH:code_python_loop.png]
-Quan sát đoạn code trong ảnh. Kết quả in ra là gì?
-A. 0 1 2 3 4
-B. 1 2 3 4 5
-C. 0 1 2 3
-D. 1 2 3 4
-Đáp án: A
+CAU 3 [LOAI:TN-ANH] [DIEM:0.5] [KHO:DE] [CHUONG:2] [ANH:{IMAGE_NAME}]
+Quan sát hình minh họa vòng lặp và chọn đáp án đúng.
+A. Vòng lặp chạy 1 lần
+B. Vòng lặp chạy 2 lần
+C. Vòng lặp chạy 3 lần
+D. Vòng lặp chạy vô hạn
+Đáp án: C
 
-CAU 4 [LOAI:TN-AUDIO] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2] [AUDIO:python_question_01.mp3]
-Nghe đoạn âm thanh và chọn từ khóa được nhắc đến trong ví dụ.
+CAU 4 [LOAI:TN-AUDIO] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2] [AUDIO:{AUDIO_NAME}]
+Nghe đoạn âm thanh mẫu và chọn từ khóa được nhắc đến trong ví dụ.
 A. list
 B. tuple
 C. dictionary
 D. set
 Đáp án: C
 
-CAU 5 [LOAI:TN-VIDEO] [DIEM:0.5] [KHO:DE] [CHUONG:3] [VIDEO:python_demo_01.mp4]
+CAU 5 [LOAI:TN-VIDEO] [DIEM:0.5] [KHO:DE] [CHUONG:3] [VIDEO:{VIDEO_NAME}]
 Xem video minh họa và cho biết hàm nào được gọi trong ví dụ.
 A. print()
 B. len()
@@ -108,73 +83,16 @@ D. input()
 CAU 6 [LOAI:TL] [DIEM:2] [KHO:KHO] [CHUONG:3]
 Viết hàm Python kiểm tra số nguyên dương n có phải số nguyên tố không. Giải thích độ phức tạp thời gian.
 Gợi ý chấm: Hàm đúng 1đ; giải thích O(√n) 1đ.
-
-────────────────────────────────────────
-MẪU KHUNG SOẠN NHANH CHO GIẢNG VIÊN
-
-CHUONG 1 : ................................
-CHUONG 2 : ................................
-CHUONG 3 : ................................
-
-CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1]
-Nội dung câu hỏi...
-A. ...
-B. ...
-C. ...
-D. ...
-Đáp án: A
-
-CAU 2 [LOAI:TN-ANH] [DIEM:0.5] [KHO:DE] [CHUONG:2] [ANH:ten_anh.png]
-Nội dung câu hỏi dùng ảnh...
-A. ...
-B. ...
-C. ...
-D. ...
-Đáp án: A
-
-CAU 3 [LOAI:TN-AUDIO] [DIEM:0.5] [KHO:TRUNGBINH] [CHUONG:2] [AUDIO:ten_audio.mp3]
-Nội dung câu hỏi dùng audio...
-A. ...
-B. ...
-C. ...
-D. ...
-Đáp án: B
-
-CAU 4 [LOAI:TN-VIDEO] [DIEM:0.5] [KHO:DE] [CHUONG:3] [VIDEO:ten_video.mp4]
-Nội dung câu hỏi dùng video...
-A. ...
-B. ...
-C. ...
-D. ...
-Đáp án: C
-
-CAU 5 [LOAI:TL] [DIEM:2] [KHO:TRUNGBINH] [CHUONG:2]
-Nội dung câu tự luận...
-Gợi ý chấm: ...
-
-────────────────────────────────────────
-CHECKLIST TRƯỚC KHI NỘP
-
-1. Đã khai báo danh sách CHUONG ở đầu file
-2. Mỗi câu đều có [CHUONG:x] hợp lệ
-3. Mỗi câu trắc nghiệm có đủ A/B/C/D và dòng Đáp án: ...
-4. Đã điền [DIEM:...] và [KHO:...]
-5. Nếu có ảnh/audio/video, nên nộp kèm 1 file ZIP chứa toàn bộ media; hệ thống đối chiếu không phân biệt hoa/thường, bỏ qua thư mục con, và coi space / "-" / "_" là tương đương
-   Ví dụ: [ANH:code_python_loop.png], [AUDIO:python_question_01.mp3], [VIDEO:python_demo_01.mp4]
-6. Nếu ZIP thiếu file hoặc tên không khớp, hệ thống sẽ báo để tải tay từng media còn thiếu ngay trên màn hình xem trước
-7. Đã xem trước, sửa cảnh báo nếu có rồi mới lưu đề
 """
 
 
-def main() -> None:
+def write_docx(content: str) -> None:
     doc = Document()
     style = doc.styles["Normal"]
     style.font.name = "Times New Roman"
     style.font.size = Pt(13)
 
-    for line in CONTENT.split("\n"):
-        if not line.strip():
-            continue
+    for line in content.split("\n"):
         para = doc.add_paragraph(line)
         if (
             line.startswith("HƯỚNG DẪN")
@@ -190,9 +108,114 @@ def main() -> None:
             for run in para.runs:
                 run.font.size = Pt(12)
 
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(OUTPUT)
-    print(f"Wrote {OUTPUT}")
+    DOCX_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(DOCX_OUTPUT)
+
+
+def build_image(path: Path) -> None:
+    image = Image.new("RGB", (960, 540), color=(245, 247, 250))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((80, 80, 880, 460), outline=(37, 99, 235), width=5)
+    draw.text((120, 140), "for i in range(3):", fill=(17, 24, 39))
+    draw.text((120, 220), "    print(i)", fill=(17, 24, 39))
+    draw.text((120, 330), "Output: 0 1 2", fill=(16, 185, 129))
+    image.save(path)
+
+
+def build_audio(path: Path) -> None:
+    sample_rate = 22050
+    duration_s = 1.0
+    frequency = 440.0
+    amplitude = 12000
+    total_samples = int(sample_rate * duration_s)
+
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        frames = bytearray()
+        for idx in range(total_samples):
+            value = int(amplitude * math.sin(2 * math.pi * frequency * idx / sample_rate))
+            frames.extend(struct.pack("<h", value))
+        wav_file.writeframes(bytes(frames))
+
+
+def build_video(path: Path) -> None:
+    width, height = 960, 540
+    fps = 12
+    writer = cv2.VideoWriter(
+        str(path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height),
+    )
+    if not writer.isOpened():
+        raise RuntimeError("Không thể tạo video mẫu .mp4 bằng OpenCV trên máy hiện tại.")
+
+    for frame_index in range(24):
+        frame = np.full((height, width, 3), (240, 244, 248), dtype=np.uint8)
+        cv2.rectangle(frame, (80, 80), (880, 460), (59, 130, 246), 4)
+        cv2.putText(frame, "Video sample for [VIDEO:python_demo_01.mp4]", (110, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (31, 41, 55), 2)
+        cv2.putText(frame, "Frame {}".format(frame_index + 1), (110, 260), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (5, 150, 105), 2)
+        cv2.putText(frame, "Use this file to test ZIP matching.", (110, 340), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (31, 41, 55), 2)
+        writer.write(frame)
+    writer.release()
+
+
+def build_media_zip() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        image_path = temp_dir / IMAGE_NAME
+        audio_path = temp_dir / AUDIO_NAME
+        video_path = temp_dir / VIDEO_NAME
+
+        build_image(image_path)
+        build_audio(audio_path)
+        build_video(video_path)
+
+        with zipfile.ZipFile(MEDIA_ZIP_OUTPUT, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.write(image_path, arcname=IMAGE_NAME)
+            archive.write(audio_path, arcname=AUDIO_NAME)
+            archive.write(video_path, arcname=VIDEO_NAME)
+
+
+def build_readme() -> str:
+    return f"""BO MAU IMPORT DE THI
+
+File dinh kem:
+1. exam_template_GiaoVien.docx
+2. exam_template_media_samples.zip
+
+Cach test nhanh:
+- Mo file Word mau va import len he thong
+- Neu co media, chon them file ZIP media mau di kem
+- He thong se tu doi chieu:
+  * [ANH:{IMAGE_NAME}]
+  * [AUDIO:{AUDIO_NAME}]
+  * [VIDEO:{VIDEO_NAME}]
+
+Luu y:
+- Ten file trong ZIP phai khop voi the trong Word
+- He thong khong phan biet hoa/thuong va bo qua thu muc con
+- Space / "-" / "_" duoc coi la tuong duong khi doi chieu
+"""
+
+
+def build_outer_pack() -> None:
+    with zipfile.ZipFile(PACK_OUTPUT, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.write(DOCX_OUTPUT, arcname=DOCX_OUTPUT.name)
+        archive.write(MEDIA_ZIP_OUTPUT, arcname=MEDIA_ZIP_OUTPUT.name)
+        archive.writestr(README_NAME, build_readme())
+
+
+def main() -> None:
+    content = build_content()
+    write_docx(content)
+    build_media_zip()
+    build_outer_pack()
+    print(f"Wrote {DOCX_OUTPUT}")
+    print(f"Wrote {MEDIA_ZIP_OUTPUT}")
+    print(f"Wrote {PACK_OUTPUT}")
 
 
 if __name__ == "__main__":

@@ -104,10 +104,10 @@ export const createExamController = async (req: Request, res: Response, next: Ne
   }
 };
 
-const WORD_IMPORT_TEMPLATE_PATH = path.join(
+const WORD_IMPORT_SAMPLE_PACK_PATH = path.join(
   process.cwd(),
   "..",
-  "exam_template_GiaoVien.docx"
+  "exam_import_sample_pack.zip"
 );
 
 function getMultipartFile(req: Request, fieldName: string): Express.Multer.File | null {
@@ -125,10 +125,10 @@ export const downloadWordImportTemplateController = async (
   next: NextFunction
 ) => {
   try {
-    if (!fs.existsSync(WORD_IMPORT_TEMPLATE_PATH)) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy file mẫu đề Word" });
+    if (!fs.existsSync(WORD_IMPORT_SAMPLE_PACK_PATH)) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy bộ file mẫu import" });
     }
-    res.download(WORD_IMPORT_TEMPLATE_PATH, "exam_template_GiaoVien.docx");
+    res.download(WORD_IMPORT_SAMPLE_PACK_PATH, "exam_import_sample_pack.zip");
   } catch (err) {
     next(err);
   }

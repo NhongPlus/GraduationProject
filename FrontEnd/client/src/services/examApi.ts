@@ -480,7 +480,7 @@ const examApi = {
     const url = URL.createObjectURL(res.data);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'exam_template_GiaoVien.docx';
+    link.download = 'exam_import_sample_pack.zip';
     link.click();
     URL.revokeObjectURL(url);
   },

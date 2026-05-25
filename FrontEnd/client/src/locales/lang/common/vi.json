@@ -865,7 +865,7 @@
     "description_placeholder": "Nội dung, yêu cầu...",
     "word_import_tags_label": "Soạn đề: dùng format mới có CHƯƠNG bắt buộc. Mỗi câu có thể bắt đầu bằng",
     "word_import_tags_example": "CAU 1 [LOAI:TN] [DIEM:0.5] [KHO:DE] [CHUONG:1] — đầu file phải khai báo CHUONG 1 : ...; nếu có media có thể gửi kèm 1 file .zip; khi tạo đề thật nên xóa phần hướng dẫn của file mẫu",
-    "word_import_download_template": "Tải file mẫu Word (.docx)",
+    "word_import_download_template": "Tải bộ file mẫu (.zip: Word + media)",
     "dropzone_hint": "Kéo thả .docx hoặc click",
     "needs_review": "{{count}} cần xem lại",
     "question_list": "Danh sách câu hỏi",
