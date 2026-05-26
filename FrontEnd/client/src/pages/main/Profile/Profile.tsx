@@ -27,7 +27,6 @@ const Profile = () => {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const isAdmin = role === 'admin';
-  const showResetRequest = role === 'student' || role === 'teacher';
 
   const handleLogout = async () => {
     await clearSession();
@@ -137,36 +136,39 @@ const Profile = () => {
                 </Notification>
               )}
 
-              <Title order={4}>{t('profile.change_password_title')}</Title>
-              <Text size="sm" c="dimmed">
-                {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
-              </Text>
-              <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
-              <InputPassword
-                label={t('first_login.current_password')}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-              />
-              <InputPassword
-                label={t('first_login.new_password')}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.currentTarget.value)}
-              />
-              <InputPassword
-                label={t('first_login.confirm_password')}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.currentTarget.value)}
-              />
-              <ButtonFilled
-                label={t('profile.change_password_submit')}
-                disabled={changingPassword}
-                onClick={() => void handleChangePassword()}
-              />
-
-              {showResetRequest && (
+              {isAdmin ? (
                 <>
-                  <Divider my="sm" />
-                  <Title order={5}>{t('profile.reset_request_title')}</Title>
+                  <Title order={4}>{t('profile.change_password_title')}</Title>
+                  <Text size="sm" c="dimmed">{t('profile.admin_change_desc')}</Text>
+                  <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
+                  <InputPassword
+                    label={t('first_login.current_password')}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+                  />
+                  <InputPassword
+                    label={t('first_login.new_password')}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.currentTarget.value)}
+                  />
+                  <InputPassword
+                    label={t('first_login.confirm_password')}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+                  />
+                  <ButtonFilled
+                    label={t('profile.change_password_submit')}
+                    disabled={changingPassword}
+                    onClick={() => void handleChangePassword()}
+                  />
+                  <Alert color="gray" variant="light">
+                    <Text size="sm">{t('profile.admin_password_note')}</Text>
+                    <Text size="sm" mt="xs">{t('profile.admin_forgot_help')}</Text>
+                  </Alert>
+                </>
+              ) : (
+                <>
+                  <Title order={4}>{t('profile.reset_request_title')}</Title>
                   <Alert color="blue" variant="light">
                     {t('profile.reset_request_desc')}
                   </Alert>
@@ -178,13 +180,6 @@ const Profile = () => {
                     color="blue"
                   />
                 </>
-              )}
-
-              {isAdmin && (
-                <Alert color="gray" variant="light">
-                  <Text size="sm">{t('profile.admin_password_note')}</Text>
-                  <Text size="sm" mt="xs">{t('profile.admin_forgot_help')}</Text>
-                </Alert>
               )}
             </Stack>
           </Paper>
