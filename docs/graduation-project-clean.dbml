@@ -1,0 +1,448 @@
+Project GraduationProject {
+  database_type: "PostgreSQL"
+  Note: "Schema cleaned from current migrations. Legacy tables assignments and grades are omitted."
+}
+
+Table programs {
+  id uuid [pk]
+  code text [not null, unique]
+  name text [not null]
+  description text
+  is_active boolean
+  created_at timestamptz
+}
+
+Table subject_groups {
+  id uuid [pk]
+  code text [not null]
+  name text [not null]
+  description text
+  sort_order int
+  group_scope text
+  is_active boolean
+  created_at timestamptz
+}
+
+Table program_subject_groups {
+  program_id uuid [not null]
+  subject_group_id uuid [not null]
+  sort_order int
+  created_at timestamptz
+
+  Indexes {
+    (program_id, subject_group_id) [pk]
+  }
+}
+
+Table subjects {
+  id uuid [pk]
+  name text [not null]
+  code text
+  credits decimal
+  semester int
+  category text
+  sub_category text
+  prerequisites text [note: "UUID[] of prerequisite subjects"]
+  subject_group_id uuid
+  is_active boolean
+  created_at timestamptz
+}
+
+Table program_subjects {
+  program_id uuid [not null]
+  subject_id uuid [not null]
+  created_at timestamptz
+
+  Indexes {
+    (program_id, subject_id) [pk]
+  }
+}
+
+Table admin_classes {
+  id uuid [pk]
+  program_code text
+  intake_year int
+  section text
+  display_name text [not null]
+  manager_teacher_id uuid
+  program_id uuid
+  expected_size int
+  created_at timestamptz
+}
+
+Table accounts {
+  id uuid [pk]
+  email text [not null, unique]
+  username text [not null, unique]
+  hashed_password text [not null]
+  password_plain text
+  role text [not null, note: "admin | teacher | student"]
+  full_name text
+  is_active boolean
+  first_login boolean
+  token_version int
+  admin_class_id uuid
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table user_sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  device_id varchar
+  device_info text
+  token_hash varchar
+  is_active boolean
+  expires_at timestamptz
+  last_active_at timestamptz
+  created_at timestamptz
+}
+
+Table password_reset_requests {
+  id uuid [pk]
+  user_id uuid [not null]
+  requested_by uuid [not null]
+  approved_by uuid
+  status text
+  admin_note text
+  new_password_plain text
+  expires_at timestamptz
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table password_reset_tokens {
+  id uuid [pk]
+  user_id uuid [not null]
+  token varchar [not null, unique]
+  expires_at timestamptz
+  used boolean
+  used_at timestamptz
+  created_at timestamptz
+}
+
+Table user_notifications {
+  id uuid [pk]
+  user_id uuid [not null]
+  type text
+  title text [not null]
+  message text [not null]
+  is_read boolean
+  link text
+  created_at timestamptz
+}
+
+Table audit_logs {
+  id uuid [pk]
+  actor_id uuid
+  actor_role text
+  action text [not null]
+  resource_type text
+  resource_id uuid
+  details jsonb
+  ip_address text
+  user_agent text
+  created_at timestamptz
+}
+
+Table classes {
+  id uuid [pk]
+  subject_id uuid [not null]
+  teacher_id uuid [not null]
+  semester text [not null]
+  year int [not null]
+  created_at timestamptz
+}
+
+Table enrollments {
+  id uuid [pk]
+  class_id uuid [not null]
+  student_id uuid [not null]
+  enrolled_at timestamptz
+}
+
+Table exams {
+  id uuid [pk]
+  title text [not null]
+  description text
+  class_id uuid
+  admin_class_id uuid
+  subject_id uuid
+  created_by uuid [not null]
+  duration_min int [not null]
+  num_versions int
+  closes_at timestamptz
+  opens_at timestamptz
+  ends_at timestamptz
+  created_at timestamptz
+}
+
+Table question_bank {
+  id uuid [pk]
+  created_by uuid [not null]
+  subject_id uuid
+  source_exam_id uuid
+  content text [not null]
+  question_type text [not null]
+  options jsonb
+  correct_answer jsonb
+  points decimal
+  difficulty text
+  chapter int
+  answer_hint text
+  explanation text
+  tags text
+  usage_count int
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table questions {
+  id uuid [pk]
+  exam_id uuid [not null]
+  question_bank_id uuid
+  content text [not null]
+  question_type text [not null]
+  options jsonb
+  correct_answer jsonb
+  explanation text
+  media_url text
+  points decimal
+  display_order int
+  difficulty text
+  chapter int
+  chapter_label text
+  answer_hint text
+  created_at timestamptz
+}
+
+Table exam_versions {
+  id uuid [pk]
+  exam_id uuid [not null]
+  version_code varchar
+  version_index int
+  question_order jsonb
+  option_maps jsonb
+  created_at timestamptz
+}
+
+Table exam_sessions {
+  id uuid [pk]
+  exam_id uuid [not null]
+  student_id uuid [not null]
+  version_id uuid
+  version_code varchar
+  status text
+  started_at timestamptz
+  submitted_at timestamptz
+  score numeric
+  max_points numeric
+  student_answers jsonb
+  graded_details jsonb
+  grading_status text
+  question_order jsonb
+  voided_at timestamptz
+  void_reason text
+  superseded_by uuid
+  retake_grant_id uuid
+  created_at timestamptz
+}
+
+Table exam_session_autosaves {
+  id uuid [pk]
+  session_id uuid [not null]
+  exam_id uuid [not null]
+  student_id uuid [not null]
+  answers jsonb
+  saved_at timestamptz
+  server_at timestamptz
+  created_at timestamptz
+  updated_at timestamptz
+}
+
+Table exam_integrity_events {
+  id uuid [pk]
+  exam_id uuid [not null]
+  session_id uuid [not null]
+  student_id uuid [not null]
+  event_type text
+  event_at timestamptz
+  details jsonb
+  created_at timestamptz
+}
+
+Table exam_deadline_notifications {
+  id uuid [pk]
+  exam_id uuid [not null]
+  student_id uuid [not null]
+  sent_at timestamptz
+  notification_type text
+  created_at timestamptz
+}
+
+Table exam_runtime_state {
+  exam_id uuid [pk]
+  started_at timestamptz
+  ends_at timestamptz
+  duration_min int
+  is_active boolean
+}
+
+Table exam_proctor_presence {
+  id uuid [pk]
+  exam_id uuid [not null]
+  student_id uuid [not null]
+  socket_id text
+  ip_address text
+  user_agent text
+  joined_at timestamptz
+  last_ping_at timestamptz
+  disconnected_at timestamptz
+}
+
+Table exam_proctor_logs {
+  id uuid [pk]
+  exam_id uuid [not null]
+  session_id uuid
+  student_id uuid [not null]
+  event_type text
+  screenshot_url text
+  ip_address text
+  user_agent text
+  metadata jsonb
+  created_at timestamptz
+}
+
+Table exam_collaborators {
+  id uuid [pk]
+  exam_id uuid [not null]
+  teacher_id uuid [not null]
+  role text
+  created_at timestamptz
+}
+
+Table exam_shares {
+  id uuid [pk]
+  exam_id uuid [not null]
+  shared_with uuid [not null]
+  role text
+  assigned_by uuid [not null]
+  assigned_at timestamptz
+}
+
+Table grading_assignments {
+  id uuid [pk]
+  exam_session_id uuid [not null]
+  exam_id uuid [not null]
+  teacher_id uuid [not null]
+  assigned_by uuid [not null]
+  assigned_at timestamptz
+  graded_at timestamptz
+  status text
+  notes text
+}
+
+Table exam_retake_grants {
+  id uuid [pk]
+  exam_id uuid [not null]
+  student_id uuid [not null]
+  granted_by uuid [not null]
+  reason text
+  status text
+  superseded_session_id uuid
+  consumed_session_id uuid
+  granted_at timestamptz
+  consumed_at timestamptz
+  revoked_at timestamptz
+  created_at timestamptz
+}
+
+Table student_prediction_cache {
+  user_id uuid [pk]
+  payload jsonb
+  computed_at timestamptz
+}
+
+Ref: program_subject_groups.program_id > programs.id
+Ref: program_subject_groups.subject_group_id > subject_groups.id
+
+Ref: subjects.subject_group_id > subject_groups.id
+Ref: program_subjects.program_id > programs.id
+Ref: program_subjects.subject_id > subjects.id
+
+Ref: admin_classes.program_id > programs.id
+Ref: admin_classes.manager_teacher_id > accounts.id
+Ref: accounts.admin_class_id > admin_classes.id
+
+Ref: user_sessions.user_id > accounts.id
+Ref: password_reset_requests.user_id > accounts.id
+Ref: password_reset_requests.requested_by > accounts.id
+Ref: password_reset_requests.approved_by > accounts.id
+Ref: password_reset_tokens.user_id > accounts.id
+Ref: user_notifications.user_id > accounts.id
+Ref: audit_logs.actor_id > accounts.id
+
+Ref: classes.subject_id > subjects.id
+Ref: classes.teacher_id > accounts.id
+Ref: enrollments.class_id > classes.id
+Ref: enrollments.student_id > accounts.id
+
+Ref: exams.class_id > classes.id
+Ref: exams.admin_class_id > admin_classes.id
+Ref: exams.subject_id > subjects.id
+Ref: exams.created_by > accounts.id
+
+Ref: question_bank.created_by > accounts.id
+Ref: question_bank.subject_id > subjects.id
+Ref: question_bank.source_exam_id > exams.id
+
+Ref: questions.exam_id > exams.id
+Ref: questions.question_bank_id > question_bank.id
+
+Ref: exam_versions.exam_id > exams.id
+Ref: exam_sessions.exam_id > exams.id
+Ref: exam_sessions.student_id > accounts.id
+Ref: exam_sessions.version_id > exam_versions.id
+
+Ref: exam_session_autosaves.session_id > exam_sessions.id
+Ref: exam_session_autosaves.exam_id > exams.id
+Ref: exam_session_autosaves.student_id > accounts.id
+
+Ref: exam_integrity_events.exam_id > exams.id
+Ref: exam_integrity_events.session_id > exam_sessions.id
+Ref: exam_integrity_events.student_id > accounts.id
+
+Ref: exam_deadline_notifications.exam_id > exams.id
+Ref: exam_deadline_notifications.student_id > accounts.id
+
+Ref: exam_runtime_state.exam_id - exams.id
+
+Ref: exam_proctor_presence.exam_id > exams.id
+Ref: exam_proctor_presence.student_id > accounts.id
+
+Ref: exam_proctor_logs.exam_id > exams.id
+Ref: exam_proctor_logs.session_id > exam_sessions.id
+Ref: exam_proctor_logs.student_id > accounts.id
+
+Ref: exam_collaborators.exam_id > exams.id
+Ref: exam_collaborators.teacher_id > accounts.id
+
+Ref: exam_shares.exam_id > exams.id
+Ref: exam_shares.shared_with > accounts.id
+Ref: exam_shares.assigned_by > accounts.id
+
+Ref: grading_assignments.exam_session_id > exam_sessions.id
+Ref: grading_assignments.exam_id > exams.id
+Ref: grading_assignments.teacher_id > accounts.id
+Ref: grading_assignments.assigned_by > accounts.id
+
+Ref: exam_retake_grants.exam_id > exams.id
+Ref: exam_retake_grants.student_id > accounts.id
+Ref: exam_retake_grants.granted_by > accounts.id
+Ref: exam_retake_grants.superseded_session_id > exam_sessions.id
+Ref: exam_retake_grants.consumed_session_id > exam_sessions.id
+
+Ref: exam_sessions.superseded_by > exam_sessions.id
+Ref: exam_sessions.retake_grant_id > exam_retake_grants.id
+
+Ref: student_prediction_cache.user_id > accounts.id

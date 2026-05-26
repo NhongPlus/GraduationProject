@@ -51,9 +51,11 @@ erDiagram
   accounts ||--o| admin_classes : manager
   accounts }o--|| admin_classes : student
   programs ||--o{ admin_classes : has
-  programs ||--o{ subject_groups : has
-  programs ||--o{ subjects : has
+  programs ||--o{ program_subject_groups : maps
+  programs ||--o{ program_subjects : maps
   subject_groups ||--o{ subjects : group
+  subject_groups ||--o{ program_subject_groups : in
+  subjects ||--o{ program_subjects : in
   subjects ||--o{ exams : subject
   admin_classes ||--o{ exams : scope
   accounts ||--o{ exams : creates
@@ -92,7 +94,7 @@ erDiagram
     string name
     string code
     string category
-    uuid program_id FK
+    uuid subject_group_id FK
     string prerequisites
   }
 
@@ -219,18 +221,18 @@ erDiagram
 
 ```mermaid
 erDiagram
-  programs ||--o{ subject_groups : has
-  programs ||--o{ subjects : has
+  programs ||--o{ program_subject_groups : maps
+  programs ||--o{ program_subjects : maps
   programs ||--o{ program_teachers : teachers
   programs ||--o{ admin_classes : has
+  subject_groups ||--o{ program_subject_groups : in
+  subjects ||--o{ program_subjects : in
   subject_groups ||--o{ subjects : group
   subjects ||--o{ classes : teaches
   classes ||--o{ enrollments : enroll
-  classes ||--o{ assignments : has
   accounts ||--o{ classes : teacher
   accounts ||--o{ enrollments : student
   accounts ||--o{ program_teachers : member
-  assignments ||--o{ grades : graded
 
   programs {
     uuid id PK
@@ -241,7 +243,6 @@ erDiagram
 
   subject_groups {
     uuid id PK
-    uuid program_id FK
     string code
     string name
     int sort_order
@@ -254,7 +255,7 @@ erDiagram
     decimal credits
     int semester
     string category
-    uuid program_id FK
+    uuid subject_group_id FK
     string prerequisites
   }
 
@@ -281,23 +282,19 @@ erDiagram
     timestamp enrolled_at
   }
 
-  assignments {
-    uuid id PK
-    uuid class_id FK
-    string title
-    timestamp due_date
-  }
-
-  grades {
-    uuid id PK
-    uuid assignment_id FK
-    uuid student_id FK
-    decimal score
-  }
-
   program_teachers {
     uuid program_id PK
     uuid teacher_id PK
+  }
+
+  program_subject_groups {
+    uuid program_id PK
+    uuid subject_group_id PK
+  }
+
+  program_subjects {
+    uuid program_id PK
+    uuid subject_id PK
   }
 ```
 
@@ -476,11 +473,14 @@ erDiagram
 ```mermaid
 erDiagram
   programs ||--o{ admin_classes : has
-  programs ||--o{ subjects : has
-  programs ||--o{ subject_groups : has
+  programs ||--o{ program_subjects : maps
+  programs ||--o{ program_subject_groups : maps
   admin_classes ||--o{ accounts : students
   admin_classes ||--o{ exams : scope
   accounts ||--o| admin_classes : manages
+  subject_groups ||--o{ program_subject_groups : in
+  subject_groups ||--o{ subjects : group
+  subjects ||--o{ program_subjects : in
   subjects ||--o{ exams : for
   exams ||--o{ questions : has
   exams ||--o{ exam_sessions : has
