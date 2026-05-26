@@ -23,6 +23,7 @@ import {
   isBeforeExamOpens,
   msUntilOpensAt,
 } from '@/utils/examDeadline';
+import { formatExamScore } from '@/utils/formatExamScore';
 import { useExamTakeState } from '@/hooks/useExamTakeState';
 import useAuth from '@/hooks/useAuth';
 import {
@@ -1308,8 +1309,8 @@ const ExamTake = () => {
                       {t('exam_take.submit_mcq_summary', {
                         correct: mcqCorrect,
                         total: mcq.length,
-                        score: mcqScore,
-                        max: mcqMax,
+                        score: formatExamScore(mcqScore),
+                        max: formatExamScore(mcqMax),
                       })}
                     </Text>
                     {essays.length > 0 && (

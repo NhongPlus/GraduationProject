@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Title, Text, Paper, Stack,
-  Notification, Group, Badge, Divider,
+  Tabs, Notification, Group, Badge, Divider,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { clearSession, changePassword } from '@/services/authApi';
@@ -26,6 +26,12 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!message) return;
+    const timeoutId = window.setTimeout(() => setMessage(''), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [message]);
 
   const handleLogout = async () => {
     await clearSession();
@@ -81,61 +87,71 @@ const Profile = () => {
         </Badge>
       </Group>
       <Text c="dimmed" mb="md">{t('profile.subtitle')}</Text>
+      <Tabs defaultValue="profile" mt="md">
+        <Tabs.List>
+          <Tabs.Tab value="profile">{t('profile.tab_profile')}</Tabs.Tab>
+          <Tabs.Tab value="settings">{t('profile.tab_settings')}</Tabs.Tab>
+        </Tabs.List>
 
-      <Paper shadow="xs" withBorder p="md" mt="md">
-        <Stack gap="sm">
-          <Text><strong>{t('profile.name')}:</strong> {name}</Text>
-          <Text><strong>{t('profile.role')}:</strong> {roleLabel}</Text>
-          <Text><strong>{t('profile.email')}:</strong> {email}</Text>
-        </Stack>
-        <Divider my="md" />
-        <Text size="sm" c="dimmed">
-          {t('profile.contact_admin_hint')}
-        </Text>
-        <ButtonFilled
-          style={{ marginTop: 16 }}
-          color="red"
-          label={t('common.logout')}
-          disabled={false}
-          onClick={handleLogout}
-        />
-      </Paper>
-
-      {isAdmin && (
-        <Paper shadow="xs" withBorder p="md" mt="md">
-          <Stack gap="md">
-            {message && (
-              <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
-                {message}
-              </Notification>
-            )}
-
-            <Title order={4}>{t('profile.change_password_title')}</Title>
-            <Text size="sm" c="dimmed">{t('profile.admin_change_desc')}</Text>
-            <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
-            <InputPassword
-              label={t('first_login.current_password')}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-            />
-            <InputPassword
-              label={t('first_login.new_password')}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.currentTarget.value)}
-            />
-            <InputPassword
-              label={t('first_login.confirm_password')}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.currentTarget.value)}
-            />
+        <Tabs.Panel value="profile" pt="md">
+          <Paper shadow="xs" withBorder p="md">
+            <Stack gap="sm">
+              <Text><strong>{t('profile.name')}:</strong> {name}</Text>
+              <Text><strong>{t('profile.role')}:</strong> {roleLabel}</Text>
+              <Text><strong>{t('profile.email')}:</strong> {email}</Text>
+            </Stack>
+            <Divider my="md" />
+            <Text size="sm" c="dimmed">
+              {t('profile.contact_admin_hint')}
+            </Text>
             <ButtonFilled
-              label={t('profile.change_password_submit')}
-              disabled={changingPassword}
-              onClick={() => void handleChangePassword()}
+              style={{ marginTop: 16 }}
+              color="red"
+              label={t('common.logout')}
+              disabled={false}
+              onClick={handleLogout}
             />
-          </Stack>
-        </Paper>
-      )}
+          </Paper>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="settings" pt="md">
+          <Paper shadow="xs" withBorder p="md">
+            <Stack gap="md">
+              {message && (
+                <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
+                  {message}
+                </Notification>
+              )}
+
+              <Title order={4}>{t('profile.change_password_title')}</Title>
+              <Text size="sm" c="dimmed">
+                {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
+              </Text>
+              <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
+              <InputPassword
+                label={t('first_login.current_password')}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+              />
+              <InputPassword
+                label={t('first_login.new_password')}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.currentTarget.value)}
+              />
+              <InputPassword
+                label={t('first_login.confirm_password')}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+              />
+              <ButtonFilled
+                label={t('profile.change_password_submit')}
+                disabled={changingPassword}
+                onClick={() => void handleChangePassword()}
+              />
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
+      </Tabs>
     </Box>
   );
 };
