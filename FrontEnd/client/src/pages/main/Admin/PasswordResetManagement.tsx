@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Button, Textarea, Modal,
+  Box, Text, Loader, Table, Paper, Group, Alert, Stack, Textarea, Modal,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { getPendingPasswordResets, approvePasswordReset, rejectPasswordReset, type PasswordResetRequestItem } from '@/services/authApi';
@@ -16,8 +16,24 @@ const PasswordResetManagement = () => {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [noteModal, setNoteModal] = useState<{ id: string; action: 'approve' | 'reject'; note: string } | null>(null);
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteAction, setNoteAction] = useState<'approve' | 'reject'>('approve');
+  const [noteRequestId, setNoteRequestId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+
+  const openNoteModal = (id: string, action: 'approve' | 'reject') => {
+    setNoteRequestId(id);
+    setNoteAction(action);
+    setNoteText('');
+    setNoteModalOpen(true);
+  };
+
+  const closeNoteModal = () => {
+    setNoteModalOpen(false);
+    setNoteRequestId(null);
+    setNoteText('');
+  };
 
   const load = async () => {
     const isFirstLoad = initialLoading;
@@ -41,7 +57,7 @@ const PasswordResetManagement = () => {
   const handleApprove = async (id: string, note: string) => {
     try {
       setProcessingId(id);
-      setNoteModal(null);
+      closeNoteModal();
       const result = await approvePasswordReset(id, note || undefined);
       setTempPassword(result.tempPassword);
       setNotice(`Đã duyệt yêu cầu. Mật khẩu tạm thời: ${result.tempPassword}`);
@@ -56,7 +72,7 @@ const PasswordResetManagement = () => {
   const handleReject = async (id: string, note: string) => {
     try {
       setProcessingId(id);
-      setNoteModal(null);
+      closeNoteModal();
       await rejectPasswordReset(id, note || undefined);
       setNotice('Đã từ chối yêu cầu.');
       await load();
@@ -141,7 +157,7 @@ const PasswordResetManagement = () => {
                         label="Duyệt"
                         loading={processingId === req.id}
                         disabled={processingId === req.id}
-                        onClick={() => setNoteModal({ id: req.id, action: 'approve', note: '' })}
+                        onClick={() => openNoteModal(req.id, 'approve')}
                       />
                       <ButtonLight
                         size="xs"
@@ -149,7 +165,7 @@ const PasswordResetManagement = () => {
                         label="Từ chối"
                         loading={processingId === req.id}
                         disabled={processingId === req.id}
-                        onClick={() => setNoteModal({ id: req.id, action: 'reject', note: '' })}
+                        onClick={() => openNoteModal(req.id, 'reject')}
                       />
                     </Group>
                   </Table.Td>
@@ -168,36 +184,34 @@ const PasswordResetManagement = () => {
       </Stack>
 
       <Modal
-        opened={noteModal != null}
-        onClose={() => setNoteModal(null)}
-        title={noteModal?.action === 'approve' ? 'Duyệt yêu cầu' : 'Từ chối yêu cầu'}
+        opened={noteModalOpen}
+        onClose={closeNoteModal}
+        title={noteAction === 'approve' ? 'Duyệt yêu cầu' : 'Từ chối yêu cầu'}
       >
         <Stack gap="sm">
           <Textarea
             label="Ghi chú (tùy chọn)"
-            value={noteModal?.note ?? ''}
-            onChange={(e) =>
-              setNoteModal((prev) => prev ? { ...prev, note: e.currentTarget.value } : null)
-            }
+            value={noteText}
+            onChange={(e) => setNoteText(e.currentTarget.value)}
             rows={3}
           />
           <Group justify="flex-end">
-            <ButtonLight size="sm" color="gray" label="Hủy" disabled={false} onClick={() => setNoteModal(null)} />
-            {noteModal?.action === 'approve' ? (
+            <ButtonLight size="sm" color="gray" label="Hủy" disabled={false} onClick={closeNoteModal} />
+            {noteAction === 'approve' ? (
               <ButtonFilled
                 size="sm"
                 color="green"
                 label="Xác nhận duyệt"
-                disabled={false}
-                onClick={() => noteModal && void handleApprove(noteModal.id, noteModal.note)}
+                disabled={!noteRequestId}
+                onClick={() => noteRequestId && void handleApprove(noteRequestId, noteText)}
               />
             ) : (
               <ButtonFilled
                 size="sm"
                 color="red"
                 label="Xác nhận từ chối"
-                disabled={false}
-                onClick={() => noteModal && void handleReject(noteModal.id, noteModal.note)}
+                disabled={!noteRequestId}
+                onClick={() => noteRequestId && void handleReject(noteRequestId, noteText)}
               />
             )}
           </Group>
