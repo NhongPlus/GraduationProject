@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Modal, Textarea, Button,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Modal, Textarea, Button, ScrollArea, SimpleGrid,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import examApi, { type ExamSession, type ExamRetakeGrant } from '@/services/examApi';
+
+type SessionTag = NonNullable<ExamSession['session_tags']>[number];
+
+const TAG_COLORS: Record<SessionTag, string> = {
+  submitted: 'green',
+  disconnected: 'red',
+  violations_exceeded: 'grape',
+  retake_pending: 'orange',
+  retake_session: 'violet',
+  voided: 'gray',
+};
 import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import PageHeader from '@/components/PageHeader/PageHeader';
 import { ListPaginationBar } from '@/components/ListPagination';
@@ -68,6 +79,41 @@ const ExamSessions = () => {
     return map;
   }, [retakeGrants]);
 
+  const statsSource = sessionStats.length > 0 ? sessionStats : sessions;
+
+  const sessionStatusLabel = (status: ExamSession['status']) => {
+    if (status === 'submitted') return t('exam_sessions.status_submitted');
+    if (status === 'active') return t('exam_sessions.status_active');
+    if (status === 'expired') return t('exam_sessions.status_expired');
+    return status;
+  };
+
+  const gradingStatusLabel = (grading: ExamSession['grading_status']) => {
+    if (grading === 'pending_manual') return t('exam_sessions.pending_manual');
+    if (grading === 'complete') return t('exam_sessions.graded');
+    return t('exam_sessions.grading_none');
+  };
+
+  const tagLabel = (tag: SessionTag) => {
+    const key = `exam_sessions.tag_${tag}` as const;
+    return t(key);
+  };
+
+  const formatScorePair = (score: number | null | undefined, max: number | null | undefined) => {
+    if (score == null || max == null) return '—';
+    return `${score}/${max}`;
+  };
+
+  const summary = useMemo(() => {
+    const rows = statsSource.filter((s) => !s.voided_at);
+    return {
+      submitted: rows.filter((s) => s.status === 'submitted').length,
+      active: rows.filter((s) => s.status === 'active').length,
+      pendingGrading: rows.filter((s) => s.grading_status === 'pending_manual').length,
+      retakeGranted: approvedGrantByStudent.size,
+    };
+  }, [approvedGrantByStudent.size, statsSource]);
+
   const openRetakeModal = (session: ExamSession) => {
     setRetakeTarget(session);
     setRetakeReason('');
@@ -116,8 +162,6 @@ const ExamSessions = () => {
     }
   };
 
-  const statsSource = sessionStats.length > 0 ? sessionStats : sessions;
-
   if (loading && sessions.length === 0) {
     return (
       <Box className="max-w-[1100px] mx-auto p-4">
@@ -142,8 +186,8 @@ const ExamSessions = () => {
       .join(' · ');
   })();
 
-  return (
-    <Box className="max-w-[1100px] mx-auto p-4">
+    return (
+      <Box className="w-full max-w-[1400px] mx-auto p-4 md:p-6">
       <Stack gap="md">
         <PageHeader
           title={t('exam_sessions.title')}
@@ -170,6 +214,25 @@ const ExamSessions = () => {
           </Alert>
         )}
 
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">{t('exam_sessions.stat_submitted')}</Text>
+            <Text fw={700} size="xl" c="green">{summary.submitted}</Text>
+          </Paper>
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">{t('exam_sessions.stat_active')}</Text>
+            <Text fw={700} size="xl" c="orange">{summary.active}</Text>
+          </Paper>
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">{t('exam_sessions.stat_pending_grading')}</Text>
+            <Text fw={700} size="xl" c="yellow.8">{summary.pendingGrading}</Text>
+          </Paper>
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">{t('exam_sessions.stat_retake_granted')}</Text>
+            <Text fw={700} size="xl" c="violet">{summary.retakeGranted}</Text>
+          </Paper>
+        </SimpleGrid>
+
         <Paper withBorder radius="md">
           <ListPaginationBar
             page={page}
@@ -181,17 +244,19 @@ const ExamSessions = () => {
               setPage(1);
             }}
           />
-          <Table striped>
+          <ScrollArea type="auto" offsetScrollbars>
+          <Table striped highlightOnHover layout="fixed" miw={1100}>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>#</Table.Th>
-                <Table.Th>{t('exam_sessions.student')}</Table.Th>
-                <Table.Th>{t('exam_sessions.version_code')}</Table.Th>
-                <Table.Th>{t('exam_sessions.status')}</Table.Th>
-                <Table.Th>{t('exam_sessions.score')}</Table.Th>
-                <Table.Th>{t('exam_sessions.grading_status')}</Table.Th>
-                <Table.Th>{t('exam_sessions.submitted_at')}</Table.Th>
-                <Table.Th>{t('common.actions')}</Table.Th>
+                <Table.Th w={48}>#</Table.Th>
+                <Table.Th w={220}>{t('exam_sessions.student')}</Table.Th>
+                <Table.Th w={72}>{t('exam_sessions.version_code')}</Table.Th>
+                <Table.Th w={100}>{t('exam_sessions.status')}</Table.Th>
+                <Table.Th w={200}>{t('exam_sessions.tags')}</Table.Th>
+                <Table.Th w={120}>{t('exam_sessions.score')}</Table.Th>
+                <Table.Th w={130}>{t('exam_sessions.grading_status')}</Table.Th>
+                <Table.Th w={150}>{t('exam_sessions.submitted_at')}</Table.Th>
+                <Table.Th w={200}>{t('exam_sessions.actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -204,11 +269,13 @@ const ExamSessions = () => {
                   <Table.Tr key={session.id} style={isVoided ? { opacity: 0.55 } : undefined}>
                     <Table.Td>{(page - 1) * pageSize + idx + 1}</Table.Td>
                     <Table.Td>
-                      <Text size="sm" fw={500}>
+                      <Text size="sm" fw={500} lineClamp={1}>
                         {session.student_name || session.full_name || session.student_id}
                       </Text>
                       {session.student_email && (
-                        <Text size="xs" c="dimmed">{session.student_email}</Text>
+                        <Text size="xs" c="dimmed" lineClamp={1} title={session.student_email}>
+                          {session.student_email}
+                        </Text>
                       )}
                       {approvedGrant && (
                         <Badge size="xs" color="orange" variant="light" mt={4}>
@@ -224,6 +291,7 @@ const ExamSessions = () => {
                         <Badge color="gray">{t('exam_retake.session_voided')}</Badge>
                       ) : (
                         <Badge
+                          variant="light"
                           color={
                             session.status === 'submitted'
                               ? 'green'
@@ -232,22 +300,55 @@ const ExamSessions = () => {
                                 : 'gray'
                           }
                         >
-                          {session.status}
+                          {sessionStatusLabel(session.status)}
                         </Badge>
                       )}
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm" fw={500}>
-                        {session.score != null ? `${session.score}/${session.max_points}` : '—'}
-                      </Text>
+                      <Group gap={4} wrap="wrap">
+                        {(session.session_tags ?? []).map((tag) => (
+                          <Badge
+                            key={tag}
+                            size="xs"
+                            variant="light"
+                            color={TAG_COLORS[tag]}
+                          >
+                            {tagLabel(tag)}
+                          </Badge>
+                        ))}
+                        {(session.session_tags ?? []).length === 0 && (
+                          <Text size="xs" c="dimmed">—</Text>
+                        )}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>
+                      {session.previous_score != null &&
+                      session.score != null &&
+                      !isVoided ? (
+                        <Text size="sm" fw={500}>
+                          {t('exam_sessions.score_retake_compare', {
+                            before: formatScorePair(
+                              session.previous_score,
+                              session.previous_max_points
+                            ),
+                            after: formatScorePair(session.score, session.max_points),
+                          })}
+                        </Text>
+                      ) : (
+                        <Text size="sm" fw={500}>
+                          {formatScorePair(session.score, session.max_points)}
+                        </Text>
+                      )}
                     </Table.Td>
                     <Table.Td>
                       {!isVoided && (
-                        <Badge color={session.grading_status === 'pending_manual' ? 'yellow' : 'green'}>
-                          {session.grading_status === 'pending_manual'
-                            ? t('exam_sessions.pending_manual')
-                            : t('exam_sessions.graded')}
-                        </Badge>
+                        <Text
+                          size="sm"
+                          c={session.grading_status === 'pending_manual' ? 'yellow.8' : 'green.7'}
+                          fw={session.grading_status === 'pending_manual' ? 600 : 500}
+                        >
+                          {gradingStatusLabel(session.grading_status)}
+                        </Text>
                       )}
                     </Table.Td>
                     <Table.Td>
@@ -258,18 +359,18 @@ const ExamSessions = () => {
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Group gap={4}>
+                      <Stack gap={6} align="stretch">
                         {!isVoided && (
-                          <ButtonLight
+                          <Button
                             size="xs"
-                            label={
-                              session.grading_status === 'complete'
-                                ? t('exam_sessions.view_grading_done')
-                                : t('exam_sessions.view_grading')
-                            }
-                            disabled={false}
+                            variant="light"
+                            color="blue"
                             onClick={() => navigate(`/grading/${session.id}`)}
-                          />
+                          >
+                            {session.grading_status === 'complete'
+                              ? t('exam_sessions.view_grading_done')
+                              : t('exam_sessions.view_grading')}
+                          </Button>
                         )}
                         {canGrantRetake && (
                           <Button
@@ -292,20 +393,21 @@ const ExamSessions = () => {
                             {t('exam_retake.revoke_btn')}
                           </Button>
                         )}
-                      </Group>
+                      </Stack>
                     </Table.Td>
                   </Table.Tr>
                 );
               })}
               {sessions.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={8}>
+                  <Table.Td colSpan={9}>
                     <Text c="dimmed" ta="center">{t('exam_sessions.no_sessions')}</Text>
                   </Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>
           </Table>
+          </ScrollArea>
         </Paper>
 
         <Group>

@@ -22,6 +22,8 @@ export interface ExamSession {
   void_reason?: string | null;
   superseded_by?: string | null;
   retake_grant_id?: string | null;
+  submit_source?: "student" | "force_submit" | "violation_auto" | "timer" | null;
+  disconnect_flag?: boolean;
 }
 
 export interface SessionWithExamMeta extends ExamSession {
@@ -138,6 +140,8 @@ export const finalizeSessionSubmit = async (
     student_answers: Record<string, string | string[]>;
     graded_details: unknown;
     grading_status: GradingStatus;
+    submit_source?: ExamSession["submit_source"];
+    disconnect_flag?: boolean;
   }
 ): Promise<ExamSession | null> => {
   const result = await pool.query(
@@ -148,7 +152,9 @@ export const finalizeSessionSubmit = async (
          max_points = $3,
          student_answers = $4::jsonb,
          graded_details = $5::jsonb,
-         grading_status = $6
+         grading_status = $6,
+         submit_source = COALESCE($7, submit_source, 'student'),
+         disconnect_flag = COALESCE($8, disconnect_flag, FALSE)
      WHERE id = $1 AND status = 'active'
      RETURNING *`,
     [
@@ -158,6 +164,8 @@ export const finalizeSessionSubmit = async (
       JSON.stringify(payload.student_answers),
       JSON.stringify(payload.graded_details),
       payload.grading_status,
+      payload.submit_source ?? "student",
+      payload.disconnect_flag ?? false,
     ]
   );
   return (result.rows[0] as ExamSession) ?? null;

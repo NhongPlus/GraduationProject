@@ -46,7 +46,7 @@ export const insertIntegrityEvents = async (
 
   const result = await pool.query(
     `INSERT INTO exam_integrity_events
-      (exam_id, session_id, student_id, event_type, client_at, details)
+      (exam_id, session_id, student_id, event_type, event_at, details)
      VALUES ${placeholders}`,
     values
   );
@@ -66,10 +66,10 @@ export const getIntegrityEventsBySession = async (
   created_at: string;
 }>> => {
   const result = await pool.query(
-    `SELECT id, exam_id, student_id, event_type, client_at, details, created_at
+    `SELECT id, exam_id, student_id, event_type, event_at AS client_at, details, created_at
      FROM exam_integrity_events
      WHERE session_id = $1
-     ORDER BY client_at ASC`,
+     ORDER BY event_at ASC`,
     [sessionId]
   );
   return result.rows;
@@ -88,10 +88,10 @@ export const getIntegrityEventsByExam = async (
   created_at: string;
 }>> => {
   const result = await pool.query(
-    `SELECT id, exam_id, session_id, student_id, event_type, client_at, details, created_at
+    `SELECT id, exam_id, session_id, student_id, event_type, event_at AS client_at, details, created_at
      FROM exam_integrity_events
      WHERE exam_id = $1
-     ORDER BY client_at ASC`,
+     ORDER BY event_at ASC`,
     [examId]
   );
   return result.rows;

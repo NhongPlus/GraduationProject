@@ -34,6 +34,7 @@ import { parseExamImportDocx, aiRecomposeExam } from "~/services/examImport.serv
 import { getIntegrityEventsByExam } from "~/models/examIntegrity.model";
 import { getActivePresenceByExam, queryProctorLogsByExamPaginated } from "~/models/examProctor.model";
 import { querySessionsByExamPaginated } from "~/models/examsession.model";
+import { enrichSessionsForTeacherView } from "~/services/examSessionDisplay.service";
 import { parsePaginationQuery, buildPaginatedList } from "~/utils/pagination";
 import {
   EXAM_MEDIA_FOLDER,
@@ -419,9 +420,10 @@ export const getExamSessionsController = async (req: Request, res: Response, nex
   try {
     const { limit, offset } = parsePaginationQuery(req.query as Record<string, unknown>);
     const result = await querySessionsByExamPaginated(req.params.examId, limit, offset);
+    const items = await enrichSessionsForTeacherView(result.items, req.params.examId);
     res.json({
       success: true,
-      data: buildPaginatedList(result.items, result.total, limit, offset),
+      data: buildPaginatedList(items, result.total, limit, offset),
     });
   } catch (err) {
     next(err);

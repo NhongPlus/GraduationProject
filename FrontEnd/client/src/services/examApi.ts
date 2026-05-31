@@ -80,6 +80,19 @@ export interface ExamSession {
   version_code?: string | null;
   voided_at?: string | null;
   void_reason?: string | null;
+  submit_source?: 'student' | 'force_submit' | 'violation_auto' | 'timer' | null;
+  disconnect_flag?: boolean;
+  strike_count?: number;
+  session_tags?: Array<
+    | 'submitted'
+    | 'disconnected'
+    | 'violations_exceeded'
+    | 'retake_pending'
+    | 'retake_session'
+    | 'voided'
+  >;
+  previous_score?: number | null;
+  previous_max_points?: number | null;
 }
 
 export interface ExamRetakeGrant {

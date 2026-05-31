@@ -94,7 +94,11 @@ import {
   normalizeScheduleAtInput,
 } from "~/utils/examSchedule";
 import { formatScoreScale10Pair } from "~/utils/gradeScale";
-import { shouldAutoSubmitByViolationCount, STRIKE_EVENT_TYPES } from "~/utils/examIntegrityPolicy";
+import {
+  DISCONNECT_AUTOSAVE_GAP_MS,
+  shouldAutoSubmitByViolationCount,
+  STRIKE_EVENT_TYPES,
+} from "~/utils/examIntegrityPolicy";
 import { canManageExamRetake } from "~/services/examRetake.service";
 import type { ImportedQuestionDraft } from "~/services/examImport.service";
 import {
@@ -1194,7 +1198,11 @@ export const submitSessionService = async (
   sessionId: string,
   studentId: string,
   answers: Record<string, string | string[]>,
-  options?: { allowPastDeadline?: boolean }
+  options?: {
+    allowPastDeadline?: boolean;
+    submitSource?: ExamSession["submit_source"];
+    disconnectFlag?: boolean;
+  }
 ): Promise<SubmitResult> => {
   const session = await getSessionById(sessionId);
   if (!session) throw httpError(404, "Phiên thi không tồn tại");
@@ -1314,6 +1322,8 @@ export const submitSessionService = async (
     student_answers: unshuffledAnswers, // store in original (unshuffled) format
     graded_details: gradedRows,
     grading_status: gradingStatus,
+    submit_source: options?.submitSource ?? "student",
+    disconnect_flag: options?.disconnectFlag ?? false,
   });
 
   if (!updated) throw httpError(409, "Không thể nộp bài (phiên không còn active)");
@@ -1858,8 +1868,14 @@ async function forceSubmitOneActiveSession(session: ExamSession): Promise<void> 
     ? autosaveToDisplayIndexAnswers(snapshot?.answers ?? {})
     : normalizeAutosaveToSubmitAnswers(snapshot?.answers ?? {}, orderedQuestionIds);
 
+  const autosaveAt = snapshot?.saved_at ? new Date(snapshot.saved_at).getTime() : NaN;
+  const autosaveAgeMs = Number.isFinite(autosaveAt) ? Date.now() - autosaveAt : Infinity;
+  const disconnectFlag = autosaveAgeMs > DISCONNECT_AUTOSAVE_GAP_MS;
+
   await submitSessionService(session.id, session.student_id, submitAnswers, {
     allowPastDeadline: true,
+    submitSource: "force_submit",
+    disconnectFlag,
   });
 }
 
@@ -2061,6 +2077,7 @@ export const reportViolationService = async (
       const submitAnswers = autosaveToDisplayIndexAnswers(snapshot?.answers ?? {});
       await submitSessionService(session.id, studentId, submitAnswers, {
         allowPastDeadline: true,
+        submitSource: "violation_auto",
       });
       autoSubmitTriggered = true;
       sessionStatus = "submitted";
