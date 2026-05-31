@@ -154,6 +154,7 @@
     "duration_minutes": "{{count}} phút",
     "questions_count": "{{count}} câu",
     "start_exam": "Bắt đầu thi",
+    "more_hint": "+{{count}} bài thi khác — xem tất cả",
     "not_open": "Chưa mở"
   },
   "recent_results": {
@@ -230,7 +231,15 @@
     "semester": "Học kỳ",
     "credits": "Tín chỉ",
     "history": "Lịch sử điểm",
-    "grade": "Xếp loại"
+    "grade": "Xếp loại",
+    "hidden_subjects_notice": "Đã ẩn {{count}} môn chưa có model dự báo điểm hợp lệ.",
+    "hidden_subjects_list_notice": "Danh sách dưới đây đã ẩn {{count}} môn chưa có model dự báo điểm hợp lệ.",
+    "weak_chapters_title": "Chủ điểm cần ôn từ bài thi gần nhất",
+    "weak_chapter_wrong": "Sai {{count}} câu: {{questions}}",
+    "question_short": "Câu {{q}}",
+    "chapter_format": "Chương {{chapter}} - {{label}}",
+    "chapter_number_only": "Chương {{chapter}}",
+    "chapter_unassigned": "Chưa gán chương"
   },
   "my_results": {
     "title": "Kết quả của tôi",

@@ -36,15 +36,17 @@ function dedupeSubjectsById(list: SubjectDto[]): SubjectDto[] {
   return out;
 }
 
-function formatChapterLabel(chapter?: number | null, chapterLabel?: string | null): string {
-  if (chapterLabel && typeof chapter === 'number') return `Chương ${chapter} - ${chapterLabel}`;
-  if (chapterLabel) return chapterLabel;
-  if (typeof chapter === 'number') return `Chương ${chapter}`;
-  return 'Chưa gán chương';
-}
-
 const Prediction = () => {
   const { t } = useTranslation();
+
+  const formatChapterLabel = (chapter?: number | null, chapterLabel?: string | null): string => {
+    if (chapterLabel && typeof chapter === 'number') {
+      return t('prediction.chapter_format', { chapter, label: chapterLabel });
+    }
+    if (chapterLabel) return chapterLabel;
+    if (typeof chapter === 'number') return t('prediction.chapter_number_only', { chapter });
+    return t('prediction.chapter_unassigned');
+  };
   const navigate = useNavigate();
   const { userRole } = useAuth();
 
@@ -373,7 +375,7 @@ const Prediction = () => {
             )}
             {hiddenUnavailablePredictionCount > 0 && (
               <Text size="sm" mt="xs">
-                {`Đã ẩn ${hiddenUnavailablePredictionCount} môn chưa có model dự báo điểm hợp lệ.`}
+                {t('prediction.hidden_subjects_notice', { count: hiddenUnavailablePredictionCount })}
               </Text>
             )}
           </Alert>
@@ -382,8 +384,8 @@ const Prediction = () => {
         {hasFuturePredictionTargets && (
           <>
             {hiddenUnavailablePredictionCount > 0 && (
-              <Alert color="blue" variant="light">
-                {`Danh sách dưới đây đã ẩn ${hiddenUnavailablePredictionCount} môn chưa có model dự báo điểm hợp lệ.`}
+              <Alert color="blue" variant="default">
+                {t('prediction.hidden_subjects_list_notice', { count: hiddenUnavailablePredictionCount })}
               </Alert>
             )}
 
@@ -465,7 +467,7 @@ const Prediction = () => {
         )}
 
         {hasFuturePredictionTargets && predictionResult?.learning_assessment && (
-          <Paper withBorder radius="md" p="md" bg="teal.0">
+          <Paper withBorder radius="md" p="md">
             <Text fw={700} mb="md">{t('prediction.assessment_title')}</Text>
             <Stack gap="sm">
               <Box>
@@ -483,7 +485,7 @@ const Prediction = () => {
                 </Box>
               )}
               {predictionResult.learning_assessment.advice.length > 0 && (
-                <Alert color="blue" variant="light" title={t('prediction.advice_title')}>
+                <Alert color="blue" variant="default" title={t('prediction.advice_title')}>
                   <Stack gap={4}>
                     {predictionResult.learning_assessment.advice.map((line, i) => (
                       <Text key={i} size="sm">• {line}</Text>
@@ -587,7 +589,7 @@ const Prediction = () => {
 
         {hasFuturePredictionTargets && predictionResult?.weak_chapters && predictionResult.weak_chapters.length > 0 && (
           <Paper withBorder radius="md" p="md">
-            <Text fw={600} mb="sm">Chủ điểm cần ôn từ bài thi gần nhất</Text>
+            <Text fw={600} mb="sm">{t('prediction.weak_chapters_title')}</Text>
             <Stack gap="xs">
               {predictionResult.weak_chapters.map((item, i) => (
                 <Box key={`${item.label}-${i}`}>
@@ -595,7 +597,12 @@ const Prediction = () => {
                     {item.label}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    {`Sai ${item.wrong_count} câu: ${item.question_numbers.map((q) => `Câu ${q}`).join(', ')}`}
+                    {t('prediction.weak_chapter_wrong', {
+                      count: item.wrong_count,
+                      questions: item.question_numbers
+                        .map((q) => t('prediction.question_short', { q }))
+                        .join(', '),
+                    })}
                   </Text>
                 </Box>
               ))}

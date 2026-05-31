@@ -783,7 +783,15 @@
     "target_subject_placeholder": "科目を選択（数学・ソフトウェア等のブロック）",
     "title": "AI 予測スコア",
     "wrong_item": "問題 {{q}}",
-    "wrong_summary_title": "最新試験で間違えた問題"
+    "wrong_summary_title": "最新試験で間違えた問題",
+    "hidden_subjects_notice": "有効な予測モデルのない科目 {{count}} 件を非表示にしています。",
+    "hidden_subjects_list_notice": "下の一覧では同様の科目 {{count}} 件を非表示にしています。",
+    "weak_chapters_title": "直近の試験で復習すべきトピック",
+    "weak_chapter_wrong": "{{count}} 問不正解: {{questions}}",
+    "question_short": "問{{q}}",
+    "chapter_format": "第{{chapter}}章 - {{label}}",
+    "chapter_number_only": "第{{chapter}}章",
+    "chapter_unassigned": "章未割当"
   },
   "proctoring": {
     "active": "実施中",
@@ -1133,6 +1141,7 @@
     "countdown_days": "あと {{count}} にち",
     "countdown_unknown": "きげんは きまっていません",
     "duration_minutes": "{{count}} ぷん",
+    "more_hint": "他 {{count}} 件 — すべて表示",
     "not_open": "まだです",
     "questions_count": "{{count}} もん",
     "start_exam": "しけん かいし",

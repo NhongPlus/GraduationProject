@@ -783,7 +783,15 @@
     "target_subject_placeholder": "Choose subject (by block: Math, Software, …)",
     "title": "Learning outcome assessment (AI)",
     "wrong_item": "Question {{q}}",
-    "wrong_summary_title": "Wrong answers from your latest exam"
+    "wrong_summary_title": "Wrong answers from your latest exam",
+    "hidden_subjects_notice": "{{count}} subject(s) without a valid score model are hidden.",
+    "hidden_subjects_list_notice": "The list below hides {{count}} subject(s) without a valid score model.",
+    "weak_chapters_title": "Topics to review from your latest exam",
+    "weak_chapter_wrong": "{{count}} wrong: {{questions}}",
+    "question_short": "Q{{q}}",
+    "chapter_format": "Chapter {{chapter}} - {{label}}",
+    "chapter_number_only": "Chapter {{chapter}}",
+    "chapter_unassigned": "No chapter assigned"
   },
   "proctoring": {
     "active": "Active",
@@ -1133,6 +1141,7 @@
     "countdown_days": "In {{count}} days",
     "countdown_unknown": "No fixed deadline",
     "duration_minutes": "{{count}} min",
+    "more_hint": "+{{count}} more — see all exams",
     "not_open": "Not open",
     "questions_count": "{{count}} questions",
     "start_exam": "Start exam",
