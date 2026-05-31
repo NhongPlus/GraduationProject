@@ -501,6 +501,8 @@
     "correct_answer": "正解",
     "empty_filtered": "現在のフィルターに一致する提出がありません。",
     "essay_grading": "記述採点",
+    "essay": "記述",
+    "essay_question": "記述問題 {{n}}",
     "filter_all_subjects": "すべての科目",
     "filter_keyword": "キーワード",
     "filter_keyword_placeholder": "試験名・学生名・学籍番号で検索...",

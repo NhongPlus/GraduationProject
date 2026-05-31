@@ -455,6 +455,8 @@
     "submitted_at": "Nộp lúc",
     "mcq_summary": "Kết quả trắc nghiệm",
     "essay_grading": "Chấm điểm tự luận",
+    "essay": "Tự luận",
+    "essay_question": "Câu tự luận {{n}}",
     "question": "Câu hỏi",
     "answer": "Đáp án SV",
     "correct_answer": "Đáp án đúng",

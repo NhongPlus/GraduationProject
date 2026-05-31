@@ -336,7 +336,9 @@ const Grading = () => {
                   <Box key={detail.question_id} p="md" style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}>
                     <Group justify="space-between" mb="xs">
                       <Group gap="xs">
-                        <Badge variant="light">{t('grading.essay')} {idx + 1}</Badge>
+                        <Badge variant="light" color="blue">
+                          {t('grading.essay_question', { n: idx + 1 })}
+                        </Badge>
                         <Text size="sm" c="dimmed">{t('grading.max_points')}: {detail.max_points}</Text>
                       </Group>
                       {detail.pending_grading && (

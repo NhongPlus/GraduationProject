@@ -501,6 +501,8 @@
     "correct_answer": "Correct answer",
     "empty_filtered": "No submissions match the current filters.",
     "essay_grading": "Essay grading",
+    "essay": "Essay",
+    "essay_question": "Essay question {{n}}",
     "filter_all_subjects": "All subjects",
     "filter_keyword": "Keyword",
     "filter_keyword_placeholder": "Search by exam, student, or student ID...",
