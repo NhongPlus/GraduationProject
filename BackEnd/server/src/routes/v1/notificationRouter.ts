@@ -30,10 +30,16 @@ notificationRouter.get("/", async (req, res) => {
   });
 
   try {
-    const { notifications, total } = await getNotificationsByUser(userId, limit, offset);
+    const [{ notifications, total }, unreadCount] = await Promise.all([
+      getNotificationsByUser(userId, limit, offset),
+      getUnreadCount(userId),
+    ]);
     res.json({
       success: true,
-      data: buildPaginatedList(notifications, total, limit, offset),
+      data: {
+        ...buildPaginatedList(notifications, total, limit, offset),
+        unread_count: unreadCount,
+      },
     });
   } catch (err: any) {
     console.error("notificationRouter error:", err?.message ?? err);

@@ -14,6 +14,7 @@ export interface UserNotificationItem {
 
 export type NotificationListResult = PaginatedList<UserNotificationItem> & {
   success: boolean;
+  unread_count?: number;
 };
 
 export interface NotificationCountResponse {
@@ -26,8 +27,13 @@ export const getNotifications = async (params?: {
   limit?: number;
 }): Promise<NotificationListResult> => {
   const res = await apiClient.get<{ success: boolean; data: unknown }>('/notifications', { params });
-  const list = unwrapPaginatedData<UserNotificationItem>(res.data.data);
-  return { success: res.data.success, ...list };
+  const raw = res.data.data as Record<string, unknown> | unknown[] | null;
+  const unreadFromApi =
+    raw && !Array.isArray(raw) && typeof raw.unread_count === 'number'
+      ? raw.unread_count
+      : undefined;
+  const list = unwrapPaginatedData<UserNotificationItem>(raw);
+  return { success: res.data.success, unread_count: unreadFromApi, ...list };
 };
 
 export const getUnreadCount = async (): Promise<number> => {

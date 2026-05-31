@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Box, Button, Divider, Group, Menu, Text, Tooltip } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import { Bell, Check, CheckCheck, ExternalLink } from 'lucide-react';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, type UserNotificationItem } from '@/services/notificationApi';
 import { sanitizeScoreInText } from '@/utils/formatExamScore';
+
+/** Chỉ poll badge khi menu đóng — tránh spam API trên production. */
+const UNREAD_POLL_MS = 3 * 60_000;
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -33,37 +36,79 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [opened, setOpened] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inFlightRef = useRef(false);
+  const openedRef = useRef(false);
 
-  async function load() {
+  const refreshUnreadCount = useCallback(async () => {
+    if (inFlightRef.current || document.visibilityState === 'hidden') return;
+    inFlightRef.current = true;
     try {
-      const [listRes, countRes] = await Promise.all([
-        getNotifications({ limit: 10 }),
-        getUnreadCount(),
-      ]);
-      setNotifications(listRes.items);
-      setUnreadCount(countRes);
+      const count = await getUnreadCount();
+      setUnreadCount(count);
     } catch (err) {
-      // Non-critical — but log so deploy/DB issues are visible in DevTools
       if (import.meta.env.DEV) {
-        console.warn('[NotificationBell] load failed', err);
+        console.warn('[NotificationBell] unread-count failed', err);
       }
+    } finally {
+      inFlightRef.current = false;
     }
-  }
+  }, []);
+
+  const refreshList = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      const listRes = await getNotifications({ limit: 10 });
+      setNotifications(listRes.items);
+      if (listRes.unread_count != null) {
+        setUnreadCount(listRes.unread_count);
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('[NotificationBell] list failed', err);
+      }
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
-    void load();
-    // Poll every 30s when the dropdown is open, or every 60s otherwise
-    pollRef.current = setInterval(() => { void load(); }, opened ? 30_000 : 60_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    openedRef.current = opened;
   }, [opened]);
+
+  useEffect(() => {
+    void refreshUnreadCount();
+
+    const pollId = window.setInterval(() => {
+      if (!openedRef.current) {
+        void refreshUnreadCount();
+      }
+    }, UNREAD_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !openedRef.current) {
+        void refreshUnreadCount();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.clearInterval(pollId);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshUnreadCount]);
+
+  useEffect(() => {
+    if (opened) {
+      void refreshList();
+    }
+  }, [opened, refreshList]);
 
   async function handleMarkAll() {
     setLoading(true);
     try {
       await markAllAsRead();
-      await load();
+      await refreshList();
     } finally {
       setLoading(false);
     }
@@ -110,7 +155,6 @@ export default function NotificationBell() {
       </Menu.Target>
 
       <Menu.Dropdown p={0}>
-        {/* Header */}
         <Group justify="space-between" p="xs" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }}>
           <Text fw={600} size="sm">{t('notification.title')}</Text>
           {unreadCount > 0 && (
@@ -122,7 +166,6 @@ export default function NotificationBell() {
           )}
         </Group>
 
-        {/* List */}
         <Box style={{ maxHeight: 360, overflowY: 'auto' }}>
           {notifications.length === 0 ? (
             <Text c="dimmed" size="sm" ta="center" py="xl">
@@ -180,7 +223,6 @@ export default function NotificationBell() {
           )}
         </Box>
 
-        {/* Footer */}
         {notifications.length > 0 && (
           <Box p="xs" style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
             <Button
