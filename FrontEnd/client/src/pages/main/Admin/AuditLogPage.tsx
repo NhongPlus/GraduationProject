@@ -178,7 +178,7 @@ const AuditLogPage = () => {
               <Center
                 pos="absolute"
                 inset={0}
-                style={{ zIndex: 2, background: 'rgba(255,255,255,0.6)' }}
+                style={{ zIndex: 2, background: 'color-mix(in srgb, var(--mantine-color-body) 70%, transparent)' }}
               >
                 <Loader size="sm" />
               </Center>

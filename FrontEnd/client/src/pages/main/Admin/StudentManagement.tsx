@@ -430,7 +430,7 @@ const StudentManagement = () => {
               <Center
                 pos="absolute"
                 inset={0}
-                style={{ zIndex: 2, background: 'rgba(255,255,255,0.6)' }}
+                style={{ zIndex: 2, background: 'color-mix(in srgb, var(--mantine-color-body) 70%, transparent)' }}
               >
                 <Loader size="sm" />
               </Center>
@@ -459,7 +459,7 @@ const StudentManagement = () => {
               </Table.Thead>
               <Table.Tbody>
                 {students.map((s, idx) => (
-                  <Table.Tr key={s.id} bg={selectedIds.has(s.id) ? 'teal.0' : undefined}>
+                  <Table.Tr key={s.id} bg={selectedIds.has(s.id) ? 'var(--mantine-color-teal-light)' : undefined}>
                     <Table.Td>
                       <Checkbox
                         checked={selectedIds.has(s.id)}

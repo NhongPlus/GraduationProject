@@ -3,20 +3,20 @@
   text-align: left;
   font-weight: 600;
   font-size: 0.76rem;
-  color: #9ca3af;
+  color: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-2));
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #fafbfc;
-  border-bottom: 1px solid #e5e7eb;
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
 }
 
 .table :global(td) {
   padding: 13px 16px;
-  color: #374151;
+  color: light-dark(var(--mantine-color-gray-7), var(--mantine-color-dark-0));
 }
 
 .table :global(tr) {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
 }
 
 .table :global(tr:last-child) {
@@ -34,6 +34,6 @@
 
 .scoreSuffix {
   margin-left: 4px;
-  color: #9ca3af;
+  color: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-2));
   font-size: 0.78rem;
 }

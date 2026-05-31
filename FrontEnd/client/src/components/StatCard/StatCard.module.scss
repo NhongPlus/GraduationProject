@@ -4,7 +4,7 @@
 
 .card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px light-dark(rgba(15, 23, 42, 0.08), rgba(0, 0, 0, 0.25));
   border-color: transparent;
 }
 
@@ -16,6 +16,26 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.iconTeal {
+  background: light-dark(#f0fdfa, rgba(13, 148, 136, 0.15));
+  color: light-dark(#0d9488, #2dd4bf);
+}
+
+.iconGreen {
+  background: light-dark(#dcfce7, rgba(22, 163, 74, 0.15));
+  color: light-dark(#16a34a, #4ade80);
+}
+
+.iconCyan {
+  background: light-dark(#cffafe, rgba(8, 145, 178, 0.15));
+  color: light-dark(#0891b2, #22d3ee);
+}
+
+.iconAmber {
+  background: light-dark(#fef3c7, rgba(217, 119, 6, 0.15));
+  color: light-dark(#d97706, #fbbf24);
 }
 
 .content {
@@ -31,11 +51,23 @@
 .label {
   margin-top: 4px;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: light-dark(var(--mantine-color-gray-6), var(--mantine-color-dark-2));
 }
 
 .trend {
   margin-top: 6px;
   font-size: 0.72rem;
   font-weight: 600;
+}
+
+.trendUp {
+  color: light-dark(#16a34a, #4ade80);
+}
+
+.trendDown {
+  color: light-dark(#dc2626, #f87171);
+}
+
+.trendFlat {
+  color: light-dark(#64748b, var(--mantine-color-dark-2));
 }

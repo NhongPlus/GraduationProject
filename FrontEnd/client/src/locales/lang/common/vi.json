@@ -70,6 +70,7 @@
     "password_mismatch": "Mật khẩu mới và xác nhận không khớp.",
     "create_account_title": "Tạo tài khoản mới",
     "save_account": "Lưu",
+    "sign_up": "Đăng ký",
     "cancel": "Hủy",
     "submit_exam": "Nộp bài",
     "refresh": "Làm mới",
@@ -690,7 +691,7 @@
     "user": "Người dùng"
   },
   "nav": {
-    "main": "Main",
+    "main": "Trang chính",
     "exams": "Bài thi",
     "exam_list": "Danh sách bài thi",
     "exam_create": "Tạo bài thi",

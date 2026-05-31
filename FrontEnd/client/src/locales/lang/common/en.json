@@ -88,6 +88,7 @@
     "result": "Result",
     "role": "Role",
     "save": "Save",
+    "sign_up": "Sign up",
     "save_account": "Save",
     "search_placeholder": "Search by exam name...",
     "selected_count": "Selected: {{count}}",
@@ -147,7 +148,7 @@
     "view_schedule": "View schedule",
     "welcome_aria": "Welcome message",
     "welcome_note": "Dashboard data is loaded live from the system.",
-    "welcome_note_stats": "You have {{taken}} submitted exam(s); {{upcoming}} exam(s) in your enrolled classes. All widgets below come from GET /v1/dashboard.",
+    "welcome_note_stats": "You have {{taken}} submitted exam(s) and {{upcoming}} upcoming exam(s) in your enrolled classes.",
     "welcome_title": "Hello, {{name}}"
   },
   "exam_authoring": {

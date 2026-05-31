@@ -22,7 +22,7 @@ export default function UpcomingExamsTable({ exams }: UpcomingExamsTableProps) {
   const navigate = useNavigate();
 
   return (
-    <Paper radius="xl" withBorder p="md" className={styles.wrapper}>
+    <Paper radius="xl" withBorder p="md">
       <Group justify="space-between" mb="md">
         <Group gap="xs">
           <IconCalendarEvent size={20} color="#0D9488" />

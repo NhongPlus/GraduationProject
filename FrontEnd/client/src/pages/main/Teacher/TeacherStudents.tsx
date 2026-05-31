@@ -385,7 +385,7 @@ const TeacherStudents = () => {
                   </Table.Thead>
                   <Table.Tbody>
                     {students.map((s, idx) => (
-                      <Table.Tr key={s.id} bg={selectedStudentIds.has(s.id) ? 'teal.0' : undefined}>
+                      <Table.Tr key={s.id} bg={selectedStudentIds.has(s.id) ? 'var(--mantine-color-teal-light)' : undefined}>
                         <Table.Td>
                           <Checkbox
                             checked={selectedStudentIds.has(s.id)}
