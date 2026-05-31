@@ -32,8 +32,10 @@ import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 import adminClassApi, { type AdminClassDto, type ImportPreviewRow } from '@/services/adminClassApi';
 import programApi, { type ProgramDto } from '@/services/programApi';
 import userApi from '@/services/userApi';
+import { useTranslation } from 'react-i18next';
 
 const AdminClassManagement = () => {
+  const { t } = useTranslation();
   const [classes, setClasses] = useState<AdminClassDto[]>([]);
   const [programs, setPrograms] = useState<ProgramDto[]>([]);
   const [teachers, setTeachers] = useState<{ value: string; label: string }[]>([]);
@@ -555,8 +557,8 @@ const AdminClassManagement = () => {
   return (
     <Box className="max-w-[1200px] mx-auto p-4">
       <PageHeader
-        title="Quản lý lớp hành chính"
-        subtitle="Tạo lớp, gán giáo viên chủ nhiệm (tối đa 2 lớp/GV), thêm hoặc import sinh viên"
+        title={t('admin_class.title')}
+        subtitle={t('admin_class.subtitle')}
         accent="teal"
       />
       {notice && <Alert color="green" mb="md" onClose={() => setNotice('')}>{notice}</Alert>}

@@ -1,0 +1,17 @@
+@startuml UC-S3_Xem_chi_tiet_bai_thi
+' Sinh viên — Xem chi tiết bài thi (dùng cho báo cáo, không nhầm với Đăng nhập)
+' Render: https://plantuml.com/ hoặc VS Code extension PlantUML
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Sinh viên" as SinhVien
+
+rectangle "Hệ thống thi trực tuyến" {
+  usecase "UC-S3\nXem chi tiết bài thi" as UC_S3
+}
+
+SinhVien --> UC_S3
+
+@enduml

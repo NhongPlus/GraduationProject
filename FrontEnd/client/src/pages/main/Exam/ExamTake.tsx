@@ -1323,11 +1323,6 @@ const ExamTake = () => {
               })()}
             </Box>
           )}
-          {!submitFailed && (
-            <Text size="xs" c="dimmed" mt="sm">
-              {t('exam_take.submit_redirect_hint')}
-            </Text>
-          )}
           {!submitFailed && examId && (
             <Button
               mt="md"

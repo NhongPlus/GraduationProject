@@ -140,7 +140,7 @@ const AuditLogPage = () => {
             <Group justify="space-between" wrap="wrap" gap="sm" align="flex-end">
               <Select
                 label={t('audit_log.filter_action')}
-                placeholder="Tất cả hành động"
+                placeholder={t('audit_log.filter_all_actions')}
                 clearable
                 value={actionFilter}
                 onChange={handleFilterChange}
@@ -149,7 +149,7 @@ const AuditLogPage = () => {
               />
               <Group gap="sm" wrap="wrap" align="flex-end">
                 <Select
-                  label="Số dòng / trang"
+                  label={t('pagination.page_size_label')}
                   data={PAGE_SIZE_OPTIONS.map((n) => ({
                     value: String(n),
                     label: t('pagination.page_size_option', { size: n }),
@@ -164,7 +164,7 @@ const AuditLogPage = () => {
                 />
                 <ButtonLight
                   size="sm"
-                  label="Làm mới"
+                  label={t('common.refresh')}
                   loading={refreshing}
                   disabled={refreshing}
                   onClick={handleRefresh}

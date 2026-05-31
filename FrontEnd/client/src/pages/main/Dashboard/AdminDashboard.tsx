@@ -169,10 +169,6 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
         )}
       </Group>
 
-      <Text size="sm" c="dimmed" mb="lg">
-        {t('dashboard.staff_hint')}
-      </Text>
-
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md" mb="xl">
         {data.metrics.map((m) => (
           <Paper key={m.key} radius="md" withBorder p="md">
@@ -182,7 +178,6 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
             <Text fw={800} size="xl" mt={4}>
               {m.value}
             </Text>
-            <Text size="xs" c="dimmed" mt={6}>{t('dashboard.management_metric_hint')}</Text>
           </Paper>
         ))}
       </SimpleGrid>
@@ -199,7 +194,7 @@ const AdminDashboard = ({ data }: AdminDashboardProps) => {
                 onClick={() => void loadStudents()}
                 loading={studentsLoading}
               >
-                Làm mới
+                {t('common.refresh')}
               </Button>
             )}
           </Group>

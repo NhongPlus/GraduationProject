@@ -503,7 +503,7 @@ const TeacherStudents = () => {
             {emailResult && <Alert color={emailResult.includes('error') ? 'red' : 'green'} variant="light">{emailResult}</Alert>}
 
             {!selectedExamId ? (
-              <Text c="dimmed">{t('teacher_students.select_exam_hint')}</Text>
+              <Text c="dimmed">{t('teacher_students.select_exam_placeholder')}</Text>
             ) : (
               <Paper withBorder radius="md" p="sm">
                 <Group justify="space-between" mb="sm" wrap="wrap">
@@ -634,7 +634,7 @@ const TeacherStudents = () => {
             onChange={(e) => setEditForm((p) => ({ ...p, username: e.currentTarget.value }))}
           />
           <InputText
-            label="Email"
+            label={t('common.email')}
             value={editForm.email}
             onChange={(e) => setEditForm((p) => ({ ...p, email: e.currentTarget.value }))}
           />

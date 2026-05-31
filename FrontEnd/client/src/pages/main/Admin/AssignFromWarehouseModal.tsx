@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import subjectApi, { type SubjectCatalogGroup } from '@/services/subjectApi';
 import programApi from '@/services/programApi';
+import { useTranslation } from 'react-i18next';
 
 type Props = {
   opened: boolean;
@@ -32,6 +33,7 @@ export default function AssignFromWarehouseModal({
   assignedGroupIds,
   onAssigned,
 }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<SubjectCatalogGroup[]>([]);
@@ -162,7 +164,7 @@ export default function AssignFromWarehouseModal({
                       <Accordion variant="contained" chevronPosition="left">
                         <Accordion.Item value="subjects">
                           <Accordion.Control>
-                            <Text size="xs">Chọn lẻ từng môn trong nhóm</Text>
+                            <Text size="xs">{t('subject_catalog.pick_subjects_in_group')}</Text>
                           </Accordion.Control>
                           <Accordion.Panel>
                             <Stack gap={4} pl="md">

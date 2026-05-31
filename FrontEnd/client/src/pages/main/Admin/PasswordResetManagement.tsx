@@ -112,7 +112,7 @@ const PasswordResetManagement = () => {
           <Group justify="flex-end" mb="sm">
             <ButtonLight
               size="sm"
-              label="Làm mới"
+              label={t('common.refresh')}
               loading={refreshing}
               disabled={refreshing}
               onClick={() => void load()}
@@ -123,7 +123,7 @@ const PasswordResetManagement = () => {
               <Table.Tr>
                 <Table.Th>#</Table.Th>
                 <Table.Th>{t('password_reset.user')}</Table.Th>
-                <Table.Th>Email</Table.Th>
+                <Table.Th>{t('password_reset.col_email')}</Table.Th>
                 <Table.Th>{t('password_reset.requested_by')}</Table.Th>
                 <Table.Th>{t('password_reset.requested_at')}</Table.Th>
                 <Table.Th>{t('password_reset.expires_at')}</Table.Th>
@@ -154,7 +154,7 @@ const PasswordResetManagement = () => {
                       <ButtonLight
                         size="xs"
                         color="green"
-                        label="Duyệt"
+                        label={t('password_reset.approve')}
                         loading={processingId === req.id}
                         disabled={processingId === req.id}
                         onClick={() => openNoteModal(req.id, 'approve')}
@@ -162,7 +162,7 @@ const PasswordResetManagement = () => {
                       <ButtonLight
                         size="xs"
                         color="red"
-                        label="Từ chối"
+                        label={t('password_reset.reject')}
                         loading={processingId === req.id}
                         disabled={processingId === req.id}
                         onClick={() => openNoteModal(req.id, 'reject')}
@@ -186,22 +186,26 @@ const PasswordResetManagement = () => {
       <Modal
         opened={noteModalOpen}
         onClose={closeNoteModal}
-        title={noteAction === 'approve' ? 'Duyệt yêu cầu' : 'Từ chối yêu cầu'}
+        title={
+          noteAction === 'approve'
+            ? t('password_reset.modal_approve_title')
+            : t('password_reset.modal_reject_title')
+        }
       >
         <Stack gap="sm">
           <Textarea
-            label="Ghi chú (tùy chọn)"
+            label={t('password_reset.note_optional')}
             value={noteText}
             onChange={(e) => setNoteText(e.currentTarget.value)}
             rows={3}
           />
           <Group justify="flex-end">
-            <ButtonLight size="sm" color="gray" label="Hủy" disabled={false} onClick={closeNoteModal} />
+            <ButtonLight size="sm" color="gray" label={t('common.cancel')} disabled={false} onClick={closeNoteModal} />
             {noteAction === 'approve' ? (
               <ButtonFilled
                 size="sm"
                 color="green"
-                label="Xác nhận duyệt"
+                label={t('password_reset.confirm_approve')}
                 disabled={!noteRequestId}
                 onClick={() => noteRequestId && void handleApprove(noteRequestId, noteText)}
               />
@@ -209,7 +213,7 @@ const PasswordResetManagement = () => {
               <ButtonFilled
                 size="sm"
                 color="red"
-                label="Xác nhận từ chối"
+                label={t('password_reset.confirm_reject')}
                 disabled={!noteRequestId}
                 onClick={() => noteRequestId && void handleReject(noteRequestId, noteText)}
               />

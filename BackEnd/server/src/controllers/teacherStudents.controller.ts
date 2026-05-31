@@ -251,6 +251,45 @@ function csvEscape(v: string): string {
   return v;
 }
 
+function toAsciiFilenameBase(value: string, fallback: string): string {
+  const ascii = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\r\n"]/g, " ")
+    .replace(/[^a-zA-Z0-9._ -]/g, " ")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 80);
+
+  return ascii || fallback;
+}
+
+function encodeRfc5987Value(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+function setContentDispositionHeader(
+  res: Response,
+  disposition: "attachment" | "inline",
+  filenameBase: string,
+  extension: string,
+  fallbackBase: string
+) {
+  const safeExt = extension.replace(/[^a-zA-Z0-9]/g, "") || "dat";
+  const cleanedBase = filenameBase.replace(/[\r\n]/g, " ").trim() || fallbackBase;
+  const fallbackFilename = `${toAsciiFilenameBase(cleanedBase, fallbackBase)}.${safeExt}`;
+  const utf8Filename = `${cleanedBase}.${safeExt}`;
+
+  res.setHeader(
+    "Content-Disposition",
+    `${disposition}; filename="${fallbackFilename}"; filename*=UTF-8''${encodeRfc5987Value(utf8Filename)}`
+  );
+}
+
 async function getClassName(adminClassId: string): Promise<string> {
   const classR = await pool.query(
     `SELECT display_name FROM admin_classes WHERE id = $1`,
@@ -619,11 +658,13 @@ export const exportGradeReportController = async (
     ];
     const csv = "\uFEFF" + lines.join("\n");
 
-    const safeName = examTitle.replace(/[^\w\u00C0-\u024F\s-]/g, "").slice(0, 40);
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="bang_diem_chi_tiet_${safeName}.csv"`
+    setContentDispositionHeader(
+      res,
+      "attachment",
+      `bang_diem_chi_tiet_${examTitle}`,
+      "csv",
+      "bang_diem_chi_tiet"
     );
     res.send(csv);
   } catch (err) {
@@ -951,17 +992,23 @@ export const exportStudentTranscriptController = async (
       ];
       const csv = "\uFEFF" + lines.join("\n");
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="bang_diem_${payload.student.student_code}.csv"`
+      setContentDispositionHeader(
+        res,
+        "attachment",
+        `bang_diem_${payload.student.student_code}`,
+        "csv",
+        "bang_diem"
       );
       return res.send(csv);
     }
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="bang_diem_${payload.student.student_code}.html"`
+    setContentDispositionHeader(
+      res,
+      "inline",
+      `bang_diem_${payload.student.student_code}`,
+      "html",
+      "bang_diem"
     );
     res.send(buildTranscriptHtml(payload));
   } catch (err) {

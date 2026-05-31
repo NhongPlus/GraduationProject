@@ -1,0 +1,12 @@
+@startuml UC-S1_Dang_nhap
+' Đăng nhập — tách riêng, không gắn nhầm vào UC-S3
+left to right direction
+skinparam actorStyle awesome
+
+actor Guest
+
+usecase "Đăng nhập" as DangNhap
+
+Guest --> DangNhap
+
+@enduml

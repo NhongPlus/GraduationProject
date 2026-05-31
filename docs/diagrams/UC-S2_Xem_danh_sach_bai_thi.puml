@@ -1,0 +1,14 @@
+@startuml UC-S2_Xem_danh_sach_bai_thi
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Sinh viên" as SinhVien
+
+rectangle "Hệ thống thi trực tuyến" {
+  usecase "UC-S2\nXem danh sách bài thi" as UC_S2
+}
+
+SinhVien --> UC_S2
+
+@enduml

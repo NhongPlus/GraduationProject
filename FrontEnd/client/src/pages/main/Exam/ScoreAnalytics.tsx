@@ -218,11 +218,7 @@ const ScoreAnalytics = () => {
               value={selectedSubjectId}
               onChange={setSelectedSubjectId}
               disabled={needsClassPick || subjects.length === 0 || subjectsLoading}
-              helperText={
-                selectedSubjectMeta
-                  ? t('score_analytics.sessions_hint', { count: selectedSubjectMeta.session_count })
-                  : undefined
-              }
+              helperText={undefined}
             />
           </Group>
         )}

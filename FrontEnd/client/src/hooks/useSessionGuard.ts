@@ -1,24 +1,21 @@
 import { useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
-import apiClient from '@/services/apiClient';
 import { fetchSession } from '@/services/authApi';
 import useAuth from '@/hooks/useAuth';
 import { connectAuthSessionSocket } from '@/services/authSessionSocket';
 import { redirectToPasswordChange } from '@/services/redirectToPasswordChange';
 
-/** Dự phòng nếu socket chưa kết nối — vẫn phát hiện phiên bị thu hồi trong vài giây. */
-const SESSION_CHECK_MS = 5_000;
-
 /**
- * Giữ một phiên / trình duyệt: socket đẩy logout ngay; HTTP poll dự phòng.
+ * Giữ một phiên / trình duyệt:
+ * - Socket: logout ngay khi login thiết bị khác (auth:session_revoked).
+ * - Mọi API khác: 401/403 → apiClient interceptor.
+ * - HTTP /auth/session: chỉ khi mount, tab focus lại, hoặc socket reconnect (không poll định kỳ).
  */
 export function useSessionGuard(): void {
   const { authenticated, accessToken } = useAuth();
 
   useEffect(() => {
     if (!authenticated || !accessToken) return;
-
-    let socket: Socket | null = connectAuthSessionSocket(accessToken);
 
     const check = () => {
       void fetchSession()
@@ -32,6 +29,9 @@ export function useSessionGuard(): void {
         });
     };
 
+    const socket: Socket = connectAuthSessionSocket(accessToken);
+    socket.on('connect', check);
+
     check();
 
     const onVisible = () => {
@@ -40,14 +40,12 @@ export function useSessionGuard(): void {
     const onFocus = () => check();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onFocus);
-    const timer = window.setInterval(check, SESSION_CHECK_MS);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onFocus);
-      window.clearInterval(timer);
-      socket?.close();
-      socket = null;
+      socket.off('connect', check);
+      socket.close();
     };
   }, [authenticated, accessToken]);
 }

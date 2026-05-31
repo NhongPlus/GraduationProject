@@ -27,6 +27,7 @@ import {
   FileButton,
 } from '@mantine/core';
 import { IconPlus, IconTrash, IconEdit, IconSearch, IconFolders, IconDownload, IconUpload } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { ListPaginationBar } from '@/components/ListPagination';
 import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 import subjectApi, {
@@ -135,6 +136,7 @@ const CategoryBadge = ({ category }: { category: string }) => {
 };
 
 const SubjectCatalogManagementPage = () => {
+  const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [programs, setPrograms] = useState<ProgramDto[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
@@ -597,7 +599,7 @@ const SubjectCatalogManagementPage = () => {
       <Stack gap="md" maw={1400} mx="auto">
         <Group justify="space-between" align="flex-start" wrap="wrap">
           <Box>
-            <Title order={2}>Quản lý nhóm môn & môn học</Title>
+            <Title order={2}>{t('subject_catalog.title')}</Title>
             <Text c="dimmed" size="sm" mt={4}>
               Kho trường (nhóm + môn) — ngành chỉ gán từ kho qua GET /subjects/catalog.
             </Text>
@@ -631,7 +633,7 @@ const SubjectCatalogManagementPage = () => {
                     Import hàng loạt
                   </Button>
                   <ButtonFilled
-                    label="Thêm môn học"
+                    label={t('subject_catalog.add_subject')}
                     leftSection={<IconPlus size={16} />}
                     disabled={!canManageSubjects}
                     onClick={() => setCreateOpen(true)}
@@ -656,8 +658,8 @@ const SubjectCatalogManagementPage = () => {
         <Paper withBorder radius="md" p="md">
           <Group align="flex-end" wrap="wrap" grow>
             <Select
-              label="Chuyên ngành"
-              placeholder="Chọn ngành"
+              label={t('subject_catalog.program')}
+              placeholder={t('subject_catalog.select_program')}
               data={programOptions}
               value={selectedProgramId}
               onChange={(v) => {

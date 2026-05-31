@@ -370,13 +370,11 @@ const ExamList = () => {
                                 loading={startingExamId === item.id}
                                 disabled={startingExamId === item.id || !canManualOpen}
                                 title={
-                                  !canManualOpen && staffEnded
-                                    ? t('exam_list.start_ended_hint')
-                                    : !canManualOpen && !staffScheduled && Boolean(item.opens_at)
-                                      ? t('exam_list.start_auto_hint')
-                                      : staffScheduled
-                                        ? t('exam_list.start_early_hint', { minutes: item.duration_min })
-                                        : t('exam_list.start_runtime_hint')
+                                  !canManualOpen && !staffScheduled && Boolean(item.opens_at)
+                                    ? t('exam_list.start_auto_hint')
+                                    : staffScheduled
+                                      ? t('exam_list.start_early_hint', { minutes: item.duration_min })
+                                      : t('exam_list.start_runtime_hint')
                                 }
                                 onClick={(e) => { e.stopPropagation(); void handleStartExam(item); }}
                               >
@@ -420,9 +418,7 @@ const ExamList = () => {
                                   ? t('exam_list.take_disabled_submitted', 'Bạn đã nộp bài thi này')
                                   : pastDeadline
                                     ? t('exam_list.take_disabled_deadline')
-                                    : canRetake
-                                      ? t('exam_list.take_retake_hint')
-                                      : undefined
+                                    : undefined
                               }
                               onClick={(e) => {
                                 e.stopPropagation();

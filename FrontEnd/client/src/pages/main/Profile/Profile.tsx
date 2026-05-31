@@ -101,9 +101,6 @@ const Profile = () => {
               <Text><strong>{t('profile.email')}:</strong> {email}</Text>
             </Stack>
             <Divider my="md" />
-            <Text size="sm" c="dimmed">
-              {t('profile.contact_admin_hint')}
-            </Text>
             <ButtonFilled
               style={{ marginTop: 16 }}
               color="red"
@@ -127,7 +124,6 @@ const Profile = () => {
               <Text size="sm" c="dimmed">
                 {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
               </Text>
-              <Text size="sm" c="dimmed">{t('profile.password_hint')}</Text>
               <InputPassword
                 label={t('first_login.current_password')}
                 value={currentPassword}

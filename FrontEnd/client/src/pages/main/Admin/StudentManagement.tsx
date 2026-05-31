@@ -146,7 +146,7 @@ const StudentManagement = () => {
   const handleBulkDelete = async () => {
     const ids = [...selectedIds];
     if (!ids.length) return;
-    if (!window.confirm(`Xóa ${ids.length} sinh viên đã chọn? Tài khoản đang dùng trong hệ thống có thể không xóa được.`)) {
+    if (!window.confirm(t('admin.confirm_bulk_delete', { count: ids.length }))) {
       return;
     }
     setBulkDeleting(true);
@@ -155,10 +155,15 @@ const StudentManagement = () => {
       const result = await userApi.bulkDeleteUsers(ids);
       setSelectedIds(new Set());
       if (result.failed.length > 0) {
-        setNotice(`Đã xóa ${result.deleted} tài khoản. ${result.failed.length} tài khoản không xóa được.`);
+        setNotice(
+          t('admin.notice_bulk_delete_partial', {
+            deleted: result.deleted,
+            failed: result.failed.length,
+          }),
+        );
         setError(result.failed.slice(0, 3).map((f) => f.reason).join(' · '));
       } else {
-        setNotice(`Đã xóa ${result.deleted} sinh viên.`);
+        setNotice(t('admin.notice_bulk_deleted', { count: result.deleted }));
       }
       void loadStudents();
     } catch {
@@ -185,8 +190,8 @@ const StudentManagement = () => {
     if (s.role !== 'student' && s.role !== 'teacher' && s.role !== 'admin') return;
     if (
       !window.confirm(
-        `Đặt lại mật khẩu cho ${s.full_name || s.username}? Mật khẩu ngẫu nhiên 10 ký tự sẽ gửi qua email ${s.email}.` +
-          (s.role === 'admin' ? ' (Tài khoản quản trị — dùng khi admin quên mật khẩu.)' : '')
+        t('admin.confirm_reset_password', { name: s.full_name || s.username, email: s.email }) +
+          (s.role === 'admin' ? t('admin.confirm_reset_password_admin') : ''),
       )
     ) {
       return;
@@ -197,13 +202,13 @@ const StudentManagement = () => {
       const result = await userApi.adminResetPassword(s.id);
       setNotice(
         result.email_sent
-          ? `Đã gửi mật khẩu mới qua email cho ${s.email}. Người dùng phải đổi mật khẩu khi đăng nhập lần đầu.`
-          : `Đã đặt mật khẩu mới (gửi email thất bại — kiểm tra SMTP).`
+          ? t('admin.notice_password_reset_ok', { email: s.email })
+          : t('admin.notice_password_reset_email_fail'),
       );
       void loadStudents();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(msg || 'Đặt lại mật khẩu thất bại.');
+      setError(msg || t('admin.reset_password_failed'));
     } finally {
       setResettingPasswordId(null);
     }
@@ -224,7 +229,7 @@ const StudentManagement = () => {
         ...(editForm.password.trim() ? { password: editForm.password.trim() } : {}),
       });
       setEditOpen(false);
-      setNotice('Đã cập nhật người dùng.');
+      setNotice(t('admin.notice_updated'));
       void loadStudents();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -261,8 +266,8 @@ const StudentManagement = () => {
       });
       setNotice(
         createForm.role === 'teacher'
-          ? 'Đã tạo tài khoản giảng viên.'
-          : 'Đã tạo tài khoản sinh viên.'
+          ? t('admin.notice_teacher_created')
+          : t('admin.notice_student_created'),
       );
       void loadStudents();
     } catch (e: unknown) {
@@ -272,23 +277,29 @@ const StudentManagement = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t('teacher_students.confirm_delete'))) return;
+    if (!window.confirm(t('admin.confirm_delete_student'))) return;
     try {
       await userApi.deleteUser(id);
-      setNotice('Đã xóa sinh viên.');
+      setNotice(t('admin.notice_student_deleted'));
       void loadStudents();
     } catch {
       setError(t('errors.user_delete_failed'));
     }
   };
 
-  const classFilterOptions = [
-    { value: '', label: 'Tất cả lớp' },
-    ...classes.map((c) => ({
-      value: c.id,
-      label: `${c.display_name} (${c.student_count ?? 0} SV)`,
-    })),
-  ];
+  const classFilterOptions = useMemo(
+    () => [
+      { value: '', label: t('dashboard.filter_class_all') },
+      ...classes.map((c) => ({
+        value: c.id,
+        label: t('admin.class_option', {
+          name: c.display_name,
+          count: c.student_count ?? 0,
+        }),
+      })),
+    ],
+    [classes, t],
+  );
 
   if (initialLoading) {
     return (
@@ -324,22 +335,22 @@ const StudentManagement = () => {
           <Group justify="space-between" wrap="wrap" align="flex-end" gap="sm">
             <Group wrap="wrap" align="flex-end" gap="sm" style={{ flex: 1 }}>
               <InputText
-                label="Tìm sinh viên / GV"
-                placeholder="Tên, mã, email người dùng..."
+                label={t('admin.search_user')}
+                placeholder={t('admin.search_user_placeholder')}
                 value={searchStudent}
                 onChange={(e) => setSearchStudent(e.currentTarget.value)}
                 style={{ minWidth: 220, flex: '1 1 180px' }}
               />
               <InputText
-                label="Tìm chủ nhiệm"
-                placeholder="Tên giáo viên chủ nhiệm..."
+                label={t('admin.search_homeroom')}
+                placeholder={t('admin.search_homeroom_placeholder')}
                 value={searchTeacher}
                 onChange={(e) => setSearchTeacher(e.currentTarget.value)}
                 style={{ minWidth: 220, flex: '1 1 180px' }}
               />
               <Select
-                label="Lớp hành chính"
-                placeholder="Tất cả lớp"
+                label={t('dashboard.filter_class')}
+                placeholder={t('dashboard.filter_class_all')}
                 data={classFilterOptions}
                 value={classFilterId ?? ''}
                 onChange={(v) => {
@@ -355,14 +366,14 @@ const StudentManagement = () => {
             <Group gap="sm">
               <ButtonFilled
                 size="sm"
-                label="Thêm người dùng"
+                label={t('admin.add_student')}
                 leftSection={<IconPlus size={16} />}
                 disabled={false}
                 onClick={() => setCreateOpen(true)}
               />
               <ButtonLight
                 size="sm"
-                label="Làm mới"
+                label={t('common.refresh')}
                 loading={refreshing}
                 disabled={refreshing}
                 onClick={() => void loadStudents()}
@@ -374,7 +385,7 @@ const StudentManagement = () => {
         {selectedIds.size > 0 && (
           <Group>
             <Text size="sm" c="dimmed">
-              Đã chọn {selectedIds.size} sinh viên
+              {t('common.selected_count', { count: selectedIds.size })}
             </Text>
             <Button
               color="red"
@@ -383,10 +394,10 @@ const StudentManagement = () => {
               loading={bulkDeleting}
               onClick={() => void handleBulkDelete()}
             >
-              Xóa đã chọn
+              {t('common.bulk_delete')}
             </Button>
             <Button variant="subtle" size="compact-sm" onClick={() => setSelectedIds(new Set())}>
-              Bỏ chọn
+              {t('common.clear_selection')}
             </Button>
           </Group>
         )}
@@ -398,7 +409,7 @@ const StudentManagement = () => {
             style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}
           >
             <Select
-              label="Số dòng / trang"
+              label={t('pagination.page_size_label')}
               data={PAGE_SIZE_OPTIONS.map((n) => ({
                 value: String(n),
                 label: t('pagination.page_size_option', { size: n }),
@@ -436,10 +447,10 @@ const StudentManagement = () => {
                     />
                   </Table.Th>
                   <Table.Th>#</Table.Th>
-                  <Table.Th>Vai trò</Table.Th>
+                  <Table.Th>{t('common.role')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_code')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_name')}</Table.Th>
-                  <Table.Th>Chủ nhiệm</Table.Th>
+                  <Table.Th>{t('common.homeroom_teacher')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_email')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_password')}</Table.Th>
                   <Table.Th>{t('teacher_students.col_status')}</Table.Th>
@@ -462,7 +473,7 @@ const StudentManagement = () => {
                         variant="light"
                         color={s.role === 'teacher' ? 'blue' : 'teal'}
                       >
-                        {s.role === 'teacher' ? 'Giảng viên' : 'Sinh viên'}
+                        {s.role === 'teacher' ? t('roles.teacher') : t('roles.student')}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -522,7 +533,7 @@ const StudentManagement = () => {
                           </ActionIcon>
                         </Tooltip>
                         {(s.role === 'student' || s.role === 'teacher' || s.role === 'admin') && (
-                          <Tooltip label="Đặt lại mật khẩu & gửi email">
+                          <Tooltip label={t('admin.reset_password_tooltip')}>
                             <ActionIcon
                               color="orange"
                               variant="light"
@@ -587,7 +598,7 @@ const StudentManagement = () => {
             onChange={(e) => setEditForm((p) => ({ ...p, username: e.currentTarget.value }))}
           />
           <InputText
-            label="Email"
+            label={t('common.email')}
             value={editForm.email}
             onChange={(e) => setEditForm((p) => ({ ...p, email: e.currentTarget.value }))}
           />
@@ -615,11 +626,11 @@ const StudentManagement = () => {
       <Modal
         opened={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Thêm người dùng"
+        title={t('admin.create_user_title')}
       >
         <Stack gap="sm">
           <Select
-            label="Vai trò"
+            label={t('common.role')}
             value={createForm.role}
             onChange={(v) =>
               setCreateForm((p) => ({
@@ -628,8 +639,8 @@ const StudentManagement = () => {
               }))
             }
             data={[
-              { value: 'student', label: 'Sinh viên' },
-              { value: 'teacher', label: 'Giảng viên' },
+              { value: 'student', label: t('roles.student') },
+              { value: 'teacher', label: t('roles.teacher') },
             ]}
             allowDeselect={false}
           />
@@ -644,14 +655,14 @@ const StudentManagement = () => {
             onChange={(e) => setCreateForm((p) => ({ ...p, username: e.currentTarget.value }))}
           />
           <InputText
-            label="Email"
+            label={t('common.email')}
             value={createForm.email}
             onChange={(e) => setCreateForm((p) => ({ ...p, email: e.currentTarget.value }))}
           />
           {createForm.role === 'student' && (
             <Select
-              label="Lớp hành chính"
-              placeholder="Chọn lớp (tuỳ chọn)"
+              label={t('dashboard.filter_class')}
+              placeholder={t('admin.select_class_optional')}
               data={classFilterOptions.filter((o) => o.value !== '')}
               value={createForm.admin_class_id || null}
               onChange={(v) => setCreateForm((p) => ({ ...p, admin_class_id: v ?? '' }))}

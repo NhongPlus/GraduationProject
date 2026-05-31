@@ -191,9 +191,6 @@ const ExamResult = () => {
                 </ThemeIcon>
               )}
             </Group>
-            <Text size="xs" c="dimmed" mt={4}>
-              {t('exam_result.correct_full_points_hint')}
-            </Text>
           </Paper>
           <Paper withBorder radius="md" p="md">
             <Text size="sm" c="dimmed">{t('exam_result.score_label')}</Text>
@@ -204,13 +201,6 @@ const ExamResult = () => {
                   ? formatScoreScale10Pair(mcqScore, mcqMax)
                   : t('exam_result.pending_score')}
             </Text>
-            {review.score != null && review.max_points != null && (
-              <Text size="xs" c="dimmed" mt={4}>
-                {t('exam_result.raw_score_hint', {
-                  raw: `${review.score}/${review.max_points}`,
-                })}
-              </Text>
-            )}
             {hasPendingEssay && review.score == null && (
               <Text size="xs" c="dimmed" mt={4}>
                 {t('exam_result.total_score_after_essay')}
@@ -328,11 +318,6 @@ const ExamResult = () => {
             </Stack>
           </Alert>
         ) : null}
-        {mcqQuestions.length > 0 && (
-          <Alert color="blue" variant="light">
-            {t('exam_result.mcq_revealed_hint')}
-          </Alert>
-        )}
 
         <Paper withBorder radius="md" p="md">
           <Title order={4} mb="md">{t('exam_result.review_title')}</Title>

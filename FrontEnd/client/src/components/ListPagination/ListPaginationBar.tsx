@@ -50,7 +50,10 @@ export default function ListPaginationBar({
 
   const pageSizeData = pageSizeOptions.map((n) => ({
     value: String(n),
-    label: t('pagination.page_size_option', { size: n }),
+    label: t('pagination.page_size_option', {
+      size: n,
+      defaultValue: `${n}/page`,
+    }),
   }));
 
   return (
@@ -65,6 +68,7 @@ export default function ListPaginationBar({
             <Select
               size={size}
               w={108}
+              aria-label={t('pagination.page_size_label')}
               data={pageSizeData}
               value={String(limit)}
               allowDeselect={false}

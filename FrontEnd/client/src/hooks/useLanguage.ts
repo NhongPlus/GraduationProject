@@ -10,6 +10,9 @@ export const useLanguage = () => {
   const changeLanguage = async (lang: "vi" | "en" | "ja") => {
     await i18n.changeLanguage(lang);
     localStorage.setItem(LANG_STORAGE_KEY, lang);
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+    }
   };
   return {
     language,

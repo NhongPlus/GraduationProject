@@ -195,12 +195,12 @@ const GradingIndex = () => {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
-                  <Table.Th>Bài thi</Table.Th>
-                  <Table.Th>Sinh viên</Table.Th>
-                  <Table.Th>Trạng thái</Table.Th>
-                  <Table.Th>Điểm</Table.Th>
-                  <Table.Th>Ngày nộp</Table.Th>
-                  <Table.Th>Thao tác</Table.Th>
+                  <Table.Th>{t('dashboard.col_exam')}</Table.Th>
+                  <Table.Th>{t('exam_sessions.student')}</Table.Th>
+                  <Table.Th>{t('grading.status')}</Table.Th>
+                  <Table.Th>{t('grading.score')}</Table.Th>
+                  <Table.Th>{t('grading.submitted_at')}</Table.Th>
+                  <Table.Th>{t('common.actions')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
