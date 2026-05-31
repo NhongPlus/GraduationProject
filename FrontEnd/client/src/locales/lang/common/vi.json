@@ -469,6 +469,7 @@
     "not_answered": "Chưa trả lời",
     "correct": "Đúng",
     "wrong": "Sai",
+    "no_options": "Không có dữ liệu các lựa chọn cho câu này.",
     "pending": "Chờ chấm",
     "graded": "Đã chấm xong",
     "no_questions": "Không có câu hỏi nào.",

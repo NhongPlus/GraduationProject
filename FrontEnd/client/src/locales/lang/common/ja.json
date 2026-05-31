@@ -533,7 +533,8 @@
     "submitted_at": "提出時刻",
     "teacher_comment": "先生コメント",
     "title": "記述採点",
-    "wrong": "不正解"
+    "wrong": "不正解",
+    "no_options": "この問題の選択肢データがありません。"
   },
   "login": {
     "email": "メール",

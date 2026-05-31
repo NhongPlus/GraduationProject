@@ -533,7 +533,8 @@
     "submitted_at": "Submitted at",
     "teacher_comment": "Teacher comment",
     "title": "Essay grading",
-    "wrong": "Wrong"
+    "wrong": "Wrong",
+    "no_options": "No answer choices available for this question."
   },
   "login": {
     "email": "Email",

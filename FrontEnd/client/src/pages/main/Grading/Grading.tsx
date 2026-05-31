@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider, Collapse, ActionIcon,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider, ActionIcon,
 } from '@mantine/core';
 import { IconChevronDown } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,13 @@ import InputTextarea from '@/components/Input/InputTextarea/InputTextarea';
 import PageHeader from '@/components/PageHeader/PageHeader';
 
 type GradeDraft = Record<string, { points_awarded: number; comment?: string }>;
+
+function answerKey(value: string | string[] | null | undefined): string | null {
+  if (value == null) return null;
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw == null || raw === '') return null;
+  return String(raw).trim().toUpperCase();
+}
 
 const Grading = () => {
   const { t } = useTranslation();
@@ -184,57 +191,129 @@ const Grading = () => {
                   const q = data.questions.find((q) => q.id === detail.question_id);
                   const content = q?.content || '...';
                   const isExpanded = expandedMcq.has(detail.question_id);
+                  const submittedKey = answerKey(detail.submitted);
+                  const correctKey = answerKey(detail.correct);
+                  const optionEntries = q?.options ? Object.entries(q.options) : [];
+
                   return (
-                    <Table.Tr key={detail.question_id}>
-                      <Table.Td>{idx + 1}</Table.Td>
-                      <Table.Td style={{ maxWidth: 320 }}>
-                        <Group gap={6} wrap="nowrap" align="flex-start">
-                          <ActionIcon
-                            variant="subtle"
-                            size="sm"
-                            color="gray"
-                            aria-label={isExpanded ? t('common.collapse') : t('common.expand')}
-                            onClick={() => toggleMcqQuestion(detail.question_id)}
-                            style={{
-                              transform: isExpanded ? 'rotate(180deg)' : undefined,
-                              transition: 'transform 150ms ease',
-                              flexShrink: 0,
-                              marginTop: 2,
-                            }}
+                    <Fragment key={detail.question_id}>
+                      <Table.Tr>
+                        <Table.Td>{idx + 1}</Table.Td>
+                        <Table.Td style={{ maxWidth: 320 }}>
+                          <Group gap={6} wrap="nowrap" align="flex-start">
+                            <ActionIcon
+                              variant="subtle"
+                              size="sm"
+                              color="gray"
+                              aria-label={isExpanded ? t('common.collapse') : t('common.expand')}
+                              onClick={() => toggleMcqQuestion(detail.question_id)}
+                              style={{
+                                transform: isExpanded ? 'rotate(180deg)' : undefined,
+                                transition: 'transform 150ms ease',
+                                flexShrink: 0,
+                                marginTop: 2,
+                              }}
+                            >
+                              <IconChevronDown size={14} />
+                            </ActionIcon>
+                            <Text size="sm" lineClamp={isExpanded ? undefined : 2} style={{ flex: 1 }}>
+                              {content}
+                            </Text>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{submittedKey ?? '—'}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={500}>{correctKey ?? '—'}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={detail.is_correct ? 'green' : 'red'}>
+                            {detail.is_correct ? t('grading.correct') : t('grading.wrong')}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td fw={500}>
+                          {detail.points_earned ?? 0}/{detail.max_points}
+                        </Table.Td>
+                      </Table.Tr>
+                      {isExpanded && (
+                        <Table.Tr>
+                          <Table.Td
+                            colSpan={6}
+                            p="md"
+                            style={{ background: 'var(--mantine-color-gray-0)' }}
                           >
-                            <IconChevronDown size={14} />
-                          </ActionIcon>
-                          <Box style={{ flex: 1, minWidth: 0 }}>
-                            {!isExpanded && (
-                              <Text size="sm" lineClamp={2}>
-                                {content}
-                              </Text>
-                            )}
-                            <Collapse in={isExpanded}>
-                              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                                {content}
-                              </Text>
-                            </Collapse>
-                          </Box>
-                        </Group>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">{Array.isArray(detail.submitted) ? detail.submitted.join(', ') : detail.submitted ?? '—'}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm" fw={500}>
-                          {Array.isArray(detail.correct) ? detail.correct.join(', ') : detail.correct ?? '—'}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge color={detail.is_correct ? 'green' : 'red'}>
-                          {detail.is_correct ? t('grading.correct') : t('grading.wrong')}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td fw={500}>
-                        {detail.points_earned ?? 0}/{detail.max_points}
-                      </Table.Td>
-                    </Table.Tr>
+                            <Stack gap="sm">
+                              <Box>
+                                <Text size="xs" c="dimmed" mb={4}>
+                                  {t('grading.question')}
+                                </Text>
+                                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {content}
+                                </Text>
+                              </Box>
+                              {optionEntries.length > 0 ? (
+                                <Box>
+                                  <Text size="xs" c="dimmed" mb={6}>
+                                    {t('exam_result.options_label')}
+                                  </Text>
+                                  <Stack gap={6}>
+                                    {optionEntries.map(([key, label]) => {
+                                      const optKey = key.toUpperCase();
+                                      const isCorrect = correctKey === optKey;
+                                      const isSubmitted =
+                                        submittedKey === optKey && submittedKey != null;
+                                      return (
+                                        <Group
+                                          key={key}
+                                          gap="xs"
+                                          p="xs"
+                                          wrap="nowrap"
+                                          align="flex-start"
+                                          style={{
+                                            borderRadius: 8,
+                                            border: isCorrect
+                                              ? '2px solid var(--mantine-color-green-6)'
+                                              : '1px solid var(--mantine-color-gray-3)',
+                                            background: isSubmitted
+                                              ? 'var(--mantine-color-blue-0)'
+                                              : isCorrect
+                                                ? 'var(--mantine-color-green-0)'
+                                                : undefined,
+                                          }}
+                                        >
+                                          <Badge
+                                            size="sm"
+                                            w={28}
+                                            ta="center"
+                                            color={isCorrect ? 'green' : 'gray'}
+                                            variant={isCorrect ? 'filled' : 'light'}
+                                          >
+                                            {key}
+                                          </Badge>
+                                          <Text size="sm" style={{ flex: 1 }}>
+                                            {label}
+                                          </Text>
+                                          {isSubmitted && (
+                                            <Badge size="xs" color="blue" variant="light">
+                                              {t('grading.answer')}
+                                            </Badge>
+                                          )}
+                                        </Group>
+                                      );
+                                    })}
+                                  </Stack>
+                                </Box>
+                              ) : (
+                                <Text size="xs" c="dimmed">
+                                  {t('grading.no_options')}
+                                </Text>
+                              )}
+                            </Stack>
+                          </Table.Td>
+                        </Table.Tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </Table.Tbody>
