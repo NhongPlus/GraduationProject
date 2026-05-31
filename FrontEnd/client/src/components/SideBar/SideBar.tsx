@@ -8,9 +8,8 @@ import {
 } from '@mantine/core';
 import styles from './SideBar.module.scss';
 import icon from '@/assets/logo/logo.svg'
-import LanguageSwitcher from '../SwitchLanguage/LanguageSwitcher';
-import ButtonFilled from '../Button/ButtonFilled/ButtonFilled';
 import useAuth from '@/hooks/useAuth';
+import ButtonFilled from '../Button/ButtonFilled/ButtonFilled';
 import NotificationBell from '../common/NotificationBell';
 
 export default function SideBar() {
@@ -30,7 +29,6 @@ export default function SideBar() {
         </Anchor>
         <Group>
           <NotificationBell />
-          <LanguageSwitcher/>
           {!authenticated && <ButtonFilled label={'Sign up'} disabled={false} />}
         </Group>
       </Flex>

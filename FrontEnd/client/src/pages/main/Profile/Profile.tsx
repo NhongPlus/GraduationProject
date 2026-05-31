@@ -7,6 +7,7 @@ import {
 import { IconDeviceDesktop, IconMoon, IconSun } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { clearSession, changePassword } from '@/services/authApi';
+import { APP_LANGUAGES, useLanguage, type AppLanguage } from '@/hooks/useLanguage';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
 import InputPassword from '@/components/Input/InputPassword/InputPassword';
 
@@ -29,6 +30,7 @@ const Profile = () => {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const { language, changeLanguage } = useLanguage();
 
   const themeOptions = [
     {
@@ -59,6 +61,16 @@ const Profile = () => {
       ),
     },
   ];
+
+  const languageOptions = (Object.keys(APP_LANGUAGES) as AppLanguage[]).map((code) => ({
+    value: code,
+    label: (
+      <Group gap={6} wrap="nowrap" justify="center">
+        <span>{APP_LANGUAGES[code].flag}</span>
+        <span>{APP_LANGUAGES[code].shortLabel}</span>
+      </Group>
+    ),
+  }));
 
   useEffect(() => {
     if (!message) return;
@@ -145,55 +157,77 @@ const Profile = () => {
         </Tabs.Panel>
 
         <Tabs.Panel value="settings" pt="md">
-          <Paper shadow="xs" withBorder p="md">
-            <Stack gap="md">
-              <Box>
-                <Title order={4}>{t('profile.appearance_title')}</Title>
-                <Text size="sm" c="dimmed" mt={4} mb="sm">
-                  {t('profile.appearance_desc')}
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  value={colorScheme}
-                  onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
-                  data={themeOptions}
+          <Stack gap="md">
+            <Paper shadow="xs" withBorder p="md">
+              <Stack gap="lg">
+                <Box>
+                  <Title order={4}>{t('profile.appearance_title')}</Title>
+                  <Text size="sm" c="dimmed" mt={4} mb="sm">
+                    {t('profile.appearance_desc')}
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={colorScheme}
+                    onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
+                    data={themeOptions}
+                  />
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Title order={4}>{t('profile.language_title')}</Title>
+                  <Text size="sm" c="dimmed" mt={4} mb="sm">
+                    {t('profile.language_desc')}
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={language}
+                    onChange={(value) => void changeLanguage(value as AppLanguage)}
+                    data={languageOptions}
+                  />
+                </Box>
+              </Stack>
+            </Paper>
+
+            <Paper shadow="xs" withBorder p="md">
+              <Stack gap="md">
+                {message && (
+                  <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
+                    {message}
+                  </Notification>
+                )}
+
+                <Box>
+                  <Title order={4}>{t('profile.change_password_title')}</Title>
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
+                  </Text>
+                </Box>
+
+                <InputPassword
+                  label={t('first_login.current_password')}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.currentTarget.value)}
                 />
-              </Box>
-
-              <Divider />
-
-              {message && (
-                <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
-                  {message}
-                </Notification>
-              )}
-
-              <Title order={4}>{t('profile.change_password_title')}</Title>
-              <Text size="sm" c="dimmed">
-                {isAdmin ? t('profile.admin_change_desc') : t('profile.change_password_desc')}
-              </Text>
-              <InputPassword
-                label={t('first_login.current_password')}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-              />
-              <InputPassword
-                label={t('first_login.new_password')}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.currentTarget.value)}
-              />
-              <InputPassword
-                label={t('first_login.confirm_password')}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.currentTarget.value)}
-              />
-              <ButtonFilled
-                label={t('profile.change_password_submit')}
-                disabled={changingPassword}
-                onClick={() => void handleChangePassword()}
-              />
-            </Stack>
-          </Paper>
+                <InputPassword
+                  label={t('first_login.new_password')}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.currentTarget.value)}
+                />
+                <InputPassword
+                  label={t('first_login.confirm_password')}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+                />
+                <ButtonFilled
+                  label={t('profile.change_password_submit')}
+                  disabled={changingPassword}
+                  onClick={() => void handleChangePassword()}
+                />
+              </Stack>
+            </Paper>
+          </Stack>
         </Tabs.Panel>
       </Tabs>
     </Box>

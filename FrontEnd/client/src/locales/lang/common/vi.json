@@ -282,6 +282,8 @@
     "admin_forgot_help": "Nếu quên mật khẩu: nhờ quản trị viên khác vào Quản lý người dùng → biểu tượng chìa khóa trên tài khoản admin của bạn → gửi mật khẩu tạm qua email. Chỉ còn một admin thì chạy script reset-admin-password trên server.",
     "appearance_title": "Giao diện",
     "appearance_desc": "Chọn chế độ sáng, tối hoặc theo cài đặt hệ thống.",
+    "language_title": "Ngôn ngữ",
+    "language_desc": "Chọn ngôn ngữ hiển thị giao diện.",
     "theme_light": "Sáng",
     "theme_dark": "Tối",
     "theme_auto": "Hệ thống",

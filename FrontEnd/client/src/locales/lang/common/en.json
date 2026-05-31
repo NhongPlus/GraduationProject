@@ -835,6 +835,8 @@
     "admin_forgot_help": "If you forgot your password: ask another admin to open User management → key icon on your admin row → temporary password by email. If you are the only admin, run reset-admin-password on the server.",
     "appearance_title": "Appearance",
     "appearance_desc": "Choose light, dark, or match your system setting.",
+    "language_title": "Language",
+    "language_desc": "Choose the display language for the interface.",
     "theme_light": "Light",
     "theme_dark": "Dark",
     "theme_auto": "System",
