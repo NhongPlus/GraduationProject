@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Title, Text, Paper, Stack,
-  Tabs, Notification, Group, Badge, Divider,
+  Tabs, Notification, Group, Badge, Divider, SegmentedControl, useMantineColorScheme,
 } from '@mantine/core';
+import { IconDeviceDesktop, IconMoon, IconSun } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { clearSession, changePassword } from '@/services/authApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
@@ -26,6 +27,38 @@ const Profile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
+
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+
+  const themeOptions = [
+    {
+      value: 'light',
+      label: (
+        <Group gap={6} wrap="nowrap" justify="center">
+          <IconSun size={16} />
+          <span>{t('profile.theme_light')}</span>
+        </Group>
+      ),
+    },
+    {
+      value: 'dark',
+      label: (
+        <Group gap={6} wrap="nowrap" justify="center">
+          <IconMoon size={16} />
+          <span>{t('profile.theme_dark')}</span>
+        </Group>
+      ),
+    },
+    {
+      value: 'auto',
+      label: (
+        <Group gap={6} wrap="nowrap" justify="center">
+          <IconDeviceDesktop size={16} />
+          <span>{t('profile.theme_auto')}</span>
+        </Group>
+      ),
+    },
+  ];
 
   useEffect(() => {
     if (!message) return;
@@ -114,6 +147,21 @@ const Profile = () => {
         <Tabs.Panel value="settings" pt="md">
           <Paper shadow="xs" withBorder p="md">
             <Stack gap="md">
+              <Box>
+                <Title order={4}>{t('profile.appearance_title')}</Title>
+                <Text size="sm" c="dimmed" mt={4} mb="sm">
+                  {t('profile.appearance_desc')}
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  value={colorScheme}
+                  onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
+                  data={themeOptions}
+                />
+              </Box>
+
+              <Divider />
+
               {message && (
                 <Notification color={messageIsError ? 'red' : 'teal'} onClose={() => setMessage('')}>
                   {message}

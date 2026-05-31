@@ -833,6 +833,11 @@
   "profile": {
     "admin_change_desc": "Enter current and new password. Admin accounts do not use the email request workflow.",
     "admin_forgot_help": "If you forgot your password: ask another admin to open User management → key icon on your admin row → temporary password by email. If you are the only admin, run reset-admin-password on the server.",
+    "appearance_title": "表示",
+    "appearance_desc": "ライト、ダーク、またはシステム設定に合わせます。",
+    "theme_light": "ライト",
+    "theme_dark": "ダーク",
+    "theme_auto": "システム",
     "admin_password_note": "Admins only change password here—no email reset requests.",
     "change_password_desc": "Enter your current and new password. No email approval is required.",
     "change_password_error": "Could not change password. Check your current password.",

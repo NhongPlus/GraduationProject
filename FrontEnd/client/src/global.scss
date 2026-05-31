@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 * {
@@ -9,8 +9,8 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f7f8fa;
-  color: #0d141b;
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
 }
 
 #root {
