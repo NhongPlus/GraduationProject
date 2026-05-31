@@ -54,7 +54,12 @@ const DefaultLayout = () => {
         <NavbarNested collapsed={navbarCollapsed} onCollapsedChange={setNavbarCollapsed} />
       </AppShell.Navbar>
 
-      <AppShell.Header>
+      <AppShell.Header
+        style={{
+          background: 'var(--mantine-color-body)',
+          borderBottom: '1px solid var(--mantine-color-default-border)',
+        }}
+      >
         <Sidebar />
       </AppShell.Header>
 

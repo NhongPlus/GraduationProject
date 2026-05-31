@@ -20,14 +20,12 @@ export default function SideBar() {
     <Box className={styles.wrapper}>
       <Flex justify={'space-between'} align={'center'}>
         {/* thẻ link */}
-        <Anchor c={'black'} underline='never'>
+        <Anchor c="inherit" underline="never">
           <Group>
-            <Image
-              w={24}
-              h={24}
-              src={icon}
-            />
-            <Text fw={700} size='lg'>NhongPlus</Text>
+            <Image w={24} h={24} src={icon} />
+            <Text fw={700} size="lg" c="inherit">
+              NhongPlus
+            </Text>
           </Group>
         </Anchor>
         <Group>
