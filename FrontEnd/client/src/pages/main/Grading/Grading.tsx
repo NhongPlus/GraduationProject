@@ -8,19 +8,12 @@ import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { GradingPayload } from '@/services/examApi';
 import ButtonFilled from '@/components/Button/ButtonFilled/ButtonFilled';
-import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
 import InputNumber from '@/components/Input/InputNumber/InputNumber';
 import InputTextarea from '@/components/Input/InputTextarea/InputTextarea';
 import PageHeader from '@/components/PageHeader/PageHeader';
+import { answerKey } from '@/utils/gradingMcq';
 
 type GradeDraft = Record<string, { points_awarded: number; comment?: string }>;
-
-function answerKey(value: string | string[] | null | undefined): string | null {
-  if (value == null) return null;
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (raw == null || raw === '') return null;
-  return String(raw).trim().toUpperCase();
-}
 
 const Grading = () => {
   const { t } = useTranslation();
