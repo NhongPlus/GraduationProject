@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider, Collapse,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
@@ -205,6 +205,7 @@ const Grading = () => {
                           background: isExpanded
                             ? 'var(--mantine-color-gray-0)'
                             : undefined,
+                          transition: 'background-color 220ms ease',
                         }}
                       >
                         <Table.Td>{idx + 1}</Table.Td>
@@ -228,13 +229,23 @@ const Grading = () => {
                           {detail.points_earned ?? 0}/{detail.max_points}
                         </Table.Td>
                       </Table.Tr>
-                      {isExpanded && (
-                        <Table.Tr>
-                          <Table.Td
-                            colSpan={6}
-                            p="md"
-                            style={{ background: 'var(--mantine-color-gray-0)' }}
-                          >
+                      <Table.Tr>
+                        <Table.Td
+                          colSpan={6}
+                          p={0}
+                          style={{
+                            padding: 0,
+                            borderBottom: isExpanded ? undefined : 'none',
+                          }}
+                        >
+                          <Collapse in={isExpanded} transitionDuration={280} transitionTimingFunction="ease">
+                            <Box
+                              p="md"
+                              style={{
+                                background: 'var(--mantine-color-gray-0)',
+                                borderTop: '1px solid var(--mantine-color-gray-2)',
+                              }}
+                            >
                             <Stack gap="sm">
                               <Box>
                                 <Text size="xs" c="dimmed" mb={4}>
@@ -302,9 +313,10 @@ const Grading = () => {
                                 </Text>
                               )}
                             </Stack>
-                          </Table.Td>
-                        </Table.Tr>
-                      )}
+                            </Box>
+                          </Collapse>
+                        </Table.Td>
+                      </Table.Tr>
                     </Fragment>
                   );
                 })}
