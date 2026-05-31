@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider, Collapse, ActionIcon,
 } from '@mantine/core';
+import { IconChevronDown } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { GradingPayload } from '@/services/examApi';
@@ -24,6 +25,16 @@ const Grading = () => {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [draft, setDraft] = useState<GradeDraft>({});
+  const [expandedMcq, setExpandedMcq] = useState<Set<string>>(new Set());
+
+  const toggleMcqQuestion = (questionId: string) => {
+    setExpandedMcq((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!sessionId) return;
@@ -171,11 +182,41 @@ const Grading = () => {
               <Table.Tbody>
                 {mcqQuestions.map((detail, idx) => {
                   const q = data.questions.find((q) => q.id === detail.question_id);
+                  const content = q?.content || '...';
+                  const isExpanded = expandedMcq.has(detail.question_id);
                   return (
                     <Table.Tr key={detail.question_id}>
                       <Table.Td>{idx + 1}</Table.Td>
-                      <Table.Td style={{ maxWidth: 250 }}>
-                        <Text size="sm" lineClamp={2}>{q?.content || '...'}</Text>
+                      <Table.Td style={{ maxWidth: 320 }}>
+                        <Group gap={6} wrap="nowrap" align="flex-start">
+                          <ActionIcon
+                            variant="subtle"
+                            size="sm"
+                            color="gray"
+                            aria-label={isExpanded ? t('common.collapse') : t('common.expand')}
+                            onClick={() => toggleMcqQuestion(detail.question_id)}
+                            style={{
+                              transform: isExpanded ? 'rotate(180deg)' : undefined,
+                              transition: 'transform 150ms ease',
+                              flexShrink: 0,
+                              marginTop: 2,
+                            }}
+                          >
+                            <IconChevronDown size={14} />
+                          </ActionIcon>
+                          <Box style={{ flex: 1, minWidth: 0 }}>
+                            {!isExpanded && (
+                              <Text size="sm" lineClamp={2}>
+                                {content}
+                              </Text>
+                            )}
+                            <Collapse in={isExpanded}>
+                              <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                {content}
+                              </Text>
+                            </Collapse>
+                          </Box>
+                        </Group>
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm">{Array.isArray(detail.submitted) ? detail.submitted.join(', ') : detail.submitted ?? '—'}</Text>

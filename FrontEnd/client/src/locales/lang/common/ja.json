@@ -51,6 +51,8 @@
     "add": "追加",
     "all": "すべて",
     "back": "戻る",
+    "expand": "展開",
+    "collapse": "折りたたむ",
     "back_exam_list": "しけんの リストに もどる",
     "back_main": "メインへ もどる",
     "bulk_delete": "選択を削除",

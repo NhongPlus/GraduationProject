@@ -51,6 +51,8 @@
     "add": "Add",
     "all": "All",
     "back": "Back",
+    "expand": "Expand",
+    "collapse": "Collapse",
     "back_exam_list": "Back to exam list",
     "back_main": "Back to Main",
     "bulk_delete": "Delete selected",

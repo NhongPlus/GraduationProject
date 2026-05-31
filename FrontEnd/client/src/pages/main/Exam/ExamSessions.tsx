@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Modal, Textarea, Button, ScrollArea, SimpleGrid,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Modal, Textarea, Button, ScrollArea, SimpleGrid, Tooltip,
 } from '@mantine/core';
 import { useTranslation } from 'react-i18next';
 import examApi, { type ExamSession, type ExamRetakeGrant } from '@/services/examApi';
+import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
+import PageHeader from '@/components/PageHeader/PageHeader';
+import { ListPaginationBar } from '@/components/ListPagination';
+import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
 
 type SessionTag = NonNullable<ExamSession['session_tags']>[number];
 
@@ -16,10 +20,37 @@ const TAG_COLORS: Record<SessionTag, string> = {
   retake_session: 'violet',
   voided: 'gray',
 };
-import ButtonLight from '@/components/Button/ButtonLight/ButtonLight';
-import PageHeader from '@/components/PageHeader/PageHeader';
-import { ListPaginationBar } from '@/components/ListPagination';
-import { DEFAULT_PAGE_SIZE, pageToOffset } from '@/utils/pagination';
+
+function TruncatedBadge({
+  label,
+  color,
+  size = 'sm',
+}: {
+  label: string;
+  color: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+}) {
+  return (
+    <Tooltip label={label} withArrow multiline maw={280}>
+      <Badge
+        variant="light"
+        color={color}
+        size={size}
+        tt="none"
+        style={{
+          maxWidth: 100,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          display: 'inline-block',
+          verticalAlign: 'middle',
+        }}
+      >
+        {label}
+      </Badge>
+    </Tooltip>
+  );
+}
 
 const ExamSessions = () => {
   const { t } = useTranslation();
@@ -272,15 +303,12 @@ const ExamSessions = () => {
                       <Text size="sm" fw={500} lineClamp={1}>
                         {session.student_name || session.full_name || session.student_id}
                       </Text>
-                      {session.student_email && (
-                        <Text size="xs" c="dimmed" lineClamp={1} title={session.student_email}>
-                          {session.student_email}
-                        </Text>
-                      )}
                       {approvedGrant && (
-                        <Badge size="xs" color="orange" variant="light" mt={4}>
-                          {t('exam_retake.grant_pending')}
-                        </Badge>
+                        <TruncatedBadge
+                          size="xs"
+                          color="orange"
+                          label={t('exam_retake.grant_pending')}
+                        />
                       )}
                     </Table.Td>
                     <Table.Td>
@@ -288,10 +316,9 @@ const ExamSessions = () => {
                     </Table.Td>
                     <Table.Td>
                       {isVoided ? (
-                        <Badge color="gray">{t('exam_retake.session_voided')}</Badge>
+                        <TruncatedBadge color="gray" label={t('exam_retake.session_voided')} />
                       ) : (
-                        <Badge
-                          variant="light"
+                        <TruncatedBadge
                           color={
                             session.status === 'submitted'
                               ? 'green'
@@ -299,22 +326,19 @@ const ExamSessions = () => {
                                 ? 'orange'
                                 : 'gray'
                           }
-                        >
-                          {sessionStatusLabel(session.status)}
-                        </Badge>
+                          label={sessionStatusLabel(session.status)}
+                        />
                       )}
                     </Table.Td>
                     <Table.Td>
                       <Group gap={4} wrap="wrap">
                         {(session.session_tags ?? []).map((tag) => (
-                          <Badge
+                          <TruncatedBadge
                             key={tag}
                             size="xs"
-                            variant="light"
                             color={TAG_COLORS[tag]}
-                          >
-                            {tagLabel(tag)}
-                          </Badge>
+                            label={tagLabel(tag)}
+                          />
                         ))}
                         {(session.session_tags ?? []).length === 0 && (
                           <Text size="xs" c="dimmed">—</Text>
@@ -342,13 +366,23 @@ const ExamSessions = () => {
                     </Table.Td>
                     <Table.Td>
                       {!isVoided && (
-                        <Text
-                          size="sm"
-                          c={session.grading_status === 'pending_manual' ? 'yellow.8' : 'green.7'}
-                          fw={session.grading_status === 'pending_manual' ? 600 : 500}
+                        <Tooltip
+                          label={gradingStatusLabel(session.grading_status)}
+                          withArrow
+                          multiline
+                          maw={280}
+                          disabled={!session.grading_status}
                         >
-                          {gradingStatusLabel(session.grading_status)}
-                        </Text>
+                          <Text
+                            size="sm"
+                            c={session.grading_status === 'pending_manual' ? 'yellow.8' : 'green.7'}
+                            fw={session.grading_status === 'pending_manual' ? 600 : 500}
+                            lineClamp={1}
+                            style={{ cursor: 'default' }}
+                          >
+                            {gradingStatusLabel(session.grading_status)}
+                          </Text>
+                        </Tooltip>
                       )}
                     </Table.Td>
                     <Table.Td>
