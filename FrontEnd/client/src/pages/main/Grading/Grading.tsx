@@ -1,9 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider, ActionIcon,
+  Box, Text, Loader, Table, Badge, Paper, Group, Alert, Stack, Divider,
 } from '@mantine/core';
-import { IconChevronDown } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import examApi from '@/services/examApi';
 import type { GradingPayload } from '@/services/examApi';
@@ -168,7 +167,7 @@ const Grading = () => {
         {mcqQuestions.length > 0 && (
           <Paper withBorder radius="md" p="md">
             <Text fw={600} mb="sm">{t('grading.mcq_summary')}</Text>
-            <Table striped>
+            <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>#</Table.Th>
@@ -190,29 +189,29 @@ const Grading = () => {
 
                   return (
                     <Fragment key={detail.question_id}>
-                      <Table.Tr>
+                      <Table.Tr
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        onClick={() => toggleMcqQuestion(detail.question_id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleMcqQuestion(detail.question_id);
+                          }
+                        }}
+                        style={{
+                          cursor: 'pointer',
+                          background: isExpanded
+                            ? 'var(--mantine-color-gray-0)'
+                            : undefined,
+                        }}
+                      >
                         <Table.Td>{idx + 1}</Table.Td>
                         <Table.Td style={{ maxWidth: 320 }}>
-                          <Group gap={6} wrap="nowrap" align="flex-start">
-                            <ActionIcon
-                              variant="subtle"
-                              size="sm"
-                              color="gray"
-                              aria-label={isExpanded ? t('common.collapse') : t('common.expand')}
-                              onClick={() => toggleMcqQuestion(detail.question_id)}
-                              style={{
-                                transform: isExpanded ? 'rotate(180deg)' : undefined,
-                                transition: 'transform 150ms ease',
-                                flexShrink: 0,
-                                marginTop: 2,
-                              }}
-                            >
-                              <IconChevronDown size={14} />
-                            </ActionIcon>
-                            <Text size="sm" lineClamp={isExpanded ? undefined : 2} style={{ flex: 1 }}>
-                              {content}
-                            </Text>
-                          </Group>
+                          <Text size="sm" lineClamp={2}>
+                            {content}
+                          </Text>
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm">{submittedKey ?? '—'}</Text>
